@@ -427,55 +427,59 @@ export class StorageService {
       };
     }
 
+    const rawIuran = this.getIuran();
+    const rawPengeluaran = this.getPengeluaran();
+
+    // Format payload with both Title Case (for Sheet columns) and camelCase
+    const formattedIuran = rawIuran.map(item => ({
+      'Tahun': item.tahun,
+      'Bulan': item.bulan,
+      'ID Sekolah': item.idSekolah,
+      'Nama Sekolah': item.namaSekolah,
+      'Nominal': item.nominal,
+      'Tanggal Input': item.tanggalInput,
+      'Diinput Oleh': item.diinputOleh,
+      'No Kuitansi': item.noKuitansi,
+      tahun: item.tahun,
+      bulan: item.bulan,
+      idSekolah: item.idSekolah,
+      namaSekolah: item.namaSekolah,
+      nominal: item.nominal,
+      tanggalInput: item.tanggalInput,
+      diinputOleh: item.diinputOleh,
+      noKuitansi: item.noKuitansi,
+      id: item.id
+    }));
+
+    const formattedPengeluaran = rawPengeluaran.map(item => ({
+      'No': item.id,
+      'Tanggal Transaksi': item.tanggal,
+      'Alokasi Project / Kegiatan': item.project,
+      'Keterangan Tambahan': item.keterangan,
+      'Jumlah Nominal (Rp)': item.nominal,
+      'Diinput Oleh': item.diinputOleh,
+      id: item.id,
+      tanggal: item.tanggal,
+      project: item.project,
+      keterangan: item.keterangan,
+      nominal: item.nominal,
+      diinputOleh: item.diinputOleh
+    }));
+
+    const payload = {
+      action: 'syncAll',
+      spreadsheetId: this.getSpreadsheetId(),
+      sekolah: this.getSekolah(),
+      users: this.getUsers(),
+      iuran: formattedIuran,
+      pengeluaran: formattedPengeluaran
+    };
+
+    let data: any = null;
+    let syncSuccess = false;
+
+    // 1. Try Express Backend Proxy
     try {
-      const rawIuran = this.getIuran();
-      const rawPengeluaran = this.getPengeluaran();
-
-      // Format payload with both Title Case (for Sheet columns) and camelCase
-      const formattedIuran = rawIuran.map(item => ({
-        'Tahun': item.tahun,
-        'Bulan': item.bulan,
-        'ID Sekolah': item.idSekolah,
-        'Nama Sekolah': item.namaSekolah,
-        'Nominal': item.nominal,
-        'Tanggal Input': item.tanggalInput,
-        'Diinput Oleh': item.diinputOleh,
-        'No Kuitansi': item.noKuitansi,
-        tahun: item.tahun,
-        bulan: item.bulan,
-        idSekolah: item.idSekolah,
-        namaSekolah: item.namaSekolah,
-        nominal: item.nominal,
-        tanggalInput: item.tanggalInput,
-        diinputOleh: item.diinputOleh,
-        noKuitansi: item.noKuitansi,
-        id: item.id
-      }));
-
-      const formattedPengeluaran = rawPengeluaran.map(item => ({
-        'No': item.id,
-        'Tanggal Transaksi': item.tanggal,
-        'Alokasi Project / Kegiatan': item.project,
-        'Keterangan Tambahan': item.keterangan,
-        'Jumlah Nominal (Rp)': item.nominal,
-        'Diinput Oleh': item.diinputOleh,
-        id: item.id,
-        tanggal: item.tanggal,
-        project: item.project,
-        keterangan: item.keterangan,
-        nominal: item.nominal,
-        diinputOleh: item.diinputOleh
-      }));
-
-      const payload = {
-        action: 'syncAll',
-        spreadsheetId: this.getSpreadsheetId(),
-        sekolah: this.getSekolah(),
-        users: this.getUsers(),
-        iuran: formattedIuran,
-        pengeluaran: formattedPengeluaran
-      };
-
       const res = await fetch('/api/proxy-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -486,28 +490,68 @@ export class StorageService {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'error') {
-          return {
-            lastSynced: null,
-            status: 'error',
-            message: `Apps Script Error: ${data.message || 'Gagal menyimpan ke Sheet'}`
-          };
+        const text = await res.text();
+        if (text && !text.startsWith('<!DOCTYPE html')) {
+          try {
+            data = JSON.parse(text);
+            syncSuccess = true;
+          } catch {
+            // Not valid JSON
+          }
         }
+      }
+    } catch {
+      // Proxy failed or not available on static host
+    }
+
+    // 2. Direct client-side fetch fallback for static hosting (Netlify, Vercel, GitHub Pages)
+    if (!syncSuccess || !data) {
+      try {
+        const directRes = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          redirect: 'follow'
+        });
+
+        const text = await directRes.text();
+        try {
+          data = JSON.parse(text);
+          syncSuccess = true;
+        } catch {
+          if (text.includes('<!DOCTYPE html') || text.includes('<html')) {
+            return {
+              lastSynced: null,
+              status: 'error',
+              message: "Google Apps Script menolak akses. Pastikan saat Deploy -> New Deployment di Apps Script, 'Who has access' diatur ke 'Anyone' (Siapa Saja)."
+            };
+          }
+          // Accept 200 text response as successful trigger
+          data = { status: 'success' };
+          syncSuccess = true;
+        }
+      } catch (directErr: any) {
         return {
-          lastSynced: new Date().toLocaleTimeString('id-ID'),
-          status: 'connected',
-          message: 'Berhasil terhubung & sinkronisasi dengan Google Spreadsheet ID ' + this.getSpreadsheetId()
+          lastSynced: null,
+          status: 'error',
+          message: directErr.message || 'Gagal terhubung ke Google Apps Script. Pastikan Web App URL valid.'
         };
       }
-      throw new Error('Gagal menghubungi proxy backend');
-    } catch (err: any) {
+    }
+
+    if (data && data.status === 'error') {
       return {
         lastSynced: null,
         status: 'error',
-        message: err.message || 'Gagal terhubung ke Google Apps Script. Pastikan Web App URL valid.'
+        message: `Apps Script Error: ${data.message || 'Gagal menyimpan ke Sheet'}`
       };
     }
+
+    return {
+      lastSynced: new Date().toLocaleTimeString('id-ID'),
+      status: 'connected',
+      message: 'Berhasil terhubung & sinkronisasi dengan Google Spreadsheet ID ' + this.getSpreadsheetId()
+    };
   }
 
   // Fetch Data from Apps Script
@@ -515,20 +559,58 @@ export class StorageService {
     const url = this.getAppsScriptUrl();
     if (!url) return false;
 
+    let data: any = null;
+    let fetchSuccess = false;
+
+    // 1. Try Express Backend Proxy
     try {
       const fetchUrl = `/api/proxy-sheet?scriptUrl=${encodeURIComponent(url)}&action=getData&spreadsheetId=${encodeURIComponent(this.getSpreadsheetId())}`;
       const res = await fetch(fetchUrl);
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.sekolah) && data.sekolah.length > 0) this.saveSekolah(data.sekolah);
-        if (Array.isArray(data.users) && data.users.length > 0) this.saveUsers(data.users);
-        if (Array.isArray(data.iuran)) this.saveIuran(data.iuran, false);
-        if (Array.isArray(data.pengeluaran)) this.savePengeluaran(data.pengeluaran, false);
-        return true;
+        const text = await res.text();
+        if (text && !text.startsWith('<!DOCTYPE html')) {
+          try {
+            data = JSON.parse(text);
+            fetchSuccess = true;
+          } catch {
+            // ignore non-json
+          }
+        }
       }
-    } catch (err) {
-      console.warn('Apps Script fetch failed:', err);
+    } catch {
+      // ignore
     }
+
+    // 2. Direct client-side fetch fallback for static hosting
+    if (!fetchSuccess || !data) {
+      try {
+        const targetUrl = new URL(url);
+        targetUrl.searchParams.set('action', 'getData');
+        targetUrl.searchParams.set('spreadsheetId', this.getSpreadsheetId());
+
+        const directRes = await fetch(targetUrl.toString(), {
+          method: 'GET',
+          redirect: 'follow'
+        });
+
+        if (directRes.ok) {
+          const text = await directRes.text();
+          data = JSON.parse(text);
+          fetchSuccess = true;
+        }
+      } catch (err) {
+        console.warn('Apps Script direct fetch failed:', err);
+      }
+    }
+
+    if (fetchSuccess && data) {
+      if (Array.isArray(data.sekolah) && data.sekolah.length > 0) this.saveSekolah(data.sekolah);
+      if (Array.isArray(data.users) && data.users.length > 0) this.saveUsers(data.users);
+      if (Array.isArray(data.iuran)) this.saveIuran(data.iuran, false);
+      if (Array.isArray(data.pengeluaran)) this.savePengeluaran(data.pengeluaran, false);
+      return true;
+    }
+
     return false;
   }
 }
