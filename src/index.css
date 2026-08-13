@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-kuitansi, #printable-kuitansi * {
+    visibility: visible;
+  }
+  #printable-kuitansi {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 16px;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
