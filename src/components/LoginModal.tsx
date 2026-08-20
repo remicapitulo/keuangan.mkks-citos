@@ -38,79 +38,74 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    const inputUsernameClean = (usernameInput || '').trim().toLowerCase();
+    const inputUsernameClean = (usernameInput || '').trim();
+    const inputPasswordClean = (passwordInput || '').trim();
+
     if (!inputUsernameClean) {
       setErrorMsg('Masukkan username terlebih dahulu.');
       return;
     }
 
+    if (!inputPasswordClean) {
+      setErrorMsg('Masukkan password terlebih dahulu.');
+      return;
+    }
+
+    setIsSyncing(true);
+
     // 1. Try to find in current users list
     let currentUsers = users.length > 0 ? users : StorageService.getUsers();
     let match = currentUsers.find(
-      u => (u.username || '').toLowerCase() === inputUsernameClean
+      u => (u.username || '').trim().toLowerCase() === inputUsernameClean.toLowerCase()
     );
 
-    // 2. If not found in current users, attempt fetch from Google Apps Script
+    // 2. If not found in current users list, try to fetch the latest from Google Apps Script / Database
     if (!match) {
-      setIsSyncing(true);
       await StorageService.fetchFromAppsScript();
-      setIsSyncing(false);
       currentUsers = StorageService.getUsers();
       match = currentUsers.find(
-        u => (u.username || '').toLowerCase() === inputUsernameClean
+        u => (u.username || '').trim().toLowerCase() === inputUsernameClean.toLowerCase()
       );
     }
 
-    // 3. If still not found, dynamically match against sekolahList or create dynamic user
+    setIsSyncing(false);
+
+    // 3. Strict validation: If user is not found in database, reject immediately
     if (!match) {
-      const schoolMatch = sekolahList.find(s => 
-        s.namaSekolah.toLowerCase().includes(inputUsernameClean) || 
-        inputUsernameClean.includes(s.namaSekolah.toLowerCase().trim())
-      );
-
-      const isAdminRole = inputUsernameClean === 'admin' || inputUsernameClean.includes('admin');
-      const isBendaharaRole = ['neng', 'bendahara', 'pengurus'].some(k => inputUsernameClean.includes(k));
-
-      const newUser: User = {
-        username: inputUsernameClean,
-        password: passwordInput.trim() || '123',
-        role: isAdminRole ? 'Admin' : (isBendaharaRole ? 'Bendahara' : 'Sekolah'),
-        sekolah: schoolMatch ? schoolMatch.namaSekolah : (isAdminRole ? 'Pengurus Admin MKKS' : (isBendaharaRole ? 'Pengurus Bendahara MKKS' : inputUsernameClean.toUpperCase())),
-        aktif: 'Ya',
-        namaKepsek: schoolMatch ? schoolMatch.namaKepsek : (isAdminRole ? 'Administrator System' : (isBendaharaRole ? 'Bendahara MKKS' : `Kepala Sekolah (${usernameInput.trim()})`))
-      };
-
-      const updatedUsers = [...currentUsers, newUser];
-      StorageService.saveUsers(updatedUsers);
-      match = newUser;
+      setErrorMsg('Username tidak terdaftar dalam database. Pastikan username sesuai dengan database.');
+      return;
     }
 
-    if (match) {
-      // Ensure Admin role is set if username is admin
-      if (inputUsernameClean === 'admin' || inputUsernameClean.includes('admin')) {
+    // 4. Strict validation: Compare password with database
+    const storedPassword = String(match.password || '').trim();
+    if (storedPassword !== inputPasswordClean) {
+      setErrorMsg('Password salah. Pastikan password sesuai dengan database.');
+      return;
+    }
+
+    // 5. Check if user is active
+    if (match.aktif && match.aktif.toString().trim().toLowerCase() === 'tidak') {
+      setErrorMsg('Akun ini sedang dinonaktifkan. Hubungi Administrator.');
+      return;
+    }
+
+    // 6. Enrich with sekolahList details if role is Sekolah
+    if (match.role === 'Sekolah' && match.sekolah) {
+      const schoolInList = sekolahList.find(s => 
+        s.namaSekolah.toLowerCase().trim() === match!.sekolah.toLowerCase().trim() ||
+        (match!.sekolah && s.namaSekolah.toLowerCase().trim().includes(match!.sekolah.toLowerCase().trim()))
+      );
+      if (schoolInList && schoolInList.namaKepsek) {
         match = {
           ...match,
-          role: 'Admin'
+          sekolah: schoolInList.namaSekolah,
+          namaKepsek: schoolInList.namaKepsek
         };
       }
-
-      // Enrich with sekolahList's namaKepsek ONLY for Sekolah role
-      if (match.role === 'Sekolah' && match.sekolah) {
-        const schoolInList = sekolahList.find(s => 
-          s.namaSekolah.toLowerCase().trim() === match!.sekolah.toLowerCase().trim()
-        );
-        if (schoolInList && schoolInList.namaKepsek) {
-          match = {
-            ...match,
-            sekolah: schoolInList.namaSekolah,
-            namaKepsek: schoolInList.namaKepsek
-          };
-        }
-      }
-
-      onSelectUser(match);
-      onClose();
     }
+
+    onSelectUser(match);
+    onClose();
   };
 
   return (
