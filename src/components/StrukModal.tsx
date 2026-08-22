@@ -1,7 +1,8 @@
-import React from 'react';
-import { formatRupiah, terbilang, formatDateIndonesian } from '../utils/formatters';
-import { Printer, CheckCircle2, X, Download, ShieldCheck, Building2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { formatRupiah, terbilang, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { Printer, CheckCircle2, X, Download, ShieldCheck, Building2, QrCode, Search } from 'lucide-react';
 import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 
 interface StrukModalProps {
   isOpen: boolean;
@@ -17,13 +18,46 @@ interface StrukModalProps {
     totalNominal: number;
     diinputOleh: string;
   } | null;
+  onOpenValidasiModal?: (data: any) => void;
 }
 
 export const StrukModal: React.FC<StrukModalProps> = ({
   isOpen,
   onClose,
-  data
+  data,
+  onOpenValidasiModal
 }) => {
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+
+  const bendaharaFullName = data ? resolveNamaBendahara(data.diinputOleh) : 'H. Nurhasan, M.Pd';
+
+  // Generate QR Code data URL when data is present
+  useEffect(() => {
+    if (!data) {
+      setQrCodeUrl('');
+      return;
+    }
+
+    const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const appPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+    
+    // Construct the verification URL that when scanned opens the validasi modal
+    const verifyUrl = `${appOrigin}${appPath}?verify=${encodeURIComponent(data.noKuitansi)}&sekolah=${encodeURIComponent(data.namaSekolah)}&bulan=${encodeURIComponent(data.bulanList.join(','))}&tahun=${data.tahunBuku}&nominal=${data.totalNominal}&tgl=${encodeURIComponent(data.tanggal)}&petugas=${encodeURIComponent(bendaharaFullName)}`;
+
+    QRCode.toDataURL(verifyUrl, {
+      width: 256,
+      margin: 1,
+      color: {
+        dark: '#042f2e',
+        light: '#ffffff'
+      }
+    }).then(url => {
+      setQrCodeUrl(url);
+    }).catch(err => {
+      console.error('Failed to generate QR Code:', err);
+    });
+  }, [data, bendaharaFullName]);
+
   if (!isOpen || !data) return null;
 
   const handlePrint = () => {
@@ -149,31 +183,54 @@ export const StrukModal: React.FC<StrukModalProps> = ({
     // Reset text color
     doc.setTextColor(30, 41, 59);
 
-    y += 18;
-    // Signature Block
-    const sigX = 88;
+    y += 16;
+
+    // QR Code & Barcode Validation on Left side, Signature on Right side
+    if (qrCodeUrl) {
+      try {
+        doc.addImage(qrCodeUrl, 'PNG', marginLeft, y, 24, 24);
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(13, 148, 136);
+        doc.text('BARCODE VALIDASI RESMI', marginLeft + 26, y + 6);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text('Scan untuk cek keaslian', marginLeft + 26, y + 10);
+        doc.text('Kuitansi Sah MKKS Citos', marginLeft + 26, y + 14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        doc.text(`ID: ${(data.noKuitansi || 'KWT').replace(/[^A-Za-z0-9]/g, '')}`, marginLeft + 26, y + 19);
+      } catch (e) {
+        console.error('Error adding QR to PDF', e);
+      }
+    }
+
+    // Signature Block on Right
+    const sigX = 92;
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Depok, ${formatDateIndonesian(data.tanggal)}`, sigX, y);
-    doc.text('Bendahara MKKS Citos,', sigX, y + 4.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`Depok, ${formatDateIndonesian(data.tanggal)}`, sigX, y + 2);
+    doc.text('Bendahara MKKS Citos,', sigX, y + 6.5);
 
-    y += 20;
     doc.setFont('helvetica', 'bold');
-    doc.text(data.diinputOleh, sigX, y);
+    doc.text(bendaharaFullName, sigX, y + 22);
 
     const safeSekolah = (data.namaSekolah || 'Sekolah').replace(/\s+/g, '_');
     const safeKuitansi = (data.noKuitansi || 'KWT').replace(/\//g, '_');
     doc.save(`Kuitansi_MKKS_${safeSekolah}_${safeKuitansi}.pdf`);
   };
 
+  const validationCode = `MKKS-CITOS-${data.tahunBuku}-${(data.noKuitansi || 'KWT').replace(/[^A-Za-z0-9]/g, '')}`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-4 sm:p-6 relative animate-in fade-in zoom-in duration-200 my-auto max-h-[92vh] flex flex-col justify-between overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-4 sm:p-6 relative animate-in fade-in zoom-in duration-200 my-auto max-h-[95vh] flex flex-col justify-between overflow-y-auto">
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-3.5 right-3.5 z-10 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+          className="absolute top-3.5 right-3.5 z-10 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
           title="Tutup Modal"
         >
           <X className="w-5 h-5" />
@@ -181,13 +238,25 @@ export const StrukModal: React.FC<StrukModalProps> = ({
 
         <div>
           {/* Success Alert Banner */}
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl mb-4 flex items-center space-x-2.5 text-xs font-semibold shadow-sm">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>Pembukuan Iuran Berhasil Disimpan Ke Dalam Database MKKS Citos!</span>
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl mb-3 flex items-center justify-between text-xs font-semibold shadow-sm gap-2">
+            <div className="flex items-center space-x-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>Pembukuan Iuran Terdaftar di Database MKKS Citos!</span>
+            </div>
+            {onOpenValidasiModal && (
+              <button
+                type="button"
+                onClick={() => onOpenValidasiModal(data)}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] px-2.5 py-1 rounded-lg shrink-0 font-bold flex items-center space-x-1 cursor-pointer transition-colors shadow-xs"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Cek Asli</span>
+              </button>
+            )}
           </div>
 
           {/* Printable Receipt Paper Card */}
-          <div id="printable-kuitansi" className="bg-slate-50/90 p-4 sm:p-6 rounded-2xl border-2 border-dashed border-teal-300 space-y-4 shadow-inner">
+          <div id="printable-kuitansi" className="bg-slate-50/90 p-4 sm:p-6 rounded-2xl border-2 border-dashed border-teal-400 space-y-4 shadow-inner relative">
             
             {/* Kop / Header Kuitansi */}
             <div className="text-center border-b-2 border-slate-200 pb-3">
@@ -246,20 +315,46 @@ export const StrukModal: React.FC<StrukModalProps> = ({
               </div>
             </div>
 
-            {/* Digital Stamp & Signature Footer */}
-            <div className="pt-2 flex items-end justify-between text-xs">
-              <div className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-800 px-2.5 py-1.5 rounded-xl border border-emerald-200 text-[10px] font-bold">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Valid Stempel Digital</span>
+            {/* Official Digital Barcode & QR Code Section */}
+            <div className="pt-2 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              
+              {/* QR & Barcode Container */}
+              <div className="bg-white p-2.5 rounded-xl border border-teal-200 shadow-xs flex items-center space-x-2.5">
+                {qrCodeUrl ? (
+                  <img 
+                    src={qrCodeUrl} 
+                    alt="Barcode Validasi MKKS Citos" 
+                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-lg border border-slate-200 shrink-0" 
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
+                    <QrCode className="w-8 h-8" />
+                  </div>
+                )}
+
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center space-x-1 text-emerald-800 font-extrabold text-[10px]">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span className="truncate">VALIDASI RESMI</span>
+                  </div>
+                  <p className="text-[9px] text-slate-500 leading-tight">
+                    Pindai QR / Barcode ini untuk cek keaslian kuitansi sah MKKS Citos.
+                  </p>
+                  <div className="font-mono text-[8px] font-bold text-slate-600 bg-slate-100 px-1 py-0.5 rounded truncate">
+                    {validationCode}
+                  </div>
+                </div>
               </div>
 
-              <div className="text-right">
+              {/* Signature Block */}
+              <div className="text-right text-xs">
                 <div className="text-[10px] text-slate-500">Depok, {formatDateIndonesian(data.tanggal)}</div>
-                <div className="text-xs font-black text-slate-800 mt-4 underline decoration-teal-500 decoration-2 underline-offset-2">
-                  {data.diinputOleh}
+                <div className="text-xs font-black text-slate-800 mt-3.5 underline decoration-teal-500 decoration-2 underline-offset-2">
+                  {bendaharaFullName}
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium">Bendahara MKKS Citos</div>
               </div>
+
             </div>
 
           </div>
@@ -269,14 +364,14 @@ export const StrukModal: React.FC<StrukModalProps> = ({
         <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button
             onClick={onClose}
-            className="w-full order-3 sm:order-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1"
+            className="w-full order-3 sm:order-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1 cursor-pointer"
           >
             <span>Tutup</span>
           </button>
 
           <button
             onClick={handleDownloadPDF}
-            className="w-full order-1 sm:order-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5 shadow-sm"
+            className="w-full order-1 sm:order-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5 shadow-sm cursor-pointer"
           >
             <Download className="w-4 h-4 shrink-0" />
             <span>Download PDF</span>
@@ -284,10 +379,10 @@ export const StrukModal: React.FC<StrukModalProps> = ({
 
           <button
             onClick={handlePrint}
-            className="w-full order-2 sm:order-3 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5 shadow-sm"
+            className="w-full order-2 sm:order-3 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5 shadow-sm cursor-pointer"
           >
             <Printer className="w-4 h-4 shrink-0" />
-            <span>Cetak Struk</span>
+            <span>Cetak Kuitansi</span>
           </button>
         </div>
 

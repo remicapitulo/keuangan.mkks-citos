@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sekolah, Iuran, BULAN_LIST, IURAN_PER_BULAN, PaketDurasi, User } from '../types';
-import { formatRupiah, formatDateIndonesian } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
 import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2 } from 'lucide-react';
 
 interface InputIuranProps {
@@ -122,7 +122,11 @@ export const InputIuran: React.FC<InputIuranProps> = ({
     const noKuitansi = `KWT/MKKS-CITOS/${tahunBuku}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${timestamp.toString().slice(-4)}`;
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const currentBendaharaName = currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS';
+    const currentBendaharaName = resolveNamaBendahara(
+      currentUser?.namaKepsek || currentUser?.username,
+      undefined,
+      sekolahList
+    );
 
     // Build new iuran records
     const newItems = selectedMonths.map(bulan => ({
@@ -443,7 +447,7 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-slate-200/50 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">Oleh: {item.diinputOleh}</span>
+                      <span className="text-[10px] text-slate-400">Oleh: {resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)}</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -457,7 +461,7 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                             tahunBuku: item.tahun,
                             bulanList: [item.bulan],
                             totalNominal: item.nominal,
-                            diinputOleh: currentUser?.namaKepsek || currentUser?.username || item.diinputOleh || 'Bendahara MKKS'
+                            diinputOleh: resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)
                           });
                         }}
                         className="text-teal-600 hover:text-teal-800 font-bold text-[10px] flex items-center space-x-1"

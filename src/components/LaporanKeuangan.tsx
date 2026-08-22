@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sekolah, Iuran, Pengeluaran, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
-import { formatRupiah, formatDateIndonesian } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
 import { exportToExcel, exportToPDF } from '../services/exportUtils';
 import { 
   FileSpreadsheet, 
@@ -591,7 +591,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <span>Bulan: <strong className="text-emerald-800">{i.bulan}</strong> ({i.tahun})</span>
                     <span>{formatDateIndonesian(i.tanggalInput)}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 text-right">Diinput: {i.diinputOleh}</div>
+                  <div className="text-[10px] text-slate-400 text-right">Diinput: {resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</div>
                 </div>
               ))
             )}
@@ -620,7 +620,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <td className="py-3 px-3 text-slate-600">{formatDateIndonesian(i.tanggalInput)}</td>
                     <td className="py-3 px-4 font-bold text-slate-900">{i.namaSekolah}</td>
                     <td className="py-3 px-3 text-right font-black text-emerald-600">{formatRupiah(i.nominal)}</td>
-                    <td className="py-3 px-3 text-center text-slate-500 text-[11px]">{i.diinputOleh}</td>
+                    <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -668,7 +668,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   <p className="text-[11px] text-slate-600">{p.keterangan}</p>
                   <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-rose-200/50">
                     <span>Tgl: {formatDateIndonesian(p.tanggal)}</span>
-                    <span>Diinput: {p.diinputOleh}</span>
+                    <span>Diinput: {resolveNamaBendahara(p.diinputOleh, undefined, sekolahList)}</span>
                   </div>
                 </div>
               ))
@@ -696,7 +696,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <td className="py-3 px-4 font-bold text-slate-900">{p.project}</td>
                     <td className="py-3 px-4 text-slate-600 max-w-sm">{p.keterangan}</td>
                     <td className="py-3 px-3 text-right font-black text-rose-600 whitespace-nowrap">{formatRupiah(p.nominal)}</td>
-                    <td className="py-3 px-3 text-center text-slate-500 text-[11px]">{p.diinputOleh}</td>
+                    <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(p.diinputOleh, undefined, sekolahList)}</td>
                   </tr>
                 ))}
               </tbody>

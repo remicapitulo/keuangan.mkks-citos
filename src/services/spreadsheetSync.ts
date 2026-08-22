@@ -135,13 +135,37 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
     }
     let sekolah = String(u.sekolah || u.Sekolah || u['Nama Sekolah'] || u.namaSekolah || '').trim();
     const aktif = u.aktif !== undefined ? u.aktif : (u.Aktif !== undefined ? u.Aktif : 'Ya');
-    let namaKepsek = String(u.namaKepsek || u['Nama Kepsek'] || u['Kepala Sekolah'] || '').trim();
+    let namaKepsek = String(
+      u.namaKepsek || u['Nama Kepsek'] || u['Nama Kepala Sekolah'] || u['Kepala Sekolah'] ||
+      u['nama_kepsek'] || u['Nama Lengkap'] || u['namaLengkap'] || u['Nama Petugas'] || ''
+    ).trim();
+
+    if (!namaKepsek || namaKepsek.toLowerCase() === username.toLowerCase()) {
+      if (username.toLowerCase() === 'neng') {
+        namaKepsek = 'Hj. Neng Nurhasanah, M.Pd';
+      } else if (username.toLowerCase() === 'bendahara') {
+        namaKepsek = 'H. Nurhasan, M.Pd';
+      } else if (username.toLowerCase() === 'admin') {
+        namaKepsek = 'Administrator MKKS Citos';
+      }
+    }
 
     if (!sekolah && role === 'Sekolah') {
       const match = sekolahList.find(s => s.namaSekolah.toLowerCase().includes(username.toLowerCase()));
       if (match) {
         sekolah = match.namaSekolah;
         if (!namaKepsek) namaKepsek = match.namaKepsek;
+      }
+    }
+
+    if (!namaKepsek && sekolah) {
+      const match = sekolahList.find(s => 
+        s.namaSekolah.toLowerCase().trim() === sekolah.toLowerCase().trim() ||
+        s.namaSekolah.toLowerCase().includes(sekolah.toLowerCase().trim()) ||
+        sekolah.toLowerCase().includes(s.namaSekolah.toLowerCase().trim())
+      );
+      if (match && match.namaKepsek) {
+        namaKepsek = match.namaKepsek;
       }
     }
 

@@ -10,6 +10,7 @@ import { LaporanKeuangan } from './components/LaporanKeuangan';
 import { StrukModal } from './components/StrukModal';
 import { SpreadsheetModal } from './components/SpreadsheetModal';
 import { LoginModal } from './components/LoginModal';
+import { ValidasiKuitansiModal, ValidasiData } from './components/ValidasiKuitansiModal';
 import { CheckCircle2, ShieldAlert, Lock, UserCheck } from 'lucide-react';
 
 export default function App() {
@@ -29,10 +30,14 @@ export default function App() {
   const [isStrukModalOpen, setIsStrukModalOpen] = useState<boolean>(false);
   const [strukData, setStrukData] = useState<any>(null);
 
+  // Digital Validation Modal state (for Barcode / QR Code scan)
+  const [isValidasiModalOpen, setIsValidasiModalOpen] = useState<boolean>(false);
+  const [validasiData, setValidasiData] = useState<ValidasiData | null>(null);
+
   const [selectedSchoolForIuran, setSelectedSchoolForIuran] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Sync background fetch on load
+  // Sync background fetch on load & check URL for scanned QR code verification
   useEffect(() => {
     // Re-verify normalized local storage data on mount
     setSekolahList(StorageService.getSekolah());
@@ -48,6 +53,33 @@ export default function App() {
         setPengeluaranList(StorageService.getPengeluaran());
       }
     });
+
+    // Check if user arrived via scanned QR Code or Barcode verification URL (?verify=...)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const verifyNo = urlParams.get('verify') || urlParams.get('kuitansi');
+      if (verifyNo) {
+        const sekolahParam = urlParams.get('sekolah') || 'Sekolah Anggota MKKS';
+        const bulanParam = urlParams.get('bulan') ? urlParams.get('bulan')!.split(',') : ['Januari'];
+        const tahunParam = Number(urlParams.get('tahun')) || new Date().getFullYear();
+        const nominalParam = Number(urlParams.get('nominal')) || 100000;
+        const tglParam = urlParams.get('tgl') || new Date().toISOString().split('T')[0];
+        const petugasParam = urlParams.get('petugas') || 'Bendahara MKKS Citos';
+
+        setValidasiData({
+          noKuitansi: verifyNo,
+          namaSekolah: sekolahParam,
+          tahunBuku: tahunParam,
+          bulanList: bulanParam,
+          totalNominal: nominalParam,
+          tanggal: tglParam,
+          diinputOleh: petugasParam
+        });
+        setIsValidasiModalOpen(true);
+      }
+    } catch (e) {
+      console.error('Error parsing QR validation URL parameter', e);
+    }
   }, []);
 
   const showToast = (msg: string) => {
@@ -109,6 +141,12 @@ export default function App() {
   const handleOpenStrukModal = (kuitansiData: any) => {
     setStrukData(kuitansiData);
     setIsStrukModalOpen(true);
+  };
+
+  // Open Validasi Modal
+  const handleOpenValidasiModal = (data: any) => {
+    setValidasiData(data);
+    setIsValidasiModalOpen(true);
   };
 
   // Switch Logged-in User
@@ -214,6 +252,7 @@ export default function App() {
                   pengeluaranList={pengeluaranList}
                   onNavigateToTab={(tab) => setActiveTab(tab)}
                   onSelectSchoolForIuran={(namaSekolah) => setSelectedSchoolForIuran(namaSekolah)}
+                  onOpenStrukModal={handleOpenStrukModal}
                 />
               )}
 
@@ -257,7 +296,7 @@ export default function App() {
                   </p>
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className="mt-4 px-5 py-2 bg-teal-600 text-white font-bold text-xs rounded-xl shadow-md"
+                    className="mt-4 px-5 py-2 bg-teal-600 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
                   >
                     Kembali ke Dashboard
                   </button>
@@ -273,6 +312,17 @@ export default function App() {
         isOpen={isStrukModalOpen}
         onClose={() => setIsStrukModalOpen(false)}
         data={strukData}
+        onOpenValidasiModal={handleOpenValidasiModal}
+      />
+
+      <ValidasiKuitansiModal
+        isOpen={isValidasiModalOpen}
+        onClose={() => setIsValidasiModalOpen(false)}
+        data={validasiData}
+        onPrintStruk={(data) => {
+          setStrukData(data);
+          setIsStrukModalOpen(true);
+        }}
       />
 
       <SpreadsheetModal
@@ -300,7 +350,7 @@ export default function App() {
           </p>
           <div className="flex items-center justify-center space-x-3 text-xs text-slate-500 flex-wrap gap-y-1">
             <span className="font-semibold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-              Versi Aplikasi 2.1.0
+              Versi Aplikasi 2.2.0
             </span>
             <span>•</span>
             <span>Tahun Terbit: <strong>2026</strong></span>
@@ -318,4 +368,3 @@ export default function App() {
     </div>
   );
 }
-

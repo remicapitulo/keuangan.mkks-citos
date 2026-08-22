@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pengeluaran, User } from '../types';
-import { formatRupiah, formatDateIndonesian } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
 import { Receipt, PlusCircle, Calendar, FileText, TrendingDown, Tag, AlertCircle } from 'lucide-react';
 
 interface KelolaPengeluaranProps {
@@ -51,7 +51,7 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
       return;
     }
 
-    const currentBendaharaName = currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS';
+    const currentBendaharaName = resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username);
 
     onSavePengeluaran({
       tanggal,

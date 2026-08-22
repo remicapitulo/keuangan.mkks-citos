@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Sekolah, Iuran, Pengeluaran, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
-import { formatRupiah, formatDateIndonesian } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
 
 export function exportToExcel(
   tahun: number,
@@ -54,7 +54,7 @@ export function exportToExcel(
     'Tanggal Pembayaran': i.tanggalInput,
     'Nama Instansi': i.namaSekolah,
     'Jumlah Nominal (Rp)': i.nominal,
-    'Diinput Oleh': i.diinputOleh,
+    'Diinput Oleh': resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
     'No. Kuitansi': i.noKuitansi || '-'
   }));
 
@@ -81,7 +81,7 @@ export function exportToExcel(
     'Alokasi Project / Kegiatan': p.project,
     'Keterangan Tambahan': p.keterangan,
     'Jumlah Nominal (Rp)': p.nominal,
-    'Diinput Oleh': p.diinputOleh
+    'Diinput Oleh': resolveNamaBendahara(p.diinputOleh, undefined, sekolahList)
   }));
 
   const totalKasKeluar = pengeluaranTahunThis.reduce((acc, curr) => acc + curr.nominal, 0);
@@ -194,7 +194,7 @@ export function exportToPDF(
     formatDateIndonesian(i.tanggalInput),
     i.namaSekolah,
     formatRupiah(i.nominal),
-    i.diinputOleh
+    resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
   ]);
 
   const totalKasMasuk = iuranTahunThis.reduce((acc, curr) => acc + curr.nominal, 0);
@@ -239,7 +239,7 @@ export function exportToPDF(
     p.project,
     p.keterangan,
     formatRupiah(p.nominal),
-    p.diinputOleh
+    resolveNamaBendahara(p.diinputOleh, undefined, sekolahList)
   ]);
 
   const totalKasKeluar = pengeluaranTahunThis.reduce((acc, curr) => acc + curr.nominal, 0);
@@ -271,45 +271,7 @@ export function exportToPDF(
     signatureY = 25;
   }
 
-  let bendaharaName = 'Bendahara MKKS';
-
-  if (currentUser) {
-    const userSekolah = (currentUser.sekolah || '').toLowerCase().trim();
-    const userName = (currentUser.username || '').toLowerCase().trim();
-
-    // 1. Search in sekolahList (sheet "sekolah") for matching school name
-    let matchedSekolah = sekolahList.find(s => 
-      userSekolah && (
-        s.namaSekolah.toLowerCase().trim() === userSekolah ||
-        s.namaSekolah.toLowerCase().includes(userSekolah) ||
-        userSekolah.includes(s.namaSekolah.toLowerCase().trim())
-      )
-    );
-
-    // 2. If not found, search in sekolahList by kepsek name or bendahara keyword
-    if (!matchedSekolah) {
-      matchedSekolah = sekolahList.find(s =>
-        (s.namaKepsek && userName && s.namaKepsek.toLowerCase().includes(userName)) ||
-        (s.namaKepsek && s.namaKepsek.toLowerCase().includes('bendahara'))
-      );
-    }
-
-    if (matchedSekolah && matchedSekolah.namaKepsek && matchedSekolah.namaKepsek.trim()) {
-      bendaharaName = matchedSekolah.namaKepsek.trim();
-    } else if (currentUser.namaKepsek && currentUser.namaKepsek.trim()) {
-      bendaharaName = currentUser.namaKepsek.trim();
-    } else if (currentUser.username) {
-      bendaharaName = currentUser.username;
-    }
-  } else {
-    // Fallback if no currentUser logged in: search sekolahList for kepsek containing bendahara
-    const bendaharaSekolah = sekolahList.find(s => 
-      s.namaKepsek && s.namaKepsek.toLowerCase().includes('bendahara')
-    );
-    if (bendaharaSekolah && bendaharaSekolah.namaKepsek) {
-      bendaharaName = bendaharaSekolah.namaKepsek.trim();
-    }
-  }
+  const bendaharaName = resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList);
 
   const printDate = formatDateIndonesian(new Date().toISOString().split('T')[0]);
 

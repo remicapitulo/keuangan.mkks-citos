@@ -10,7 +10,7 @@ export const INITIAL_USER: User[] = [
     role: 'Admin',
     sekolah: 'Pengurus Admin MKKS Citos',
     aktif: 'Ya',
-    namaKepsek: 'Administrator System'
+    namaKepsek: 'Administrator MKKS Citos'
   },
   {
     username: 'bendahara',
@@ -18,7 +18,7 @@ export const INITIAL_USER: User[] = [
     role: 'Bendahara',
     sekolah: 'Pengurus MKKS Citos',
     aktif: 'Ya',
-    namaKepsek: 'H. Nurhasan, M.Pd (Bendahara MKKS)'
+    namaKepsek: 'H. Nurhasan, M.Pd'
   },
   {
     username: 'neng',
@@ -26,7 +26,7 @@ export const INITIAL_USER: User[] = [
     role: 'Bendahara',
     sekolah: 'Pengurus MKKS Citos',
     aktif: 'Ya',
-    namaKepsek: 'Neng (Bendahara MKKS)'
+    namaKepsek: 'Hj. Neng Nurhasanah, M.Pd'
   }
 ];
 
