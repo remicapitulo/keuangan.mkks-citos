@@ -345,12 +345,12 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs sm:text-sm text-slate-500 mt-12">
         <div className="max-w-[1700px] mx-auto px-4 space-y-2">
-          <p className="font-bold text-slate-800 text-sm sm:text-base">
-            Aplikasi Laporan Keuangan & Iuran MKKS Kecamatan Cimanggis & Tapos (MKKS CITOS)
+          <p className="font-extrabold text-slate-800 text-sm sm:text-base tracking-tight">
+            Sistem Keuangan MKKS Citos
           </p>
           <div className="flex items-center justify-center space-x-3 text-xs text-slate-500 flex-wrap gap-y-1">
             <span className="font-semibold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
-              Versi Aplikasi 2.2.0
+              Versi 2.2.0
             </span>
             <span>•</span>
             <span>Tahun Terbit: <strong>2026</strong></span>

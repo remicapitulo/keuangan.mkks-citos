@@ -534,21 +534,37 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
               {/* Table Footer Summary Row */}
               <tfoot>
-                <tr className="bg-slate-800 text-white font-bold text-xs">
-                  <td colSpan={2} className="py-3 px-3 text-left rounded-bl-xl">TOTAL KAS MASUK:</td>
+                <tr className="bg-slate-900 text-white font-bold text-xs border-t-2 border-teal-500 shadow-inner">
+                  <td colSpan={2} className="py-3.5 px-3 text-left rounded-bl-xl">
+                    <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider uppercase inline-flex items-center space-x-1.5">
+                      <span>TOTAL KAS MASUK:</span>
+                    </span>
+                  </td>
                   {BULAN_LIST.map((bulan, bIdx) => {
                     const monthTotal = iuranYear
                       .filter(i => i.bulan === bulan)
                       .reduce((acc, curr) => acc + curr.nominal, 0);
                     return (
-                      <td key={`foot-b-${bulan}-${bIdx}`} className="py-3 px-0.5 text-[9px] font-mono text-teal-300">
-                        {monthTotal > 0 ? `${monthTotal / 1000}k` : '0'}
+                      <td key={`foot-b-${bulan}-${bIdx}`} className="py-3.5 px-0.5 text-center">
+                        <span className={`inline-block font-mono text-[11px] font-black px-1 py-0.5 rounded ${
+                          monthTotal > 0 
+                            ? 'text-teal-200 bg-teal-950/80 border border-teal-700/50' 
+                            : 'text-slate-400 font-semibold'
+                        }`}>
+                          {monthTotal > 0 ? `${monthTotal / 1000}k` : '0'}
+                        </span>
                       </td>
                     );
                   })}
-                  <td className="py-3 px-3 text-right text-emerald-400 font-black">{formatRupiah(totalKasMasuk)}</td>
-                  <td className="py-3 px-3 text-right text-rose-300 font-black rounded-br-xl">
-                    {formatRupiah(Math.max(0, (sekolahList.length * 12 * IURAN_PER_BULAN) - totalKasMasuk))}
+                  <td className="py-3.5 px-3 text-right bg-slate-950/40">
+                    <span className="font-mono text-xs sm:text-sm font-black text-emerald-300 drop-shadow-xs">
+                      {formatRupiah(totalKasMasuk)}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-3 text-right bg-slate-950/60 rounded-br-xl">
+                    <span className="font-mono text-xs sm:text-sm font-black text-rose-300 drop-shadow-xs">
+                      {formatRupiah(Math.max(0, (sekolahList.length * 12 * IURAN_PER_BULAN) - totalKasMasuk))}
+                    </span>
                   </td>
                 </tr>
               </tfoot>
