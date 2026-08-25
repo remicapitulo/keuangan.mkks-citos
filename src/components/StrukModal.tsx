@@ -21,6 +21,101 @@ interface StrukModalProps {
   onOpenValidasiModal?: (data: any) => void;
 }
 
+// Draw Lucide Building2 icon onto Canvas 2D context
+function drawLucideBuilding2(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+  ctx.save();
+  ctx.translate(x, y);
+  const scale = size / 24;
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.stroke(new Path2D('M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z'));
+  ctx.stroke(new Path2D('M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2'));
+  ctx.stroke(new Path2D('M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2'));
+  ctx.stroke(new Path2D('M10 6h4'));
+  ctx.stroke(new Path2D('M10 10h4'));
+  ctx.stroke(new Path2D('M10 14h4'));
+  ctx.stroke(new Path2D('M10 18h4'));
+
+  ctx.restore();
+}
+
+// Draw Lucide ShieldCheck icon onto Canvas 2D context
+function drawLucideShieldCheck(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+  ctx.save();
+  ctx.translate(x, y);
+  const scale = size / 24;
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.stroke(new Path2D('M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'));
+  ctx.stroke(new Path2D('m9 12 2 2 4-4'));
+
+  ctx.restore();
+}
+
+// Helper to draw clean rounded rectangles on Canvas
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+  fill = true,
+  stroke = true
+) {
+  ctx.beginPath();
+  if (typeof (ctx as any).roundRect === 'function') {
+    (ctx as any).roundRect(x, y, w, h, radius);
+  } else {
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+  if (fill) ctx.fill();
+  if (stroke) ctx.stroke();
+}
+
+// Helper to split and wrap text with max width
+function wrapTextLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && i > 0) {
+      lines.push(currentLine);
+      currentLine = words[i];
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  return lines;
+}
+
 export const StrukModal: React.FC<StrukModalProps> = ({
   isOpen,
   onClose,
@@ -68,7 +163,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       return;
     }
 
-    const printWin = window.open('', '_blank', 'width=800,height=700');
+    const printWin = window.open('', '_blank', 'width=800,height=750');
     if (printWin) {
       printWin.document.write(`
         <!DOCTYPE html>
@@ -81,6 +176,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
                 color-adjust: exact !important;
+                box-sizing: border-box !important;
               }
               body {
                 font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -90,17 +186,18 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                 display: flex;
                 justify-content: center;
                 align-items: center;
+                margin: 0;
               }
               @page {
                 size: A5 portrait;
-                margin: 6mm;
+                margin: 8mm;
               }
               .kuitansi-print-card {
-                max-width: 560px;
-                width: 100%;
+                width: 520px;
+                max-width: 520px;
                 margin: 0 auto;
                 border: 2px dashed #0d9488 !important;
-                padding: 22px;
+                padding: 24px;
                 border-radius: 16px !important;
                 background: #f8fafc !important;
                 box-shadow: none !important;
@@ -117,10 +214,6 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                 vertical-align: middle !important;
                 color: currentColor !important;
                 flex-shrink: 0 !important;
-              }
-              svg.w-3\.5, svg.w-3 {
-                width: 14px !important;
-                height: 14px !important;
               }
             </style>
           </head>
@@ -143,280 +236,353 @@ export const StrukModal: React.FC<StrukModalProps> = ({
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+    if (!data) return;
     setIsGeneratingPdf(true);
     try {
-      // Create A5 Portrait PDF: 148 mm width x 210 mm height
+      // Ensure fonts are loaded
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+
+      // Load QR Code as an Image object
+      const qrImg = new Image();
+      if (qrCodeUrl) {
+        qrImg.src = qrCodeUrl;
+        await new Promise<void>((resolve) => {
+          qrImg.onload = () => resolve();
+          qrImg.onerror = () => resolve();
+        });
+      }
+
+      // Set up high-resolution offscreen canvas (scale = 3.0 for 300+ DPI sharpness)
+      const scale = 3.0;
+      const logicalWidth = 560;
+      const logicalHeight = 770;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = logicalWidth * scale;
+      canvas.height = logicalHeight * scale;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas context tidak tersedia');
+      }
+
+      ctx.scale(scale, scale);
+
+      // 1. Page Background (Pure White)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+      // 2. Receipt Outer Card (#f8fafc with dashed teal border)
+      const cardX = 18;
+      const cardY = 18;
+      const cardW = 524;
+      const cardH = 734;
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.strokeStyle = '#0d9488';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 16, true, true);
+      ctx.setLineDash([]); // Reset line dash
+
+      // 3. Kop / Header Section
+      // Top Pill Badge
+      const badgeText = 'MKKS CIMANGGIS & TAPOS • DEPOK';
+      ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      const textMetrics = ctx.measureText(badgeText);
+      const badgeW = textMetrics.width + 44;
+      const badgeX = (logicalWidth - badgeW) / 2;
+      const badgeY = 36;
+      const badgeH = 26;
+
+      ctx.fillStyle = '#f0fdfa';
+      ctx.strokeStyle = '#99f6e4';
+      ctx.lineWidth = 1;
+      drawRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 13, true, true);
+
+      // Building icon inside pill badge
+      drawLucideBuilding2(ctx, badgeX + 11, badgeY + 5.5, 15, '#0d9488');
+
+      // Pill text
+      ctx.fillStyle = '#0f766e';
+      ctx.textAlign = 'left';
+      ctx.fillText(badgeText, badgeX + 32, badgeY + 17.5);
+
+      // Main Receipt Title
+      ctx.font = '900 18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillStyle = '#0f172a';
+      ctx.textAlign = 'center';
+      ctx.fillText('KUITANSI PEMBAYARAN IURAN', logicalWidth / 2, 85);
+
+      // No Kuitansi Box
+      const noBoxW = 230;
+      const noBoxH = 24;
+      const noBoxX = (logicalWidth - noBoxW) / 2;
+      const noBoxY = 95;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      drawRoundedRect(ctx, noBoxX, noBoxY, noBoxW, noBoxH, 6, true, true);
+
+      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#475569';
+      ctx.fillText('No: ', noBoxX + 60, noBoxY + 16.5);
+      ctx.fillStyle = '#0f766e';
+      ctx.fillText(data.noKuitansi, noBoxX + 130, noBoxY + 16.5);
+
+      // Top Divider Line
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(38, 131);
+      ctx.lineTo(522, 131);
+      ctx.stroke();
+
+      // 4. Structured Data Rows
+      let curY = 153;
+
+      // Row 1: Tanggal Transaksi
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Tanggal Transaksi', 40, curY);
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(formatDateIndonesian(data.tanggal), 520, curY);
+
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(40, curY + 9);
+      ctx.lineTo(520, curY + 9);
+      ctx.stroke();
+
+      // Row 2: Telah Terima Dari
+      curY += 28;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Telah Terima Dari', 40, curY);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(data.namaSekolah, 520, curY);
+
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(40, curY + 9);
+      ctx.lineTo(520, curY + 9);
+      ctx.stroke();
+
+      // Row 3: Kepala Sekolah (if present)
+      if (data.namaKepsek && data.namaKepsek.trim()) {
+        curY += 28;
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('Kepala Sekolah', 40, curY);
+
+        ctx.fillStyle = '#334155';
+        ctx.font = '600 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(data.namaKepsek, 520, curY);
+
+        ctx.strokeStyle = '#f1f5f9';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(40, curY + 9);
+        ctx.lineTo(520, curY + 9);
+        ctx.stroke();
+      }
+
+      // Row 4: Uang Sejumlah Box
+      curY += 24;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Uang Sejumlah', 40, curY);
+
+      curY += 7;
+      const uangBoxW = 480;
+      const uangBoxH = 34;
+      ctx.fillStyle = '#f0fdfa';
+      ctx.strokeStyle = '#99f6e4';
+      ctx.lineWidth = 1;
+      drawRoundedRect(ctx, 40, curY, uangBoxW, uangBoxH, 10, true, true);
+
+      ctx.fillStyle = '#134e4a';
+      ctx.font = 'italic bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`"${terbilang(data.totalNominal)}"`, 52, curY + 21);
+
+      // Row 5: Untuk Pembayaran
+      curY += uangBoxH + 18;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Untuk Pembayaran', 40, curY);
+
+      const pemText = `Iuran Anggota MKKS Bulan ${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`;
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'right';
+
+      const pemLines = wrapTextLines(ctx, pemText, 320);
+      for (let i = 0; i < pemLines.length; i++) {
+        ctx.fillText(pemLines[i], 520, curY + (i * 15));
+      }
+      curY += (pemLines.length - 1) * 15;
+
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(40, curY + 11);
+      ctx.lineTo(520, curY + 11);
+      ctx.stroke();
+
+      // 5. Highlight Box: TOTAL TERBAYAR
+      curY += 24;
+      const totalBoxW = 480;
+      const totalBoxH = 48;
+
+      const grad = ctx.createLinearGradient(40, curY, 520, curY);
+      grad.addColorStop(0, '#0f766e');
+      grad.addColorStop(1, '#047857');
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#0d9488';
+      ctx.lineWidth = 1;
+      drawRoundedRect(ctx, 40, curY, totalBoxW, totalBoxH, 14, true, true);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('TOTAL TERBAYAR:', 56, curY + 29);
+
+      ctx.font = '900 20px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(formatRupiah(data.totalNominal), 504, curY + 31);
+
+      // 6. Validation Box (Memanjang / Full Width)
+      curY += totalBoxH + 16;
+      const valBoxW = 480;
+      const valBoxH = 88;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#99f6e4';
+      ctx.lineWidth = 1;
+      drawRoundedRect(ctx, 40, curY, valBoxW, valBoxH, 12, true, true);
+
+      // QR Code on Left
+      if (qrImg.src) {
+        // Draw image frame
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        drawRoundedRect(ctx, 50, curY + 8, 72, 72, 8, true, true);
+        ctx.drawImage(qrImg, 52, curY + 10, 68, 68);
+      }
+
+      // Validasi Header (ShieldCheck icon + VALIDASI RESMI)
+      const valContentX = 136;
+      drawLucideShieldCheck(ctx, valContentX, curY + 12, 17, '#059669');
+
+      ctx.fillStyle = '#065f46';
+      ctx.font = '900 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('VALIDASI RESMI', valContentX + 22, curY + 25);
+
+      // Helper Text
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 10.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('Pindai QR / Barcode ini untuk cek keaslian kuitansi sah MKKS Citos.', valContentX, curY + 44);
+
+      // Monospace Code Pill Box
+      const codeBoxW = 370;
+      const codeBoxH = 24;
+      const codeBoxY = curY + 54;
+      ctx.fillStyle = '#f1f5f9';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      drawRoundedRect(ctx, valContentX, codeBoxY, codeBoxW, codeBoxH, 6, true, true);
+
+      ctx.fillStyle = '#334155';
+      ctx.font = 'bold 10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      ctx.fillText(validationCode, valContentX + 10, codeBoxY + 16.5);
+
+      // 7. Signature Block (Directly below validation box, Right-Aligned)
+      curY += valBoxH + 16;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 11.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Depok, ${formatDateIndonesian(data.tanggal)}`, 520, curY);
+
+      // Bendahara Name
+      curY += 18;
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 13.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(bendaharaFullName, 520, curY);
+
+      // Underline
+      const nameWidth = ctx.measureText(bendaharaFullName).width;
+      ctx.strokeStyle = '#0d9488';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(520 - nameWidth, curY + 3.5);
+      ctx.lineTo(520, curY + 3.5);
+      ctx.stroke();
+
+      // Title
+      curY += 17;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 11.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('Bendahara MKKS Citos', 520, curY);
+
+      // Convert Canvas to High Quality PNG
+      const imgData = canvas.toDataURL('image/png', 1.0);
+
+      // Generate Standard A5 PDF (148mm x 210mm)
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a5'
       });
 
-      const cardX = 11;
-      const cardY = 12;
-      const cardWidth = 126;
-      const cardHeight = 186;
-      const innerLeft = cardX + 6;
-      const innerRight = cardX + cardWidth - 6;
-      const innerWidth = cardWidth - 12;
-      const centerX = 74;
+      const pageWidth = 148;
+      const pageHeight = 210;
+      const margin = 8;
+      const maxContentWidth = pageWidth - (margin * 2); // 132 mm
+      const maxContentHeight = pageHeight - (margin * 2); // 194 mm
 
-      // 1. Draw outer Card Background with Rounded Corners
-      doc.setFillColor(248, 250, 252); // slate-50 (#f8fafc)
-      doc.setDrawColor(13, 148, 136); // teal-600 (#0d9488)
-      doc.setLineWidth(0.5);
-      // Dashed teal border
-      doc.setLineDashPattern([2.5, 1.5], 0);
-      doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 4, 4, 'FD');
-      doc.setLineDashPattern([], 0); // reset dash
+      let renderWidth = maxContentWidth;
+      let renderHeight = (logicalHeight * renderWidth) / logicalWidth;
 
-      // 2. Top Header Pill Badge
-      const headerTitle = 'MKKS CIMANGGIS & TAPOS • DEPOK';
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      const textW = doc.getTextWidth(headerTitle);
-      const iconW = 3.2;
-      const iconGap = 1.6;
-      const totalHeaderW = iconW + iconGap + textW;
-
-      const badgeW = Math.max(68, totalHeaderW + 8);
-      const badgeH = 6.5;
-      const badgeX = centerX - (badgeW / 2);
-      const badgeY = cardY + 6;
-      doc.setFillColor(240, 253, 250); // teal-50 (#f0fdfa)
-      doc.setDrawColor(153, 246, 228); // teal-200 (#99f6e4)
-      doc.setLineWidth(0.3);
-      doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 3.25, 3.25, 'FD');
-
-      // Draw Building vector icon in Header Pill
-      const iconStartX = centerX - (totalHeaderW / 2);
-      const iconStartY = badgeY + 1.6;
-
-      doc.setDrawColor(13, 148, 136); // teal-600
-      doc.setFillColor(13, 148, 136);
-      doc.setLineWidth(0.28);
-
-      // Building frame
-      doc.rect(iconStartX, iconStartY + 0.6, 3.2, 2.5, 'S');
-      // Roof / top triangle
-      doc.line(iconStartX - 0.2, iconStartY + 0.6, iconStartX + 1.6, iconStartY);
-      doc.line(iconStartX + 1.6, iconStartY, iconStartX + 3.4, iconStartY + 0.6);
-      // Door
-      doc.rect(iconStartX + 1.15, iconStartY + 1.8, 0.9, 1.3, 'FD');
-      // Windows
-      doc.rect(iconStartX + 0.4, iconStartY + 1.0, 0.5, 0.45, 'FD');
-      doc.rect(iconStartX + 2.3, iconStartY + 1.0, 0.5, 0.45, 'FD');
-
-      // Header Text next to icon
-      doc.setTextColor(15, 118, 110); // teal-700
-      doc.text(headerTitle, iconStartX + iconW + iconGap, badgeY + 4.5);
-
-      // 3. Main Title
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12.5);
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.text('KUITANSI PEMBAYARAN IURAN', centerX, badgeY + 13.5, { align: 'center' });
-
-      // 4. No Kuitansi Pill
-      const noPillW = 58;
-      const noPillH = 5.5;
-      const noPillX = centerX - (noPillW / 2);
-      const noPillY = badgeY + 16.5;
-      doc.setFillColor(241, 245, 249); // slate-100
-      doc.setDrawColor(226, 232, 240); // slate-200
-      doc.roundedRect(noPillX, noPillY, noPillW, noPillH, 2.75, 2.75, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(13, 148, 136); // teal-600
-      doc.text(`No : ${data.noKuitansi}`, centerX, noPillY + 3.8, { align: 'center' });
-
-      // 5. Divider Line
-      let y = noPillY + 9;
-      doc.setDrawColor(226, 232, 240); // slate-200
-      doc.setLineWidth(0.4);
-      doc.line(innerLeft, y, innerRight, y);
-
-      // Helper function for standard detail rows
-      const drawRow = (label: string, value: string, isBoldVal = false, customColorVal?: [number, number, number]) => {
-        y += 6.5;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139); // slate-500
-        doc.text(label, innerLeft, y);
-
-        doc.setFont('helvetica', isBoldVal ? 'bold' : 'normal');
-        doc.setFontSize(8);
-        if (customColorVal) {
-          doc.setTextColor(customColorVal[0], customColorVal[1], customColorVal[2]);
-        } else {
-          doc.setTextColor(15, 23, 42); // slate-900
-        }
-        doc.text(value, innerRight, y, { align: 'right' });
-
-        // separator line
-        doc.setDrawColor(241, 245, 249);
-        doc.setLineWidth(0.25);
-        doc.line(innerLeft, y + 2.5, innerRight, y + 2.5);
-      };
-
-      // Row 1: Tanggal Transaksi
-      drawRow('Tanggal Transaksi', formatDateIndonesian(data.tanggal), true);
-
-      // Row 2: Telah Terima Dari
-      drawRow('Telah Terima Dari', data.namaSekolah, true, [15, 23, 42]);
-
-      // Row 3: Kepala Sekolah (if exists)
-      if (data.namaKepsek && data.namaKepsek.trim()) {
-        drawRow('Kepala Sekolah', data.namaKepsek, false, [51, 65, 85]);
+      if (renderHeight > maxContentHeight) {
+        renderHeight = maxContentHeight;
+        renderWidth = (logicalWidth * renderHeight) / logicalHeight;
       }
 
-      // Row 4: Uang Sejumlah (Rounded Box)
-      y += 5;
-      const boxW = innerWidth;
-      const boxH = 12.5;
-      doc.setFillColor(240, 253, 250); // teal-50
-      doc.setDrawColor(153, 246, 228); // teal-200
-      doc.setLineWidth(0.3);
-      doc.roundedRect(innerLeft, y, boxW, boxH, 2.5, 2.5, 'FD');
+      const posX = (pageWidth - renderWidth) / 2;
+      const posY = (pageHeight - renderHeight) / 2;
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.setTextColor(100, 116, 139); // slate-500
-      doc.text('Uang Sejumlah :', innerLeft + 3, y + 4.2);
+      doc.addImage(imgData, 'PNG', posX, posY, renderWidth, renderHeight, undefined, 'FAST');
 
-      doc.setFont('helvetica', 'bolditalic');
-      doc.setFontSize(8);
-      doc.setTextColor(15, 118, 110); // teal-700
-      const terbilangText = `"${terbilang(data.totalNominal)}"`;
-      const splitTerbilang = doc.splitTextToSize(terbilangText, boxW - 6);
-      doc.text(splitTerbilang, innerLeft + 3, y + 8.5);
-
-      y += boxH + 2;
-
-      // Row 5: Untuk Pembayaran
-      y += 4;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139); // slate-500
-      doc.text('Untuk Pembayaran', innerLeft, y);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(30, 41, 59); // slate-800
-      const pembayaranStr = `Iuran Anggota MKKS Bulan ${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`;
-      const splitPem = doc.splitTextToSize(pembayaranStr, 70);
-      doc.text(splitPem, innerRight, y, { align: 'right' });
-
-      y += (splitPem.length * 4) + 2;
-
-      // 6. TOTAL TERBAYAR Highlight Box (Identical Rich Teal / Emerald Colors)
-      const totalBoxH = 13;
-      doc.setFillColor(15, 118, 110); // #0f766e (teal-700)
-      doc.setDrawColor(13, 148, 136); // #0d9488 (teal-600)
-      doc.setLineWidth(0.4);
-      doc.roundedRect(innerLeft, y, innerWidth, totalBoxH, 3, 3, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(255, 255, 255);
-      doc.text('TOTAL TERBAYAR :', innerLeft + 4, y + 8.5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12.5);
-      doc.setTextColor(255, 255, 255);
-      doc.text(formatRupiah(data.totalNominal), innerRight - 4, y + 8.8, { align: 'right' });
-
-      y += totalBoxH + 6;
-
-      // 7. Footer: QR Code Validasi on Left, Signature on Right
-      const validationBoxW = 54;
-      const validationBoxH = 29;
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(204, 251, 241); // teal-100
-      doc.setLineWidth(0.3);
-      doc.roundedRect(innerLeft, y, validationBoxW, validationBoxH, 2.5, 2.5, 'FD');
-
-      if (qrCodeUrl) {
-        try {
-          doc.addImage(qrCodeUrl, 'PNG', innerLeft + 2, y + 3.5, 22, 22);
-        } catch (e) {
-          console.error('Error adding QR code image to PDF:', e);
-        }
-      }
-
-      // Validasi Resmi header with ShieldCheck vector icon
-      const textX = innerLeft + 25.5;
-      const shieldX = textX;
-      const shieldY = y + 3.6;
-      const sW = 3.2;
-      const sH = 3.6;
-
-      // Draw Shield icon contour
-      doc.setDrawColor(5, 150, 105); // emerald-600
-      doc.setLineWidth(0.32);
-      doc.line(shieldX, shieldY, shieldX + sW, shieldY);
-      doc.line(shieldX, shieldY, shieldX, shieldY + 1.8);
-      doc.line(shieldX + sW, shieldY, shieldX + sW, shieldY + 1.8);
-      doc.line(shieldX, shieldY + 1.8, shieldX + (sW / 2), shieldY + sH);
-      doc.line(shieldX + sW, shieldY + 1.8, shieldX + (sW / 2), shieldY + sH);
-
-      // Draw Checkmark inside shield
-      doc.setDrawColor(5, 150, 105);
-      doc.setLineWidth(0.36);
-      doc.line(shieldX + 0.8, shieldY + 1.7, shieldX + 1.4, shieldY + 2.4);
-      doc.line(shieldX + 1.4, shieldY + 2.4, shieldX + 2.4, shieldY + 1.0);
-
-      // Validasi Resmi text
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
-      doc.setTextColor(6, 95, 70); // emerald-800
-      doc.text('VALIDASI RESMI', textX + 4.4, y + 6.5);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(5);
-      doc.setTextColor(100, 116, 139); // slate-500
-      doc.text('Pindai QR / Barcode', textX, y + 10.5);
-      doc.text('untuk cek keaslian', textX, y + 14);
-      doc.text('kuitansi sah MKKS Citos.', textX, y + 17.5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(4.8);
-      doc.setTextColor(148, 163, 184); // slate-400
-      const cleanKwtId = (data.noKuitansi || 'KWT').replace(/[^A-Za-z0-9]/g, '');
-      doc.text(`ID: ${cleanKwtId.slice(-10)}`, textX, y + 23);
-
-      // Signature Block on Right side
-      const sigX = innerRight;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139); // slate-500
-      doc.text(`Depok, ${formatDateIndonesian(data.tanggal)}`, sigX, y + 4.5, { align: 'right' });
-
-      // Bendahara Name
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.text(bendaharaFullName, sigX, y + 20, { align: 'right' });
-
-      // Teal Underline beneath signature name
-      const nameWidth = doc.getTextWidth(bendaharaFullName);
-      doc.setDrawColor(13, 148, 136); // teal-600
-      doc.setLineWidth(0.4);
-      doc.line(sigX - nameWidth, y + 21, sigX, y + 21);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139); // slate-500
-      doc.text('Bendahara MKKS Citos', sigX, y + 25.5, { align: 'right' });
-
-      // Save PDF file
-      const safeSekolah = (data.namaSekolah || 'Sekolah').replace(/\s+/g, '_');
-      const safeKuitansi = (data.noKuitansi || 'KWT').replace(/\//g, '_');
+      const safeSekolah = (data.namaSekolah || 'Sekolah').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeKuitansi = (data.noKuitansi || 'KWT').replace(/[^a-zA-Z0-9]/g, '_');
       doc.save(`Kuitansi_MKKS_${safeSekolah}_${safeKuitansi}.pdf`);
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('Error generating PDF with Canvas:', error);
       alert('Gagal membuat file PDF. Silakan gunakan tombol Cetak Kuitansi.');
     } finally {
       setIsGeneratingPdf(false);
@@ -465,50 +631,50 @@ export const StrukModal: React.FC<StrukModalProps> = ({
             
             {/* Kop / Header Kuitansi */}
             <div className="text-center border-b-2 border-slate-200 pb-3">
-              <div className="inline-flex items-center justify-center space-x-1.5 text-teal-700 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider mb-1 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+              <div className="inline-flex items-center justify-center space-x-1.5 text-teal-700 font-extrabold text-xs uppercase tracking-wider mb-1 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
                 <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                 <span>MKKS CIMANGGIS & TAPOS • DEPOK</span>
               </div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight mt-0.5">
+              <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight mt-0.5">
                 KUITANSI PEMBAYARAN IURAN
               </h3>
-              <div className="mt-1 inline-block bg-white px-3 py-0.5 rounded-md border border-slate-200 text-[11px] font-mono text-slate-600 font-bold">
-                No: <span className="text-teal-700">{data.noKuitansi}</span>
+              <div className="mt-1 inline-block bg-white px-3 py-0.5 rounded-md border border-slate-200 text-xs font-mono text-slate-600 font-bold">
+                No: <span className="text-teal-700 font-extrabold">{data.noKuitansi}</span>
               </div>
             </div>
 
             {/* Structured Details */}
             <div className="space-y-2.5 text-xs">
               
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/80 pb-2 gap-1">
+              <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                 <span className="text-slate-500 font-medium">Tanggal Transaksi</span>
                 <span className="font-bold text-slate-800">{formatDateIndonesian(data.tanggal)}</span>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/80 pb-2 gap-1">
+              <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                 <span className="text-slate-500 font-medium">Telah Terima Dari</span>
-                <span className="font-extrabold text-slate-900 text-sm sm:text-xs text-teal-950 sm:text-right">
+                <span className="font-extrabold text-slate-900 text-sm text-right">
                   {data.namaSekolah}
                 </span>
               </div>
 
               {data.namaKepsek && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/80 pb-2 gap-1">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                   <span className="text-slate-500 font-medium">Kepala Sekolah</span>
-                  <span className="font-semibold text-slate-800 sm:text-right">{data.namaKepsek}</span>
+                  <span className="font-semibold text-slate-800 text-right">{data.namaKepsek}</span>
                 </div>
               )}
 
               <div className="border-b border-slate-200/80 pb-2 space-y-1">
                 <span className="text-slate-500 font-medium block">Uang Sejumlah</span>
-                <div className="bg-teal-50/80 border border-teal-200 p-2 rounded-xl text-teal-900 font-semibold italic text-xs leading-relaxed">
+                <div className="bg-teal-50/90 border border-teal-200 p-2.5 rounded-xl text-teal-900 font-bold italic text-xs leading-relaxed">
                   "{terbilang(data.totalNominal)}"
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between border-b border-slate-200/80 pb-2 gap-1">
+              <div className="flex items-start justify-between border-b border-slate-200/80 pb-2 gap-2">
                 <span className="text-slate-500 font-medium shrink-0">Untuk Pembayaran</span>
-                <span className="font-bold text-slate-800 sm:text-right max-w-xs leading-snug">
+                <span className="font-bold text-slate-800 text-right max-w-xs leading-snug">
                   Iuran Anggota MKKS Bulan {data.bulanList.join(', ')} (Tahun {data.tahunBuku})
                 </span>
               </div>
@@ -524,49 +690,53 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                 }}
                 className="total-terbayar-box bg-gradient-to-r from-teal-700 to-emerald-700 text-white p-3.5 rounded-2xl flex items-center justify-between font-bold mt-3 shadow-md border border-teal-600/30"
               >
-                <span className="text-xs tracking-wider uppercase opacity-95 text-white">TOTAL TERBAYAR:</span>
-                <span className="text-lg sm:text-xl font-black text-white">{formatRupiah(data.totalNominal)}</span>
+                <span className="text-xs tracking-wider uppercase opacity-95 text-white font-bold">TOTAL TERBAYAR:</span>
+                <span className="text-xl font-black text-white">{formatRupiah(data.totalNominal)}</span>
               </div>
             </div>
 
-            {/* Official Digital Barcode & QR Code Section */}
-            <div className="pt-2 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            {/* Official Digital Barcode & QR Code Section - Memanjang (Full Width) */}
+            <div className="pt-2 border-t border-slate-200/80 space-y-3">
               
-              {/* QR & Barcode Container */}
-              <div className="bg-white p-2.5 rounded-xl border border-teal-200 shadow-xs flex items-center space-x-2.5">
+              {/* QR & Barcode Container - Spans full width so all critical info is clearly readable */}
+              <div className="w-full bg-white p-3 rounded-xl border border-teal-200 shadow-xs flex items-center space-x-3.5">
                 {qrCodeUrl ? (
                   <img 
                     src={qrCodeUrl} 
                     alt="Barcode Validasi MKKS Citos" 
-                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-lg border border-slate-200 shrink-0" 
+                    className="w-18 h-18 sm:w-20 sm:h-20 rounded-lg border border-slate-200 shrink-0 object-contain p-0.5 bg-white" 
                   />
                 ) : (
-                  <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
+                  <div className="w-18 h-18 sm:w-20 sm:h-20 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
                     <QrCode className="w-8 h-8" />
                   </div>
                 )}
 
-                <div className="min-w-0 space-y-0.5">
-                  <div className="flex items-center space-x-1 text-emerald-800 font-extrabold text-[10px]">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="truncate">VALIDASI RESMI</span>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center space-x-1.5 text-emerald-800 font-extrabold text-xs">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>VALIDASI RESMI</span>
                   </div>
-                  <p className="text-[9px] text-slate-500 leading-tight">
+                  <p className="text-[11px] text-slate-500 leading-snug">
                     Pindai QR / Barcode ini untuk cek keaslian kuitansi sah MKKS Citos.
                   </p>
-                  <div className="font-mono text-[8px] font-bold text-slate-600 bg-slate-100 px-1 py-0.5 rounded truncate">
+                  <div className="font-mono text-[10px] font-bold text-slate-700 bg-slate-100/90 px-2 py-1 rounded border border-slate-200 break-all select-all">
                     {validationCode}
                   </div>
                 </div>
               </div>
 
-              {/* Signature Block */}
-              <div className="text-right text-xs">
-                <div className="text-[10px] text-slate-500">Depok, {formatDateIndonesian(data.tanggal)}</div>
-                <div className="text-xs font-black text-slate-800 mt-3.5 underline decoration-teal-500 decoration-2 underline-offset-2">
+              {/* Signature Block - Directly below validation box (No empty blank signature area) */}
+              <div className="text-right text-xs pr-1">
+                <div className="text-xs text-slate-500">
+                  Depok, {formatDateIndonesian(data.tanggal)}
+                </div>
+                <div className="text-sm font-extrabold text-slate-900 mt-1 inline-block pb-0.5 border-b-2 border-teal-600">
                   {bendaharaFullName}
                 </div>
-                <div className="text-[10px] text-slate-500 font-medium">Bendahara MKKS Citos</div>
+                <div className="text-xs text-slate-500 font-medium mt-0.5">
+                  Bendahara MKKS Citos
+                </div>
               </div>
 
             </div>
