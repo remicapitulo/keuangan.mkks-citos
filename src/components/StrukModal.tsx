@@ -318,33 +318,40 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       ctx.fillText('KUITANSI PEMBAYARAN IURAN', logicalWidth / 2, 85);
 
       // No Kuitansi Box
-      const noBoxW = 230;
-      const noBoxH = 24;
+      const prefix = 'No: ';
+      const kuitansiText = data.noKuitansi || '-';
+      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+      const prefixWidth = ctx.measureText(prefix).width;
+      const kuitansiWidth = ctx.measureText(kuitansiText).width;
+      const totalTextWidth = prefixWidth + kuitansiWidth;
+
+      const noBoxW = Math.max(260, totalTextWidth + 36);
+      const noBoxH = 26;
       const noBoxX = (logicalWidth - noBoxW) / 2;
-      const noBoxY = 95;
+      const noBoxY = 96;
 
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 1;
       drawRoundedRect(ctx, noBoxX, noBoxY, noBoxW, noBoxH, 6, true, true);
 
-      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#475569';
-      ctx.fillText('No: ', noBoxX + 60, noBoxY + 16.5);
+      const startTextX = (logicalWidth - totalTextWidth) / 2;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(prefix, startTextX, noBoxY + 17.5);
       ctx.fillStyle = '#0f766e';
-      ctx.fillText(data.noKuitansi, noBoxX + 130, noBoxY + 16.5);
+      ctx.fillText(kuitansiText, startTextX + prefixWidth, noBoxY + 17.5);
 
       // Top Divider Line
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(38, 131);
-      ctx.lineTo(522, 131);
+      ctx.moveTo(38, 134);
+      ctx.lineTo(522, 134);
       ctx.stroke();
 
       // 4. Structured Data Rows
-      let curY = 153;
+      let curY = 156;
 
       // Row 1: Tanggal Transaksi
       ctx.fillStyle = '#64748b';
