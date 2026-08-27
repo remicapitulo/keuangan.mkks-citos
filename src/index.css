@@ -4,6 +4,8 @@
   body * {
     visibility: hidden;
   }
+
+  /* Printable Kuitansi */
   #printable-kuitansi, #printable-kuitansi * {
     visibility: visible;
   }
@@ -18,4 +20,24 @@
     border: none !important;
     box-shadow: none !important;
   }
+
+  /* Printable Laporan Keuangan */
+  #printable-laporan-keuangan, #printable-laporan-keuangan * {
+    visibility: visible;
+  }
+  #printable-laporan-keuangan {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 16px;
+    background: white !important;
+    color: #0f172a !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
 }
+

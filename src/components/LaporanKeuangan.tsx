@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sekolah, Iuran, Pengeluaran, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
+import { Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
 import { exportToExcel, exportToPDF } from '../services/exportUtils';
 import { 
@@ -20,47 +20,69 @@ import {
   ListFilter,
   ArrowUpRight,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  HandCoins,
+  Printer
 } from 'lucide-react';
 
 interface LaporanKeuanganProps {
   sekolahList: Sekolah[];
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
+  pemasukanLainList?: PemasukanLain[];
   userSchoolName?: string;
   currentUser?: User | null;
+  onOpenStrukModal?: (data: any) => void;
 }
 
 export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   sekolahList,
   iuranList,
   pengeluaranList,
+  pemasukanLainList = [],
   userSchoolName,
-  currentUser
+  currentUser,
+  onOpenStrukModal
 }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'kas-keluar' | 'rekap'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap'>('matrix');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [matrixViewMode, setMatrixViewMode] = useState<'cards' | 'table'>('cards');
 
   // Filter dataset by year
   const iuranYear = iuranList.filter(i => i.tahun === selectedYear);
   const pengeluaranYear = pengeluaranList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
+  const pemasukanLainYear = pemasukanLainList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
 
   // Total Kas
-  const totalKasMasuk = iuranYear.reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalIuranMasuk = iuranYear.reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalPemasukanLain = pemasukanLainYear.reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalKasMasuk = totalIuranMasuk + totalPemasukanLain;
   const totalKasKeluar = pengeluaranYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const saldoBersih = totalKasMasuk - totalKasKeluar;
 
   // Export handlers
   const handleExportExcel = () => {
-    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList);
+    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList);
   };
 
   const handleExportPDF = () => {
-    exportToPDF(selectedYear, sekolahList, iuranList, pengeluaranList, currentUser);
+    exportToPDF(selectedYear, sekolahList, iuranList, pengeluaranList, currentUser, pemasukanLainList);
   };
+
+  const handlePrintReport = () => {
+    window.print();
+  };
+
+  const isAdmin = currentUser ? (
+    currentUser.role === 'Admin' ||
+    currentUser.role?.toLowerCase() === 'admin' ||
+    currentUser.username?.toLowerCase() === 'admin' ||
+    currentUser.username?.toLowerCase().includes('admin')
+  ) : false;
+
+  const isBendahara = currentUser?.role === 'Bendahara' || isAdmin;
 
   // Filtered lists for search
   const query = (searchFilter || '').toLowerCase();
@@ -72,6 +94,12 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const filteredKasMasuk = iuranYear.filter(i =>
     (i.namaSekolah || '').toLowerCase().includes(query) ||
     (i.bulan || '').toLowerCase().includes(query)
+  );
+
+  const filteredPemasukanLain = pemasukanLainYear.filter(p =>
+    (p.sumberDana || '').toLowerCase().includes(query) ||
+    (p.kategori || '').toLowerCase().includes(query) ||
+    (p.keterangan || '').toLowerCase().includes(query)
   );
 
   const filteredKasKeluar = pengeluaranYear.filter(p =>
@@ -96,7 +124,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               Laporan Keuangan & Matriks Iuran
             </h2>
             <p className="text-xs sm:text-sm text-teal-100/80 mt-1 max-w-xl font-light hidden sm:block">
-              Matriks kelunasan 10 sekolah anggota, rincian penerimaan iuran, pengeluaran operasional, dan rekap arus kas.
+              Matriks kelunasan 10 sekolah anggota, penerimaan iuran, pemasukan non-iuran, pengeluaran operasional, dan rekap arus kas.
             </p>
           </div>
 
@@ -120,26 +148,36 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               </select>
             </div>
 
-            {/* Export Buttons Group */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Export & Print Buttons Group */}
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               <button
                 id="btn-export-excel"
                 onClick={handleExportExcel}
-                className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
                 title="Export Ke Excel (.xlsx)"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>Excel</span>
               </button>
 
               <button
                 id="btn-export-pdf"
                 onClick={handleExportPDF}
-                className="bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-xs px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
                 title="Export Ke PDF (.pdf)"
               >
-                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>PDF</span>
+              </button>
+
+              <button
+                id="btn-print-laporan"
+                onClick={handlePrintReport}
+                className="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-bold text-xs px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                title="Cetak Laporan Keuangan"
+              >
+                <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span>Cetak</span>
               </button>
             </div>
 
@@ -148,7 +186,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
       </div>
 
       {/* Financial Health Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Kas Masuk */}
         <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-emerald-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
           <div className="flex items-center space-x-3 sm:space-x-0 sm:justify-between sm:mb-2">
@@ -156,13 +194,30 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Pemasukan</span>
-              <p className="text-[10px] text-slate-400 font-medium sm:hidden">Iuran Terkumpul ({selectedYear})</p>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Total Masuk</span>
+              <p className="text-[10px] text-slate-400 font-medium sm:hidden">Iuran & Non-Iuran ({selectedYear})</p>
             </div>
           </div>
           <div className="text-right sm:text-left">
             <div className="text-base sm:text-xl font-extrabold text-emerald-700">{formatRupiah(totalKasMasuk)}</div>
-            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Iuran Terkumpul ({selectedYear})</p>
+            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Iuran & Non-Iuran ({selectedYear})</p>
+          </div>
+        </div>
+
+        {/* Pemasukan Non-Iuran */}
+        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-teal-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
+          <div className="flex items-center space-x-3 sm:space-x-0 sm:justify-between sm:mb-2">
+            <div className="bg-teal-100 p-2 sm:p-2.5 rounded-xl text-teal-700 shrink-0">
+              <HandCoins className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Non-Iuran</span>
+              <p className="text-[10px] text-slate-400 font-medium sm:hidden">Sponsor / Sisa ({selectedYear})</p>
+            </div>
+          </div>
+          <div className="text-right sm:text-left">
+            <div className="text-base sm:text-xl font-extrabold text-teal-700">{formatRupiah(totalPemasukanLain)}</div>
+            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">{pemasukanLainYear.length} Transaksi Pemasukan Lain</p>
           </div>
         </div>
 
@@ -184,9 +239,9 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
 
         {/* Saldo Kas Bersih */}
-        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-teal-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
+        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-indigo-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
           <div className="flex items-center space-x-3 sm:space-x-0 sm:justify-between sm:mb-2">
-            <div className="bg-teal-100 p-2 sm:p-2.5 rounded-xl text-teal-700 shrink-0">
+            <div className="bg-indigo-100 p-2 sm:p-2.5 rounded-xl text-indigo-700 shrink-0">
               <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
@@ -195,10 +250,10 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             </div>
           </div>
           <div className="text-right sm:text-left">
-            <div className={`text-base sm:text-xl font-extrabold ${saldoBersih >= 0 ? 'text-teal-700' : 'text-rose-700'}`}>
+            <div className={`text-base sm:text-xl font-extrabold ${saldoBersih >= 0 ? 'text-indigo-700' : 'text-rose-700'}`}>
               {formatRupiah(saldoBersih)}
             </div>
-            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Kas Saat Ini</p>
+            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Kas Bersih Saat Ini</p>
           </div>
         </div>
       </div>
@@ -207,12 +262,12 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
       <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200 shadow-xs space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-3">
         
         {/* Tab Buttons Strip */}
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
           
           <button
             id="tab-laporan-matriks"
             onClick={() => setActiveTab('matrix')}
-            className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
               activeTab === 'matrix'
                 ? 'bg-teal-700 text-white shadow-md'
                 : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
@@ -225,20 +280,38 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           <button
             id="tab-laporan-kas-masuk"
             onClick={() => setActiveTab('kas-masuk')}
-            className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
               activeTab === 'kas-masuk'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>Kas Masuk</span>
+            <span>Kas Masuk Iuran</span>
+          </button>
+
+          <button
+            id="tab-laporan-pemasukan-lain"
+            onClick={() => setActiveTab('pemasukan-lain')}
+            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+              activeTab === 'pemasukan-lain'
+                ? 'bg-teal-600 text-white shadow-md'
+                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+            }`}
+          >
+            <HandCoins className="w-3.5 h-3.5" />
+            <span>Pemasukan Non-Iuran</span>
+            {pemasukanLainYear.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeTab === 'pemasukan-lain' ? 'bg-teal-800 text-teal-100' : 'bg-teal-100 text-teal-800'}`}>
+                {pemasukanLainYear.length}
+              </span>
+            )}
           </button>
 
           <button
             id="tab-laporan-kas-keluar"
             onClick={() => setActiveTab('kas-keluar')}
-            className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
               activeTab === 'kas-keluar'
                 ? 'bg-rose-600 text-white shadow-md'
                 : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
@@ -251,7 +324,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           <button
             id="tab-laporan-rekap"
             onClick={() => setActiveTab('rekap')}
-            className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
               activeTab === 'rekap'
                 ? 'bg-indigo-600 text-white shadow-md'
                 : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
@@ -453,100 +526,108 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             )}
           </div>
 
-          {/* TABLE VIEW (Desktop Default & Mobile Toggle Table) */}
-          <div className={`${matrixViewMode === 'table' ? 'block' : 'hidden sm:block'} overflow-x-auto no-scrollbar touch-pan-x -mx-2 sm:mx-0 px-2 sm:px-0`}>
-            <table className="w-full text-center text-xs border-collapse min-w-[700px]">
+          {/* DESKTOP TABLE VIEW */}
+          <div className={`${matrixViewMode === 'table' ? 'block' : 'hidden sm:block'} overflow-x-auto rounded-xl border border-slate-200`}>
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
-                <tr className="bg-teal-800 text-white font-bold text-xs">
-                  <th className="py-3 px-2 text-left rounded-tl-xl w-8">No</th>
-                  <th className="py-3 px-3 text-left min-w-[180px]">Nama Sekolah Anggota</th>
-                  {BULAN_SINGKAT.map((b, bIdx) => (
-                    <th key={`b-singkat-${b}-${bIdx}`} className="py-3 px-1 min-w-[38px]">{b}</th>
+                <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-extrabold">
+                  <th className="py-3.5 px-3 text-center w-10 rounded-tl-xl">No</th>
+                  <th className="py-3.5 px-4 min-w-[170px]">Nama Sekolah</th>
+                  {BULAN_SINGKAT.map((b, idx) => (
+                    <th key={`head-month-${idx}`} className="py-3.5 px-1 text-center w-9 font-mono">
+                      {b}
+                    </th>
                   ))}
-                  <th className="py-3 px-3 text-right bg-teal-900">Total Lunas</th>
-                  <th className="py-3 px-3 text-right bg-teal-950 rounded-tr-xl">Sisa Tunggakan</th>
+                  <th className="py-3.5 px-3 text-right font-black min-w-[105px]">Lunas</th>
+                  <th className="py-3.5 px-3 text-right font-black min-w-[105px] rounded-tr-xl">Tunggakan</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 {filteredSekolah.map((sek, idx) => {
                   let lunasCount = 0;
                   const isUserSchool = userSchoolName && userSchoolName === sek.namaSekolah;
 
+                  const monthStatuses = BULAN_LIST.map(bulan => {
+                    const isPaid = iuranYear.some(i => 
+                      ((i.idSekolah && sek.idSekolah && i.idSekolah === sek.idSekolah) || 
+                       (i.namaSekolah && sek.namaSekolah && (
+                         i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim() ||
+                         i.namaSekolah.toLowerCase().includes(sek.namaSekolah.toLowerCase().trim()) ||
+                         sek.namaSekolah.toLowerCase().includes(i.namaSekolah.toLowerCase().trim())
+                       ))) &&
+                      i.bulan === bulan
+                    );
+                    if (isPaid) lunasCount++;
+                    return isPaid;
+                  });
+
+                  const totalBayarNominal = lunasCount * IURAN_PER_BULAN;
+                  const totalTunggakanNominal = (12 - lunasCount) * IURAN_PER_BULAN;
+
                   return (
                     <tr 
-                      key={`sek-matrix-${sek.idSekolah || sek.namaSekolah}-${idx}`} 
-                      className={`hover:bg-teal-50/50 transition-colors ${
-                        isUserSchool ? 'bg-amber-50/80 font-bold border-l-4 border-amber-500' : ''
+                      key={`sek-row-${sek.idSekolah || sek.namaSekolah}-${idx}`}
+                      className={`transition-colors ${
+                        isUserSchool 
+                          ? 'bg-amber-50/90 font-semibold' 
+                          : 'hover:bg-teal-50/40'
                       }`}
                     >
-                      <td className="py-3 px-2 text-left font-mono font-bold text-slate-500">{idx + 1}</td>
-                      <td className="py-3 px-3 text-left">
-                        <div className="font-bold text-slate-800 leading-snug">
-                          {sek.namaSekolah}
-                          {isUserSchool && (
-                            <span className="ml-1.5 text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold">Sekolah Anda</span>
-                          )}
-                        </div>
+                      <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px]">{idx + 1}</td>
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-slate-800 text-xs">{sek.namaSekolah}</div>
                         {sek.namaKepsek && (
-                          <div className="text-[10px] text-slate-500 font-normal">
-                            Kepsek: <strong className="text-slate-700">{sek.namaKepsek}</strong>
-                          </div>
+                          <div className="text-[10px] text-slate-400">{sek.namaKepsek}</div>
                         )}
                       </td>
 
-                      {BULAN_LIST.map((bulan, bIdx) => {
-                        const isPaid = iuranYear.some(i => 
-                          ((i.idSekolah && sek.idSekolah && i.idSekolah === sek.idSekolah) || 
-                           (i.namaSekolah && sek.namaSekolah && (
-                             i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim() ||
-                             i.namaSekolah.toLowerCase().includes(sek.namaSekolah.toLowerCase().trim()) ||
-                             sek.namaSekolah.toLowerCase().includes(i.namaSekolah.toLowerCase().trim())
-                           ))) &&
-                          i.bulan === bulan
-                        );
-                        if (isPaid) lunasCount++;
+                      {monthStatuses.map((isPaid, bIdx) => (
+                        <td key={`status-${sek.idSekolah}-${bIdx}`} className="py-3 px-1 text-center">
+                          {isPaid ? (
+                            <span 
+                              title={`Lunas (Bulan ${BULAN_LIST[bIdx]})`}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 font-black text-xs shadow-2xs"
+                            >
+                              ✓
+                            </span>
+                          ) : (
+                            <span 
+                              title={`Belum Lunas (Bulan ${BULAN_LIST[bIdx]})`}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-slate-100 text-slate-400 font-bold text-xs"
+                            >
+                              -
+                            </span>
+                          )}
+                        </td>
+                      ))}
 
-                        return (
-                          <td key={`cell-${sek.idSekolah || idx}-${bulan}-${bIdx}`} className="py-2.5 px-0.5">
-                            {isPaid ? (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[11px]" title={`${bulan}: Lunas`}>
-                                V
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-slate-100 text-slate-300 font-bold text-[11px]" title={`${bulan}: Belum Lunas`}>
-                                -
-                              </span>
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      <td className="py-2.5 px-3 text-right font-black text-emerald-700 bg-emerald-50/50">
-                        {formatRupiah(lunasCount * IURAN_PER_BULAN)}
+                      <td className="py-3 px-3 text-right font-black text-emerald-700 text-xs">
+                        {formatRupiah(totalBayarNominal)}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-black text-rose-600 bg-rose-50/50">
-                        {formatRupiah((12 - lunasCount) * IURAN_PER_BULAN)}
+                      <td className="py-3 px-3 text-right font-black text-xs">
+                        <span className={totalTunggakanNominal > 0 ? 'text-rose-600' : 'text-slate-400'}>
+                          {formatRupiah(totalTunggakanNominal)}
+                        </span>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
-
-              {/* Table Footer Summary Row */}
               <tfoot>
-                <tr className="bg-slate-900 text-white font-bold text-xs border-t-2 border-teal-500 shadow-inner">
-                  <td colSpan={2} className="py-3.5 px-3 text-left rounded-bl-xl">
-                    <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider uppercase inline-flex items-center space-x-1.5">
-                      <span>TOTAL KAS MASUK:</span>
-                    </span>
+                <tr className="bg-slate-900 text-white font-extrabold text-xs">
+                  <td colSpan={2} className="py-3.5 px-4 text-left rounded-bl-xl">
+                    <div className="flex items-center space-x-1.5">
+                      <span>TOTAL KESELURUHAN ({selectedYear}):</span>
+                    </div>
                   </td>
                   {BULAN_LIST.map((bulan, bIdx) => {
                     const monthTotal = iuranYear
                       .filter(i => i.bulan === bulan)
                       .reduce((acc, curr) => acc + curr.nominal, 0);
+
                     return (
-                      <td key={`foot-b-${bulan}-${bIdx}`} className="py-3.5 px-0.5 text-center">
-                        <span className={`inline-block font-mono text-[11px] font-black px-1 py-0.5 rounded ${
+                      <td key={`foot-month-${bIdx}`} className="py-3.5 px-1 text-center font-mono text-[10px]">
+                        <span className={`inline-block px-1 py-0.5 rounded ${
                           monthTotal > 0 
                             ? 'text-teal-200 bg-teal-950/80 border border-teal-700/50' 
                             : 'text-slate-400 font-semibold'
@@ -558,12 +639,12 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   })}
                   <td className="py-3.5 px-3 text-right bg-slate-950/40">
                     <span className="font-mono text-xs sm:text-sm font-black text-emerald-300 drop-shadow-xs">
-                      {formatRupiah(totalKasMasuk)}
+                      {formatRupiah(totalIuranMasuk)}
                     </span>
                   </td>
                   <td className="py-3.5 px-3 text-right bg-slate-950/60 rounded-br-xl">
                     <span className="font-mono text-xs sm:text-sm font-black text-rose-300 drop-shadow-xs">
-                      {formatRupiah(Math.max(0, (sekolahList.length * 12 * IURAN_PER_BULAN) - totalKasMasuk))}
+                      {formatRupiah(Math.max(0, (sekolahList.length * 12 * IURAN_PER_BULAN) - totalIuranMasuk))}
                     </span>
                   </td>
                 </tr>
@@ -574,19 +655,19 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       )}
 
-      {/* TAB 2: RINCIAN KAS MASUK */}
+      {/* TAB 2: RINCIAN KAS MASUK IURAN */}
       {activeTab === 'kas-masuk' && (
         <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
             <div>
               <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-                Rincian Kas Masuk (Penerimaan Iuran)
+                Rincian Kas Masuk (Penerimaan Iuran Sekolah)
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-500">Tahun Buku {selectedYear}</p>
             </div>
             <div className="text-left sm:text-right">
               <div className="text-[10px] sm:text-[11px] text-slate-500">Total Terbayar ({filteredKasMasuk.length} Transaksi)</div>
-              <div className="text-base sm:text-lg font-black text-emerald-600">{formatRupiah(totalKasMasuk)}</div>
+              <div className="text-base sm:text-lg font-black text-emerald-600">{formatRupiah(totalIuranMasuk)}</div>
             </div>
           </div>
 
@@ -594,7 +675,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           <div className="block sm:hidden space-y-2.5">
             {filteredKasMasuk.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-xs">
-                Tidak ada catatan kas masuk pada tahun {selectedYear}.
+                Tidak ada catatan kas masuk iuran pada tahun {selectedYear}.
               </div>
             ) : (
               filteredKasMasuk.map((i, idx) => (
@@ -607,7 +688,33 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <span>Bulan: <strong className="text-emerald-800">{i.bulan}</strong> ({i.tahun})</span>
                     <span>{formatDateIndonesian(i.tanggalInput)}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 text-right">Diinput: {resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</div>
+                  <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1.5 border-t border-emerald-100">
+                    <span>Diinput: {resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</span>
+                    {isBendahara && onOpenStrukModal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const schoolOfItem = sekolahList.find(s => s.namaSekolah === i.namaSekolah);
+                          onOpenStrukModal({
+                            jenis: 'iuran',
+                            noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
+                            tanggal: i.tanggalInput,
+                            namaSekolah: i.namaSekolah,
+                            namaKepsek: schoolOfItem?.namaKepsek || '-',
+                            alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                            tahunBuku: i.tahun,
+                            bulanList: [i.bulan],
+                            totalNominal: i.nominal,
+                            diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
+                          });
+                        }}
+                        className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-emerald-200"
+                      >
+                        <Printer className="w-3 h-3" />
+                        <span>Kuitansi</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -624,7 +731,10 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   <th className="py-3 px-3">Tanggal Pembayaran</th>
                   <th className="py-3 px-4">Nama Instansi / Sekolah</th>
                   <th className="py-3 px-3 text-right">Jumlah Nominal</th>
-                  <th className="py-3 px-3 text-center rounded-tr-xl">Diinput Oleh</th>
+                  <th className={`py-3 px-3 text-center ${!isBendahara ? 'rounded-tr-xl' : ''}`}>Diinput Oleh</th>
+                  {isBendahara && (
+                    <th className="py-3 px-3 text-center rounded-tr-xl">Aksi</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -637,14 +747,43 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <td className="py-3 px-4 font-bold text-slate-900">{i.namaSekolah}</td>
                     <td className="py-3 px-3 text-right font-black text-emerald-600">{formatRupiah(i.nominal)}</td>
                     <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</td>
+                    {isBendahara && (
+                      <td className="py-3 px-3 text-center">
+                        {onOpenStrukModal && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const schoolOfItem = sekolahList.find(s => s.namaSekolah === i.namaSekolah);
+                              onOpenStrukModal({
+                                jenis: 'iuran',
+                                noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
+                                tanggal: i.tanggalInput,
+                                namaSekolah: i.namaSekolah,
+                                namaKepsek: schoolOfItem?.namaKepsek || '-',
+                                alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                                tahunBuku: i.tahun,
+                                bulanList: [i.bulan],
+                                totalNominal: i.nominal,
+                                diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
+                              });
+                            }}
+                            className="inline-flex items-center space-x-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold text-[11px] transition-colors cursor-pointer"
+                            title="Cetak Kuitansi Iuran"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Kuitansi</span>
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-slate-800 text-white font-bold text-xs">
-                  <td colSpan={5} className="py-3 px-4 text-right rounded-bl-xl">TOTAL KAS MASUK ({selectedYear}):</td>
-                  <td className="py-3 px-3 text-right text-emerald-400 font-black text-sm">{formatRupiah(totalKasMasuk)}</td>
-                  <td className="rounded-br-xl"></td>
+                  <td colSpan={5} className="py-3 px-4 text-right rounded-bl-xl">TOTAL IURAN MASUK ({selectedYear}):</td>
+                  <td className="py-3 px-3 text-right text-emerald-400 font-black text-sm">{formatRupiah(totalIuranMasuk)}</td>
+                  <td colSpan={isBendahara ? 2 : 1} className="rounded-br-xl"></td>
                 </tr>
               </tfoot>
             </table>
@@ -652,7 +791,152 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       )}
 
-      {/* TAB 3: RINCIAN KAS KELUAR */}
+      {/* TAB 3: PEMASUKAN NON-IURAN */}
+      {activeTab === 'pemasukan-lain' && (
+        <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base">
+                Rincian Pemasukan Kas Non-Iuran
+              </h3>
+              <p className="text-[11px] sm:text-xs text-slate-500">Sponsorship, Sisa Kegiatan, Hibah, Sumbangan & Lain-lain ({selectedYear})</p>
+            </div>
+            <div className="text-left sm:text-right">
+              <div className="text-[10px] sm:text-[11px] text-slate-500">Total Non-Iuran ({filteredPemasukanLain.length} Transaksi)</div>
+              <div className="text-base sm:text-lg font-black text-teal-600">{formatRupiah(totalPemasukanLain)}</div>
+            </div>
+          </div>
+
+          {/* Mobile Card List */}
+          <div className="block sm:hidden space-y-2.5">
+            {filteredPemasukanLain.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                Belum ada catatan pemasukan non-iuran pada tahun {selectedYear}.
+              </div>
+            ) : (
+              filteredPemasukanLain.map((l, idx) => (
+                <div key={`pemasukan-lain-card-${l.id || 'noid'}-${idx}`} className="p-3 rounded-xl border border-teal-100 bg-teal-50/30 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{l.sumberDana}</span>
+                    <span className="font-black text-teal-700 bg-teal-100 px-2 py-0.5 rounded text-[11px]">{formatRupiah(l.nominal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-semibold text-[10px]">{l.kategori}</span>
+                    <span className="text-slate-500">{formatDateIndonesian(l.tanggal)}</span>
+                  </div>
+                  {l.keterangan && <p className="text-[11px] text-slate-600">{l.keterangan}</p>}
+                  <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1.5 border-t border-teal-100">
+                    <span>Diinput: {resolveNamaBendahara(l.diinputOleh, undefined, sekolahList)}</span>
+                    {isBendahara && onOpenStrukModal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const year = new Date(l.tanggal).getFullYear();
+                          onOpenStrukModal({
+                            jenis: 'pemasukan-lain',
+                            noKuitansi: l.noKuitansi || `KWT-IN/MKKS-CITOS/${year}/${l.id}`,
+                            tanggal: l.tanggal,
+                            namaSekolah: l.sumberDana,
+                            sumberDana: l.sumberDana,
+                            kategori: l.kategori,
+                            keterangan: l.keterangan || `Penerimaan ${l.kategori} dari ${l.sumberDana}`,
+                            alamatSekolah: l.keterangan || '-',
+                            tahunBuku: year,
+                            bulanList: [`Penerimaan ${l.kategori}`],
+                            totalNominal: l.nominal,
+                            diinputOleh: l.diinputOleh
+                          });
+                        }}
+                        className="text-teal-700 hover:text-teal-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-teal-200"
+                      >
+                        <Printer className="w-3 h-3" />
+                        <span>Kuitansi</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-teal-700 text-white font-bold text-[11px]">
+                  <th className="py-3 px-3 rounded-tl-xl">No</th>
+                  <th className="py-3 px-3">Tanggal Transaksi</th>
+                  <th className="py-3 px-3">Kategori</th>
+                  <th className="py-3 px-4">Sumber Dana / Pihak Terkait</th>
+                  <th className="py-3 px-4">Keterangan</th>
+                  <th className="py-3 px-3 text-right">Jumlah Nominal</th>
+                  <th className={`py-3 px-3 text-center ${!isBendahara ? 'rounded-tr-xl' : ''}`}>Diinput Oleh</th>
+                  {isBendahara && (
+                    <th className="py-3 px-3 text-center rounded-tr-xl">Aksi</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredPemasukanLain.map((l, idx) => (
+                  <tr key={`pemasukan-lain-row-${l.id || 'noid'}-${idx}`} className="hover:bg-teal-50/50 transition-colors">
+                    <td className="py-3 px-3 font-mono font-semibold text-slate-500">{idx + 1}</td>
+                    <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{formatDateIndonesian(l.tanggal)}</td>
+                    <td className="py-3 px-3">
+                      <span className="bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded font-semibold text-[10px]">
+                        {l.kategori}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 font-bold text-slate-900">{l.sumberDana}</td>
+                    <td className="py-3 px-4 text-slate-600 max-w-xs">{l.keterangan || '-'}</td>
+                    <td className="py-3 px-3 text-right font-black text-teal-700 whitespace-nowrap">{formatRupiah(l.nominal)}</td>
+                    <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(l.diinputOleh, undefined, sekolahList)}</td>
+                    {isBendahara && (
+                      <td className="py-3 px-3 text-center">
+                        {onOpenStrukModal && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const year = new Date(l.tanggal).getFullYear();
+                              onOpenStrukModal({
+                                jenis: 'pemasukan-lain',
+                                noKuitansi: l.noKuitansi || `KWT-IN/MKKS-CITOS/${year}/${l.id}`,
+                                tanggal: l.tanggal,
+                                namaSekolah: l.sumberDana,
+                                sumberDana: l.sumberDana,
+                                kategori: l.kategori,
+                                keterangan: l.keterangan || `Penerimaan ${l.kategori} dari ${l.sumberDana}`,
+                                alamatSekolah: l.keterangan || '-',
+                                tahunBuku: year,
+                                bulanList: [`Penerimaan ${l.kategori}`],
+                                totalNominal: l.nominal,
+                                diinputOleh: l.diinputOleh
+                              });
+                            }}
+                            className="inline-flex items-center space-x-1 text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-lg border border-teal-200 font-bold text-[11px] transition-colors cursor-pointer"
+                            title="Cetak Kuitansi Pemasukan"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Kuitansi</span>
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-800 text-white font-bold text-xs">
+                  <td colSpan={5} className="py-3 px-4 text-right rounded-bl-xl">TOTAL PEMASUKAN NON-IURAN ({selectedYear}):</td>
+                  <td className="py-3 px-3 text-right text-teal-400 font-black text-sm">{formatRupiah(totalPemasukanLain)}</td>
+                  <td colSpan={isBendahara ? 2 : 1} className="rounded-br-xl"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: RINCIAN KAS KELUAR */}
       {activeTab === 'kas-keluar' && (
         <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
@@ -728,29 +1012,35 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       )}
 
-      {/* TAB 4: REKAP BULANAN & SALDO BERSIH */}
+      {/* TAB 5: REKAP BULANAN & SALDO BERSIH */}
       {activeTab === 'rekap' && (
         <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm sm:text-base">
               Rekapitulasi Arus Kas Bulanan ({selectedYear})
             </h3>
-            <p className="text-[11px] sm:text-xs text-slate-500">Perbandingan Pemasukan, Pengeluaran, dan Net Saldo Kas per Bulan</p>
+            <p className="text-[11px] sm:text-xs text-slate-500">Perbandingan Pemasukan (Iuran & Non-Iuran), Pengeluaran, dan Net Saldo Kas per Bulan</p>
           </div>
 
           {/* Mobile Card List for Rekap Bulanan */}
           <div className="block sm:hidden space-y-2.5">
             {BULAN_LIST.map((bulanName, idx) => {
               const monthStr = String(idx + 1).padStart(2, '0');
-              const inVal = iuranYear
+              const inIuran = iuranYear
                 .filter(i => i.bulan === bulanName)
                 .reduce((a, b) => a + b.nominal, 0);
+
+              const inLain = pemasukanLainYear
+                .filter(l => l.tanggal.split('-')[1] === monthStr)
+                .reduce((a, b) => a + b.nominal, 0);
+
+              const totalIn = inIuran + inLain;
 
               const outVal = pengeluaranYear
                 .filter(p => p.tanggal.split('-')[1] === monthStr)
                 .reduce((a, b) => a + b.nominal, 0);
 
-              const net = inVal - outVal;
+              const net = totalIn - outVal;
               const isSurplus = net >= 0;
 
               return (
@@ -773,8 +1063,11 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   {/* Card Body Grid */}
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
                     <div className="bg-emerald-50/80 p-2 rounded-xl border border-emerald-100/80">
-                      <span className="text-[10px] text-slate-500 font-medium block">Pemasukan</span>
-                      <span className="font-extrabold text-emerald-700 text-xs">{formatRupiah(inVal)}</span>
+                      <span className="text-[10px] text-slate-500 font-medium block">Total Pemasukan</span>
+                      <span className="font-extrabold text-emerald-700 text-xs">{formatRupiah(totalIn)}</span>
+                      <div className="text-[9px] text-slate-400 mt-0.5">
+                        Iuran: {formatRupiah(inIuran)} | Lain: {formatRupiah(inLain)}
+                      </div>
                     </div>
 
                     <div className="bg-rose-50/80 p-2 rounded-xl border border-rose-100/80">
@@ -797,12 +1090,14 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
           {/* Desktop Table View */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[550px]">
+            <table className="w-full text-left text-xs border-collapse min-w-[650px]">
               <thead>
                 <tr className="bg-indigo-800 text-white font-bold text-[11px]">
                   <th className="py-3 px-3 rounded-tl-xl">Bulan</th>
-                  <th className="py-3 px-3 text-right">Pemasukan (Iuran)</th>
-                  <th className="py-3 px-3 text-right">Pengeluaran</th>
+                  <th className="py-3 px-3 text-right">Iuran (Rp)</th>
+                  <th className="py-3 px-3 text-right">Non-Iuran (Rp)</th>
+                  <th className="py-3 px-3 text-right">Total Masuk (Rp)</th>
+                  <th className="py-3 px-3 text-right">Pengeluaran (Rp)</th>
                   <th className="py-3 px-3 text-right">Net Cashflow</th>
                   <th className="py-3 px-3 text-right rounded-tr-xl">Status</th>
                 </tr>
@@ -810,20 +1105,28 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <tbody className="divide-y divide-slate-200">
                 {BULAN_LIST.map((bulanName, idx) => {
                   const monthStr = String(idx + 1).padStart(2, '0');
-                  const inVal = iuranYear
+                  const inIuran = iuranYear
                     .filter(i => i.bulan === bulanName)
                     .reduce((a, b) => a + b.nominal, 0);
+
+                  const inLain = pemasukanLainYear
+                    .filter(l => l.tanggal.split('-')[1] === monthStr)
+                    .reduce((a, b) => a + b.nominal, 0);
+
+                  const totalIn = inIuran + inLain;
 
                   const outVal = pengeluaranYear
                     .filter(p => p.tanggal.split('-')[1] === monthStr)
                     .reduce((a, b) => a + b.nominal, 0);
 
-                  const net = inVal - outVal;
+                  const net = totalIn - outVal;
 
                   return (
                     <tr key={`rekap-row-${bulanName}-${idx}`} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-3 font-bold text-slate-800">{bulanName}</td>
-                      <td className="py-2.5 px-3 text-right font-semibold text-emerald-600">{formatRupiah(inVal)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-600">{formatRupiah(inIuran)}</td>
+                      <td className="py-2.5 px-3 text-right text-teal-600 font-medium">{formatRupiah(inLain)}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-emerald-700">{formatRupiah(totalIn)}</td>
                       <td className="py-2.5 px-3 text-right font-semibold text-rose-600">{formatRupiah(outVal)}</td>
                       <td className={`py-2.5 px-3 text-right font-black ${net >= 0 ? 'text-teal-700' : 'text-rose-700'}`}>
                         {formatRupiah(net)}
@@ -842,6 +1145,8 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <tfoot>
                 <tr className="bg-slate-900 text-white font-bold text-xs">
                   <td className="py-3 px-3 rounded-bl-xl">TOTAL AKUMULASI:</td>
+                  <td className="py-3 px-3 text-right text-slate-300 font-bold">{formatRupiah(totalIuranMasuk)}</td>
+                  <td className="py-3 px-3 text-right text-teal-300 font-bold">{formatRupiah(totalPemasukanLain)}</td>
                   <td className="py-3 px-3 text-right text-emerald-400 font-black">{formatRupiah(totalKasMasuk)}</td>
                   <td className="py-3 px-3 text-right text-rose-400 font-black">{formatRupiah(totalKasKeluar)}</td>
                   <td className={`py-3 px-3 text-right text-sm font-black ${saldoBersih >= 0 ? 'text-teal-300' : 'text-rose-300'}`}>
@@ -854,6 +1159,237 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           </div>
         </div>
       )}
+
+      {/* PRINT-ONLY COMPLETE REPORT VIEW */}
+      <div id="printable-laporan-keuangan" className="hidden print:block space-y-6 text-slate-900 bg-white p-4">
+        {/* Kop Surat Resmi */}
+        <div className="text-center pb-3 border-b-2 border-slate-800">
+          <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">
+            Musyawarah Kerja Kepala Sekolah (MKKS)
+          </h2>
+          <h3 className="text-base font-bold text-teal-800 uppercase tracking-wide">
+            Kecamatan Cimanggis dan Tapos • Kota Depok
+          </h3>
+          <p className="text-xs font-semibold text-slate-600 mt-0.5">
+            Laporan Keuangan, Penerimaan Iuran, Pemasukan Non-Iuran & Pengeluaran Kas • Tahun Buku {selectedYear}
+          </p>
+        </div>
+
+        {/* 4 Financial Health Summary Cards on Print */}
+        <div className="grid grid-cols-4 gap-3">
+          {/* Total Kas Masuk */}
+          <div className="border border-emerald-300 bg-emerald-50/60 rounded-xl p-3">
+            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Total Masuk</span>
+            <div className="text-base font-black text-emerald-700 mt-0.5">{formatRupiah(totalKasMasuk)}</div>
+            <p className="text-[9px] text-slate-500 mt-0.5">Iuran & Non-Iuran ({selectedYear})</p>
+          </div>
+
+          {/* Non-Iuran */}
+          <div className="border border-teal-300 bg-teal-50/60 rounded-xl p-3">
+            <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">Non-Iuran</span>
+            <div className="text-base font-black text-teal-700 mt-0.5">{formatRupiah(totalPemasukanLain)}</div>
+            <p className="text-[9px] text-slate-500 mt-0.5">{pemasukanLainYear.length} Transaksi Non-Iuran</p>
+          </div>
+
+          {/* Pengeluaran */}
+          <div className="border border-rose-300 bg-rose-50/60 rounded-xl p-3">
+            <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block">Pengeluaran</span>
+            <div className="text-base font-black text-rose-700 mt-0.5">{formatRupiah(totalKasKeluar)}</div>
+            <p className="text-[9px] text-slate-500 mt-0.5">Operasional ({selectedYear})</p>
+          </div>
+
+          {/* Saldo Bersih */}
+          <div className={`border rounded-xl p-3 ${saldoBersih >= 0 ? 'border-indigo-300 bg-indigo-50/60' : 'border-rose-300 bg-rose-50/60'}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider block ${saldoBersih >= 0 ? 'text-indigo-800' : 'text-rose-800'}`}>Saldo Bersih</span>
+            <div className={`text-base font-black mt-0.5 ${saldoBersih >= 0 ? 'text-indigo-700' : 'text-rose-700'}`}>
+              {formatRupiah(saldoBersih)}
+            </div>
+            <p className="text-[9px] text-slate-500 mt-0.5">{saldoBersih >= 0 ? 'Kas Bersih (Surplus)' : 'Kas Bersih (Defisit)'}</p>
+          </div>
+        </div>
+
+        {/* 1. Matriks Iuran */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+            1. Matriks Status Pembayaran Iuran Per Sekolah (Tahun {selectedYear})
+          </h4>
+          <table className="w-full text-left text-[10px] border-collapse border border-slate-300">
+            <thead>
+              <tr className="bg-teal-700 text-white font-bold">
+                <th className="p-1.5 border border-teal-800 text-center w-6">No</th>
+                <th className="p-1.5 border border-teal-800">Nama Sekolah</th>
+                {BULAN_SINGKAT.map(b => (
+                  <th key={`print-head-${b}`} className="p-1.5 border border-teal-800 text-center w-8">{b}</th>
+                ))}
+                <th className="p-1.5 border border-teal-800 text-right">Lunas (Rp)</th>
+                <th className="p-1.5 border border-teal-800 text-right">Tunggakan (Rp)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sekolahList.map((s, idx) => {
+                let lunasCount = 0;
+                const monthsStatus = BULAN_LIST.map(bulan => {
+                  const isPaid = iuranYear.some(i => i.idSekolah === s.idSekolah && i.bulan === bulan);
+                  if (isPaid) {
+                    lunasCount++;
+                    return 'V';
+                  }
+                  return '-';
+                });
+                const totalLunas = lunasCount * IURAN_PER_BULAN;
+                const totalTunggakan = (12 - lunasCount) * IURAN_PER_BULAN;
+
+                return (
+                  <tr key={`print-matrix-${s.idSekolah || idx}`} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
+                    <td className="p-1.5 border border-slate-300 text-center font-bold">{idx + 1}</td>
+                    <td className="p-1.5 border border-slate-300 font-semibold">{s.namaSekolah}</td>
+                    {monthsStatus.map((st, sIdx) => (
+                      <td key={`print-st-${sIdx}`} className={`p-1.5 border border-slate-300 text-center font-bold ${st === 'V' ? 'text-emerald-700' : 'text-slate-300'}`}>
+                        {st}
+                      </td>
+                    ))}
+                    <td className="p-1.5 border border-slate-300 text-right font-bold text-emerald-700">{formatRupiah(totalLunas)}</td>
+                    <td className="p-1.5 border border-slate-300 text-right font-bold text-rose-600">{formatRupiah(totalTunggakan)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 2. Pemasukan Non-Iuran (if any) */}
+        {pemasukanLainYear.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+              2. Rincian Pemasukan Kas Non-Iuran (Tahun {selectedYear})
+            </h4>
+            <table className="w-full text-left text-[10px] border-collapse border border-slate-300">
+              <thead>
+                <tr className="bg-teal-700 text-white font-bold">
+                  <th className="p-1.5 border border-teal-800 text-center w-6">No</th>
+                  <th className="p-1.5 border border-teal-800">Tanggal</th>
+                  <th className="p-1.5 border border-teal-800">Kategori</th>
+                  <th className="p-1.5 border border-teal-800">Sumber Dana / Pihak</th>
+                  <th className="p-1.5 border border-teal-800">Keterangan</th>
+                  <th className="p-1.5 border border-teal-800 text-right">Nominal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pemasukanLainYear.map((l, idx) => (
+                  <tr key={`print-lain-${l.id || idx}`} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
+                    <td className="p-1.5 border border-slate-300 text-center">{idx + 1}</td>
+                    <td className="p-1.5 border border-slate-300">{formatDateIndonesian(l.tanggal)}</td>
+                    <td className="p-1.5 border border-slate-300 font-semibold text-teal-800">{l.kategori}</td>
+                    <td className="p-1.5 border border-slate-300 font-bold">{l.sumberDana}</td>
+                    <td className="p-1.5 border border-slate-300">{l.keterangan || '-'}</td>
+                    <td className="p-1.5 border border-slate-300 text-right font-bold text-teal-700">{formatRupiah(l.nominal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-800 text-white font-bold">
+                  <td colSpan={5} className="p-1.5 text-right">TOTAL PEMASUKAN NON-IURAN:</td>
+                  <td className="p-1.5 text-right text-teal-300 font-black">{formatRupiah(totalPemasukanLain)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+
+        {/* 3. Kas Keluar Operasional */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+            {pemasukanLainYear.length > 0 ? '3' : '2'}. Rincian Kas Keluar (Pengeluaran Operasional {selectedYear})
+          </h4>
+          <table className="w-full text-left text-[10px] border-collapse border border-slate-300">
+            <thead>
+              <tr className="bg-rose-700 text-white font-bold">
+                <th className="p-1.5 border border-rose-800 text-center w-6">No</th>
+                <th className="p-1.5 border border-rose-800">Tanggal</th>
+                <th className="p-1.5 border border-rose-800">Alokasi Project / Kegiatan</th>
+                <th className="p-1.5 border border-rose-800">Keterangan</th>
+                <th className="p-1.5 border border-rose-800 text-right">Nominal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pengeluaranYear.map((p, idx) => (
+                <tr key={`print-out-${p.id || idx}`} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
+                  <td className="p-1.5 border border-slate-300 text-center">{idx + 1}</td>
+                  <td className="p-1.5 border border-slate-300">{formatDateIndonesian(p.tanggal)}</td>
+                  <td className="p-1.5 border border-slate-300 font-bold">{p.project}</td>
+                  <td className="p-1.5 border border-slate-300">{p.keterangan}</td>
+                  <td className="p-1.5 border border-slate-300 text-right font-bold text-rose-600">{formatRupiah(p.nominal)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-800 text-white font-bold">
+                <td colSpan={4} className="p-1.5 text-right">TOTAL KAS KELUAR:</td>
+                <td className="p-1.5 text-right text-rose-300 font-black">{formatRupiah(totalKasKeluar)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* 4. Rekapitulasi Arus Kas & Saldo Akhir */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+            {pemasukanLainYear.length > 0 ? '4' : '3'}. Ringkasan Rekapitulasi Arus Kas & Saldo Akhir (Tahun {selectedYear})
+          </h4>
+          <table className="w-full text-left text-[10px] border-collapse border border-slate-300">
+            <thead>
+              <tr className="bg-slate-900 text-white font-bold">
+                <th className="p-2 border border-slate-800">Komponen Arus Kas</th>
+                <th className="p-2 border border-slate-800 text-right">Jumlah Nominal (Rp)</th>
+                <th className="p-2 border border-slate-800">Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="p-2 border border-slate-300 font-semibold">Total Penerimaan Iuran Anggota</td>
+                <td className="p-2 border border-slate-300 text-right font-bold text-slate-800">{formatRupiah(totalIuranMasuk)}</td>
+                <td className="p-2 border border-slate-300 text-slate-600">Iuran 10 Sekolah Anggota MKKS ({iuranYear.length} transaksi)</td>
+              </tr>
+              <tr>
+                <td className="p-2 border border-slate-300 font-semibold">Total Pemasukan Kas Non-Iuran</td>
+                <td className="p-2 border border-slate-300 text-right font-bold text-teal-700">{formatRupiah(totalPemasukanLain)}</td>
+                <td className="p-2 border border-slate-300 text-slate-600">{pemasukanLainYear.length} Transaksi Non-Iuran (Sponsor/Sisa/Donasi)</td>
+              </tr>
+              <tr className="bg-emerald-50">
+                <td className="p-2 border border-slate-300 font-extrabold text-emerald-900">TOTAL KAS MASUK (Iuran + Non-Iuran)</td>
+                <td className="p-2 border border-slate-300 text-right font-black text-emerald-700">{formatRupiah(totalKasMasuk)}</td>
+                <td className="p-2 border border-slate-300 font-semibold text-emerald-800">Akumulasi Seluruh Penerimaan Dana Kas Masuk</td>
+              </tr>
+              <tr className="bg-rose-50">
+                <td className="p-2 border border-slate-300 font-extrabold text-rose-900">TOTAL KAS KELUAR (Pengeluaran)</td>
+                <td className="p-2 border border-slate-300 text-right font-black text-rose-700">{formatRupiah(totalKasKeluar)}</td>
+                <td className="p-2 border border-slate-300 font-semibold text-rose-800">Akumulasi Seluruh Belanja & Pengeluaran Operasional</td>
+              </tr>
+              <tr className={saldoBersih >= 0 ? 'bg-indigo-50' : 'bg-rose-100'}>
+                <td className="p-2.5 border border-slate-300 font-black text-xs text-slate-900">SALDO BERSIH KAS AKHIR</td>
+                <td className={`p-2.5 border border-slate-300 text-right font-black text-xs ${saldoBersih >= 0 ? 'text-indigo-800' : 'text-rose-700'}`}>
+                  {formatRupiah(saldoBersih)}
+                </td>
+                <td className="p-2.5 border border-slate-300 font-extrabold text-xs text-slate-800">
+                  {saldoBersih >= 0 ? 'STATUS: SURPLUS KAS' : 'STATUS: DEFISIT KAS'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Tanda Tangan */}
+        <div className="pt-6 flex justify-end">
+          <div className="text-right text-xs text-slate-800 space-y-1">
+            <p>Depok, {formatDateIndonesian(new Date().toISOString().split('T')[0])}</p>
+            <p className="font-bold">Bendahara MKKS,</p>
+            <div className="h-16"></div>
+            <p className="font-extrabold underline text-slate-900">
+              {resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList)}
+            </p>
+          </div>
+        </div>
+      </div>
 
     </div>
   );

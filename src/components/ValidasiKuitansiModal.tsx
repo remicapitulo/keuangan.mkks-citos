@@ -14,8 +14,12 @@ import {
 } from 'lucide-react';
 
 export interface ValidasiData {
+  jenis?: 'iuran' | 'pemasukan-lain';
   noKuitansi: string;
   namaSekolah: string;
+  sumberDana?: string;
+  kategori?: string;
+  keterangan?: string;
   namaKepsek?: string;
   alamatSekolah?: string;
   tahunBuku: number;
@@ -39,6 +43,13 @@ export const ValidasiKuitansiModal: React.FC<ValidasiKuitansiModalProps> = ({
   onPrintStruk
 }) => {
   if (!isOpen || !data) return null;
+
+  const isPemasukanLain = Boolean(
+    data.jenis === 'pemasukan-lain' ||
+    Boolean(data.kategori) ||
+    data.bulanList.some(b => b.includes('Pemasukan Non-Iuran') || b.includes('Penerimaan')) ||
+    data.noKuitansi?.startsWith('KWT-IN')
+  );
 
   const verificationHash = `MKKS-CITOS-${data.tahunBuku}-${(data.noKuitansi || 'KWT').replace(/[^A-Za-z0-9]/g, '')}`;
 
@@ -69,7 +80,7 @@ export const ValidasiKuitansiModal: React.FC<ValidasiKuitansiModalProps> = ({
             </div>
 
             <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
-              Kuitansi Sah MKKS Cimanggis & Tapos
+              {isPemasukanLain ? 'Kuitansi Sah Penerimaan Kas Non-Iuran' : 'Kuitansi Sah MKKS Cimanggis & Tapos'}
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
               Dokumen kuitansi ini 100% asli, sah, dan tercatat dalam basis data pembukuan resmi MKKS Citos Kota Depok.
@@ -87,25 +98,43 @@ export const ValidasiKuitansiModal: React.FC<ValidasiKuitansiModalProps> = ({
               </span>
             </div>
 
-            {/* Sekolah */}
+            {/* Sumber Dana / Sekolah */}
             <div className="flex items-start justify-between pb-2.5 border-b border-emerald-200/60 gap-2">
-              <span className="text-slate-500 font-semibold shrink-0">Instansi / Sekolah</span>
-              <span className="font-extrabold text-slate-900 text-right">{data.namaSekolah}</span>
+              <span className="text-slate-500 font-semibold shrink-0">
+                {isPemasukanLain ? 'Sumber Dana / Pihak Terkait' : 'Instansi / Sekolah'}
+              </span>
+              <span className="font-extrabold text-slate-900 text-right">
+                {isPemasukanLain ? (data.sumberDana || data.namaSekolah) : data.namaSekolah}
+              </span>
             </div>
 
-            {/* Kepsek if exists */}
-            {data.namaKepsek && (
+            {/* Kategori / Kepsek if exists */}
+            {isPemasukanLain ? (
               <div className="flex items-start justify-between pb-2.5 border-b border-emerald-200/60 gap-2">
-                <span className="text-slate-500 font-semibold shrink-0">Kepala Sekolah</span>
-                <span className="font-semibold text-slate-800 text-right">{data.namaKepsek}</span>
+                <span className="text-slate-500 font-semibold shrink-0">Kategori Penerimaan</span>
+                <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 text-right">
+                  {data.kategori || 'Pemasukan Non-Iuran'}
+                </span>
               </div>
+            ) : (
+              data.namaKepsek && (
+                <div className="flex items-start justify-between pb-2.5 border-b border-emerald-200/60 gap-2">
+                  <span className="text-slate-500 font-semibold shrink-0">Kepala Sekolah</span>
+                  <span className="font-semibold text-slate-800 text-right">{data.namaKepsek}</span>
+                </div>
+              )
             )}
 
-            {/* Peruntukan */}
+            {/* Peruntukan / Keperluan */}
             <div className="flex items-start justify-between pb-2.5 border-b border-emerald-200/60 gap-2">
-              <span className="text-slate-500 font-semibold shrink-0">Bulan Iuran</span>
-              <span className="font-bold text-emerald-800 text-right">
-                {data.bulanList.join(', ')} (Tahun {data.tahunBuku})
+              <span className="text-slate-500 font-semibold shrink-0">
+                {isPemasukanLain ? 'Keperluan / Keterangan' : 'Bulan Iuran'}
+              </span>
+              <span className="font-bold text-slate-800 text-right">
+                {isPemasukanLain 
+                  ? (data.keterangan || `Penerimaan ${data.kategori || 'Kas Non-Iuran'}`)
+                  : `${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`
+                }
               </span>
             </div>
 
@@ -119,7 +148,7 @@ export const ValidasiKuitansiModal: React.FC<ValidasiKuitansiModalProps> = ({
 
             {/* Tanggal & Petugas */}
             <div className="flex items-center justify-between pb-2.5 border-b border-emerald-200/60">
-              <span className="text-slate-500 font-semibold">Tanggal Pembayaran</span>
+              <span className="text-slate-500 font-semibold">Tanggal Transaksi</span>
               <span className="font-bold text-slate-800">{formatDateIndonesian(data.tanggal)}</span>
             </div>
 

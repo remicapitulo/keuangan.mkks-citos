@@ -1,11 +1,12 @@
-import { Sekolah, User, Iuran, Pengeluaran, UserRole } from '../types';
-import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
+import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole } from '../types';
+import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
 
 const STORAGE_KEYS = {
   SEKOLAH: 'mkks_citos_sekolah',
   USER: 'mkks_citos_user',
   IURAN: 'mkks_citos_iuran',
   PENGELUARAN: 'mkks_citos_pengeluaran',
+  PEMASUKAN_LAIN: 'mkks_citos_pemasukan_lain',
   SPREADSHEET_ID: 'mkks_citos_sheet_id',
   APPS_SCRIPT_URL: 'mkks_citos_apps_script_url',
   CURRENT_USER: 'mkks_citos_current_user'
@@ -279,6 +280,70 @@ export function normalizePengeluaranList(rawList: any[]): Pengeluaran[] {
   }).filter((item): item is Pengeluaran => item !== null);
 }
 
+export function normalizePemasukanLainList(rawList: any[]): PemasukanLain[] {
+  if (!Array.isArray(rawList)) return [];
+
+  return rawList.map((p, idx) => {
+    if (!p || typeof p !== 'object') return null;
+
+    const id = String(p.id || p.ID || p.No || `IN-LAIN-${idx + 1}`).trim();
+    
+    // Find tanggal flexibly
+    const tanggalRaw = p.tanggal || p.Tanggal || p['Tanggal Transaksi'] || p['Tanggal Input'] || p['Tgl'] || p['TGL'] || new Date().toISOString().split('T')[0];
+    const tanggal = String(tanggalRaw).trim();
+
+    // Find kategori flexibly
+    const kategori = String(
+      p.kategori || p.Kategori || p['Kategori Pemasukan'] || p['Jenis Pemasukan'] || p.jenis || 'Pemasukan Lain-lain'
+    ).trim();
+
+    // Find sumberDana / nama pihak pemberi flexibly
+    const sumberDana = String(
+      p.sumberDana || p.sumber || p.Sumber || p['Sumber Dana'] || p['Sumber Dana / Pihak Terkait'] || 
+      p['Dari'] || p['Diterima Dari'] || p['Nama Pihak'] || p['Pihak Terkait'] || p['Instansi'] || '-'
+    ).trim();
+
+    // Find keterangan flexibly
+    const keterangan = String(
+      p.keterangan || p.Keterangan || p.deskripsi || p.Deskripsi || 
+      p['Keterangan Tambahan'] || p['Catatan'] || '-'
+    ).trim();
+
+    // Find nominal flexibly
+    let nominalRaw = p.nominal ?? p.Nominal ?? p.jumlah ?? p.Jumlah ?? 
+                     p['Jumlah Nominal (Rp)'] ?? p['Nominal (Rp)'] ?? p['Jumlah Nominal'] ?? p['JUMLAH'];
+    
+    if (typeof nominalRaw === 'string') {
+      nominalRaw = nominalRaw.replace(/[^0-9]/g, '');
+    }
+    const nominal = Number(nominalRaw) || 0;
+
+    // Find diinputOleh flexibly
+    const diinputOleh = String(
+      p.diinputOleh || p['Diinput Oleh'] || p.Petugas || p.Operator || 'Bendahara MKKS Citos'
+    ).trim();
+
+    // Find noKuitansi flexibly
+    const noKuitansi = String(
+      p.noKuitansi || p['No Kuitansi'] || p['No. Kuitansi'] || p.kuitansi || ''
+    ).trim();
+
+    if (!sumberDana && (!keterangan || keterangan === '-') && nominal === 0) return null;
+
+    const result: PemasukanLain = {
+      id,
+      tanggal,
+      kategori,
+      sumberDana: sumberDana || 'Pihak Ketiga / Donatur',
+      keterangan,
+      nominal,
+      diinputOleh,
+      noKuitansi: noKuitansi || undefined
+    };
+    return result;
+  }).filter((item): item is PemasukanLain => item !== null);
+}
+
 export class StorageService {
   public static getSpreadsheetId(): string {
     return localStorage.getItem(STORAGE_KEYS.SPREADSHEET_ID) || DEFAULT_SPREADSHEET_ID;
@@ -408,6 +473,29 @@ export class StorageService {
     }
   }
 
+  public static getPemasukanLain(): PemasukanLain[] {
+    const data = localStorage.getItem(STORAGE_KEYS.PEMASUKAN_LAIN);
+    if (!data) {
+      const normalized = normalizePemasukanLainList(INITIAL_PEMASUKAN_LAIN);
+      this.savePemasukanLain(normalized, false);
+      return normalized;
+    }
+    try {
+      const parsed = JSON.parse(data);
+      return normalizePemasukanLainList(parsed);
+    } catch {
+      return INITIAL_PEMASUKAN_LAIN;
+    }
+  }
+
+  public static savePemasukanLain(pemasukanLainList: PemasukanLain[], syncToRemote = true): void {
+    const normalized = normalizePemasukanLainList(pemasukanLainList);
+    localStorage.setItem(STORAGE_KEYS.PEMASUKAN_LAIN, JSON.stringify(normalized));
+    if (syncToRemote) {
+      this.syncToAppsScript();
+    }
+  }
+
   // Current logged in user
   public static getCurrentUser(): User | null {
     const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -435,6 +523,7 @@ export class StorageService {
     this.saveUsers(INITIAL_USER);
     this.saveIuran(INITIAL_IURAN, false);
     this.savePengeluaran(INITIAL_PENGELUARAN, false);
+    this.savePemasukanLain(INITIAL_PEMASUKAN_LAIN, false);
     this.setSpreadsheetId(DEFAULT_SPREADSHEET_ID);
     this.setAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
     this.setCurrentUser(INITIAL_USER[0]);
@@ -453,6 +542,7 @@ export class StorageService {
 
     const rawIuran = this.getIuran();
     const rawPengeluaran = this.getPengeluaran();
+    const rawPemasukanLain = this.getPemasukanLain();
 
     // Format payload with both Title Case (for Sheet columns) and camelCase
     const formattedIuran = rawIuran.map(item => ({
@@ -490,13 +580,33 @@ export class StorageService {
       diinputOleh: item.diinputOleh
     }));
 
+    const formattedPemasukanLain = rawPemasukanLain.map(item => ({
+      'No': item.id,
+      'Tanggal Transaksi': item.tanggal,
+      'Kategori': item.kategori,
+      'Sumber Dana / Pihak Terkait': item.sumberDana,
+      'Keterangan Tambahan': item.keterangan,
+      'Jumlah Nominal (Rp)': item.nominal,
+      'Diinput Oleh': item.diinputOleh,
+      'No Kuitansi': item.noKuitansi || '',
+      id: item.id,
+      tanggal: item.tanggal,
+      kategori: item.kategori,
+      sumberDana: item.sumberDana,
+      keterangan: item.keterangan,
+      nominal: item.nominal,
+      diinputOleh: item.diinputOleh,
+      noKuitansi: item.noKuitansi
+    }));
+
     const payload = {
       action: 'syncAll',
       spreadsheetId: this.getSpreadsheetId(),
       sekolah: this.getSekolah(),
       users: this.getUsers(),
       iuran: formattedIuran,
-      pengeluaran: formattedPengeluaran
+      pengeluaran: formattedPengeluaran,
+      pemasukanLain: formattedPemasukanLain
     };
 
     let data: any = null;
@@ -632,6 +742,7 @@ export class StorageService {
       if (Array.isArray(data.users) && data.users.length > 0) this.saveUsers(data.users);
       if (Array.isArray(data.iuran)) this.saveIuran(data.iuran, false);
       if (Array.isArray(data.pengeluaran)) this.savePengeluaran(data.pengeluaran, false);
+      if (Array.isArray(data.pemasukanLain)) this.savePemasukanLain(data.pemasukanLain, false);
       return true;
     }
 
@@ -660,7 +771,8 @@ function doGet(e) {
       sekolah: getSheetData(ss, 'Sekolah'),
       users: getSheetData(ss, 'User'),
       iuran: getSheetData(ss, 'Iuran'),
-      pengeluaran: getSheetData(ss, 'Pengeluaran')
+      pengeluaran: getSheetData(ss, 'Pengeluaran'),
+      pemasukanLain: getSheetData(ss, 'PemasukanLain')
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -671,6 +783,7 @@ function doGet(e) {
       if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
+      if (data.pemasukanLain) writeSheetData(ss, 'PemasukanLain', data.pemasukanLain);
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed via GET' }))
         .setMimeType(ContentService.MimeType.JSON);
     } catch(err) {
@@ -698,6 +811,7 @@ function doPost(e) {
       if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
+      if (data.pemasukanLain) writeSheetData(ss, 'PemasukanLain', data.pemasukanLain);
       
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed' }))
         .setMimeType(ContentService.MimeType.JSON);
@@ -735,6 +849,7 @@ function writeSheetData(ss, sheetName, rows) {
   var headerMap = {
     'Iuran': ['Tahun', 'Bulan', 'ID Sekolah', 'Nama Sekolah', 'Nominal', 'Tanggal Input', 'Diinput Oleh', 'No Kuitansi'],
     'Pengeluaran': ['No', 'Tanggal Transaksi', 'Alokasi Project / Kegiatan', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh'],
+    'PemasukanLain': ['No', 'Tanggal Transaksi', 'Kategori', 'Sumber Dana / Pihak Terkait', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh', 'No Kuitansi'],
     'Sekolah': ['ID Sekolah', 'Nama Sekolah', 'Nama Kepsek', 'Alamat', 'Kelurahan', 'Kecamatan'],
     'User': ['Username', 'Password', 'Role', 'Sekolah', 'Aktif', 'Nama Kepsek']
   };
@@ -751,8 +866,10 @@ function writeSheetData(ss, sheetName, rows) {
     'No': ['No', 'id', 'ID'],
     'Tanggal Transaksi': ['Tanggal Transaksi', 'tanggal', 'Tanggal'],
     'Alokasi Project / Kegiatan': ['Alokasi Project / Kegiatan', 'project', 'Kegiatan'],
-    'Keterangan Tambahan': ['Keterangan Tambahan', 'keterangan', 'Keterangan'],
-    'Jumlah Nominal (Rp)': ['Jumlah Nominal (Rp)', 'nominal', 'Nominal'],
+    'Kategori': ['Kategori', 'kategori', 'Jenis Pemasukan'],
+    'Sumber Dana / Pihak Terkait': ['Sumber Dana / Pihak Terkait', 'sumberDana', 'sumber', 'Dari', 'Diterima Dari'],
+    'Keterangan Tambahan': ['Keterangan Tambahan', 'keterangan', 'Keterangan', 'Catatan'],
+    'Jumlah Nominal (Rp)': ['Jumlah Nominal (Rp)', 'nominal', 'Nominal', 'Jumlah'],
     'Nama Kepsek': ['Nama Kepsek', 'namaKepsek', 'Kepala Sekolah'],
     'Alamat': ['Alamat', 'alamat'],
     'Kelurahan': ['Kelurahan', 'kelurahan'],

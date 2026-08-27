@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { User, Sekolah, Iuran, Pengeluaran } from './types';
+import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain } from './types';
 import { StorageService } from './services/spreadsheetSync';
 import { Navbar } from './components/Navbar';
 import { Navigation, ActiveTab } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { InputIuran } from './components/InputIuran';
+import { InputPemasukanLain } from './components/InputPemasukanLain';
 import { KelolaPengeluaran } from './components/KelolaPengeluaran';
 import { LaporanKeuangan } from './components/LaporanKeuangan';
 import { StrukModal } from './components/StrukModal';
@@ -22,6 +23,7 @@ export default function App() {
   const [usersList, setUsersList] = useState<User[]>(() => StorageService.getUsers());
   const [iuranList, setIuranList] = useState<Iuran[]>(() => StorageService.getIuran());
   const [pengeluaranList, setPengeluaranList] = useState<Pengeluaran[]>(() => StorageService.getPengeluaran());
+  const [pemasukanLainList, setPemasukanLainList] = useState<PemasukanLain[]>(() => StorageService.getPemasukanLain());
   const [spreadsheetId, setSpreadsheetId] = useState<string>(() => StorageService.getSpreadsheetId());
 
   // Modals state
@@ -44,6 +46,7 @@ export default function App() {
     setUsersList(StorageService.getUsers());
     setIuranList(StorageService.getIuran());
     setPengeluaranList(StorageService.getPengeluaran());
+    setPemasukanLainList(StorageService.getPemasukanLain());
 
     StorageService.fetchFromAppsScript().then((success) => {
       if (success) {
@@ -51,6 +54,7 @@ export default function App() {
         setUsersList(StorageService.getUsers());
         setIuranList(StorageService.getIuran());
         setPengeluaranList(StorageService.getPengeluaran());
+        setPemasukanLainList(StorageService.getPemasukanLain());
       }
     });
 
@@ -106,6 +110,37 @@ export default function App() {
     }
   };
 
+  // Save new Pemasukan Lain item
+  const handleSavePemasukanLain = async (newIncome: Omit<PemasukanLain, 'id'>) => {
+    const created: PemasukanLain = {
+      ...newIncome,
+      id: `INC-${Date.now()}`
+    };
+
+    const updated = [created, ...pemasukanLainList];
+    setPemasukanLainList(updated);
+    StorageService.savePemasukanLain(updated);
+
+    const syncRes = await StorageService.syncToAppsScript();
+    if (syncRes.status === 'connected') {
+      showToast('Berhasil mencatat pemasukan non-iuran ke Database Google Sheet!');
+    } else {
+      showToast(`Tersimpan lokal. ${syncRes.message}`);
+    }
+  };
+
+  // Delete Pemasukan Lain item
+  const handleDeletePemasukanLain = async (id: string) => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus catatan pemasukan non-iuran ini?')) {
+      const updated = pemasukanLainList.filter(p => p.id !== id);
+      setPemasukanLainList(updated);
+      StorageService.savePemasukanLain(updated);
+      
+      const syncRes = await StorageService.syncToAppsScript();
+      showToast(syncRes.status === 'connected' ? 'Pemasukan non-iuran dihapus dari Database Google Sheet.' : 'Pemasukan non-iuran dihapus lokal.');
+    }
+  };
+
   // Save new Pengeluaran item
   const handleSavePengeluaran = async (newExpense: Omit<Pengeluaran, 'id'>) => {
     const created: Pengeluaran = {
@@ -157,7 +192,7 @@ export default function App() {
     showToast(`Login sebagai ${user.sekolah} (${user.role})`);
 
     // Reset tab if user is Sekolah role and on Bendahara-only tab
-    if (user.role === 'Sekolah' && (activeTab === 'input-iuran' || activeTab === 'kelola-pengeluaran')) {
+    if (user.role === 'Sekolah' && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran')) {
       setActiveTab('dashboard');
     }
   };
@@ -177,6 +212,7 @@ export default function App() {
     setUsersList(StorageService.getUsers());
     setIuranList(StorageService.getIuran());
     setPengeluaranList(StorageService.getPengeluaran());
+    setPemasukanLainList(StorageService.getPemasukanLain());
     setCurrentUser(StorageService.getCurrentUser());
     showToast('Data aplikasi di-reset ke data default awal.');
   };
@@ -250,6 +286,7 @@ export default function App() {
                   sekolahList={sekolahList}
                   iuranList={iuranList}
                   pengeluaranList={pengeluaranList}
+                  pemasukanLainList={pemasukanLainList}
                   onNavigateToTab={(tab) => setActiveTab(tab)}
                   onSelectSchoolForIuran={(namaSekolah) => setSelectedSchoolForIuran(namaSekolah)}
                   onOpenStrukModal={handleOpenStrukModal}
@@ -263,6 +300,16 @@ export default function App() {
                   onSaveIuran={handleSaveIuran}
                   onOpenStrukModal={handleOpenStrukModal}
                   selectedSchoolNameFromDashboard={selectedSchoolForIuran}
+                  currentUser={currentUser}
+                />
+              )}
+
+              {activeTab === 'pemasukan-lain' && isBendahara && (
+                <InputPemasukanLain
+                  pemasukanLainList={pemasukanLainList}
+                  onSavePemasukanLain={handleSavePemasukanLain}
+                  onDeletePemasukanLain={handleDeletePemasukanLain}
+                  onOpenStrukModal={handleOpenStrukModal}
                   currentUser={currentUser}
                 />
               )}
@@ -281,13 +328,15 @@ export default function App() {
                   sekolahList={sekolahList}
                   iuranList={iuranList}
                   pengeluaranList={pengeluaranList}
+                  pemasukanLainList={pemasukanLainList}
                   userSchoolName={currentUser?.sekolah}
                   currentUser={currentUser}
+                  onOpenStrukModal={handleOpenStrukModal}
                 />
               )}
 
               {/* Access denied fallback if Sekolah attempts Bendahara route */}
-              {!isBendahara && (activeTab === 'input-iuran' || activeTab === 'kelola-pengeluaran') && (
+              {!isBendahara && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran') && (
                 <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12 space-y-3">
                   <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto" />
                   <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Bendahara)</h3>

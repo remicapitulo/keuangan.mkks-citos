@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Sekolah, Iuran, Pengeluaran, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN } from '../types';
+import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN } from '../types';
 import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara } from '../utils/formatters';
 import { 
   TrendingUp, 
@@ -16,7 +16,8 @@ import {
   ShieldAlert,
   UserCheck,
   Printer,
-  FileCheck
+  FileCheck,
+  HandCoins
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -24,7 +25,8 @@ interface DashboardProps {
   sekolahList: Sekolah[];
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
-  onNavigateToTab: (tab: 'input-iuran' | 'kelola-pengeluaran' | 'laporan-keuangan') => void;
+  pemasukanLainList?: PemasukanLain[];
+  onNavigateToTab: (tab: 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan') => void;
   onSelectSchoolForIuran?: (namaSekolah: string) => void;
   onOpenStrukModal?: (kuitansiData: any) => void;
 }
@@ -34,6 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   sekolahList,
   iuranList,
   pengeluaranList,
+  pemasukanLainList = [],
   onNavigateToTab,
   onSelectSchoolForIuran,
   onOpenStrukModal
@@ -44,25 +47,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Filter lists by selected year
   const iuranYear = iuranList.filter(i => i.tahun === selectedYear);
   const pengeluaranYear = pengeluaranList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
+  const pemasukanLainYear = pemasukanLainList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
 
   // Calculations
-  const totalKasMasuk = iuranYear.reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalIuranMasuk = iuranYear.reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalPemasukanLain = pemasukanLainYear.reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalKasMasuk = totalIuranMasuk + totalPemasukanLain;
   const totalKasKeluar = pengeluaranYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const totalKasBersih = totalKasMasuk - totalKasKeluar;
 
   // Target total expected iuran per year = 10 Sekolah * 12 Bulan * Rp 100.000 = Rp 12.000.000
   const totalExpectedIuran = sekolahList.length * 12 * IURAN_PER_BULAN; // Rp 12,000,000
-  const totalTunggakan = Math.max(0, totalExpectedIuran - totalKasMasuk);
-  const percentageLunas = Math.min(100, Math.round((totalKasMasuk / (totalExpectedIuran || 1)) * 100));
+  const totalTunggakan = Math.max(0, totalExpectedIuran - totalIuranMasuk);
+  const percentageLunas = Math.min(100, Math.round((totalIuranMasuk / (totalExpectedIuran || 1)) * 100));
 
   // Monthly breakdown for trend chart
   const monthlyTrends = BULAN_LIST.map((bulanName, index) => {
     const monthIndexStr = String(index + 1).padStart(2, '0');
     
     // Total iuran for this month
-    const masukan = iuranYear
+    const iuranBulan = iuranYear
       .filter(i => i.bulan === bulanName)
       .reduce((acc, curr) => acc + curr.nominal, 0);
+
+    // Total pemasukan lain in this month
+    const pemasukanLainBulan = pemasukanLainYear
+      .filter(p => {
+        const pMonth = p.tanggal.split('-')[1];
+        return pMonth === monthIndexStr;
+      })
+      .reduce((acc, curr) => acc + curr.nominal, 0);
+
+    const masukan = iuranBulan + pemasukanLainBulan;
 
     // Total pengeluaran in this month
     const keluaran = pengeluaranYear
@@ -76,6 +92,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       bulanSingkat: BULAN_SINGKAT[index],
       bulanName,
       masukan,
+      iuranBulan,
+      pemasukanLainBulan,
       keluaran,
       selisih: masukan - keluaran
     };
@@ -204,14 +222,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm text-slate-600 font-semibold">
-            <span>Penerimaan: {formatRupiah(totalKasMasuk)}</span>
+            <span>Total Masuk: {formatRupiah(totalKasMasuk)}</span>
           </div>
         </div>
 
-        {/* Card 2: Total Kas Masuk */}
+        {/* Card 2: Total Kas Masuk (Iuran + Pemasukan Lain) */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">Kas Masuk (Iuran)</span>
+            <span className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">Total Kas Masuk</span>
             <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
               <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
@@ -220,14 +238,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="text-2xl sm:text-3xl lg:text-3xl font-black text-emerald-600 tracking-tight">
               {formatRupiah(totalKasMasuk)}
             </div>
-            <p className="text-xs sm:text-sm text-emerald-700 font-bold mt-1 flex items-center">
-              <ArrowUpRight className="w-4 h-4 mr-0.5" />
-              <span>{iuranYear.length} Transaksi iuran lunas</span>
-            </p>
+            <div className="text-[11px] text-slate-500 font-medium mt-1 flex items-center justify-between">
+              <span>Iuran: <strong className="text-emerald-700">{formatRupiah(totalIuranMasuk)}</strong></span>
+              <span>Lainnya: <strong className="text-teal-700">{formatRupiah(totalPemasukanLain)}</strong></span>
+            </div>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm text-slate-600 font-medium">
-            <span>Target: {formatRupiah(totalExpectedIuran)}</span>
-            <span className="font-bold text-emerald-600">{percentageLunas}% Tercapai</span>
+            <span>Target Iuran: {formatRupiah(totalExpectedIuran)}</span>
+            <span className="font-bold text-emerald-600">{percentageLunas}% Iuran</span>
           </div>
         </div>
 
@@ -553,6 +571,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 desc: `Iuran Bulan ${i.bulan} ${i.tahun}`,
                 amount: i.nominal,
                 by: i.diinputOleh
+              })),
+              ...pemasukanLainYear.slice(-10).map(l => ({
+                type: 'MASUK' as const,
+                date: l.tanggal,
+                title: `${l.sumberDana} (${l.kategori})`,
+                desc: l.keterangan,
+                amount: l.nominal,
+                by: l.diinputOleh
               })),
               ...pengeluaranYear.slice(-10).map(p => ({
                 type: 'KELUAR' as const,

@@ -39,6 +39,26 @@ export interface Pengeluaran {
   diinputOleh: string;
 }
 
+export interface PemasukanLain {
+  id: string;
+  tanggal: string; // YYYY-MM-DD
+  kategori: string; // 'Sponsor & Kemitraan' | 'Uang Kembali / Sisa Panitia' | 'Sumbangan & Donasi' | 'Dana Hibah / Bantuan' | 'Bagi Hasil / Jasa Giro' | 'Pemasukan Lain-lain'
+  sumberDana: string; // Nama Pihak Pemberi / Sponsor / Panitia / Donatur
+  keterangan: string;
+  nominal: number;
+  diinputOleh: string;
+  noKuitansi?: string;
+}
+
+export const KATEGORI_PEMASUKAN_LAIN = [
+  'Sponsor & Kemitraan',
+  'Uang Kembali / Sisa Panitia',
+  'Sumbangan & Donasi',
+  'Dana Hibah / Bantuan',
+  'Bagi Hasil / Jasa Giro',
+  'Pemasukan Lain-lain'
+] as const;
+
 export interface PaketDurasi {
   label: string;
   bulanCount: number;

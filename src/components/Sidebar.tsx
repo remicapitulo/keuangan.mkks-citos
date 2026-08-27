@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { UserRole } from '../types';
-import { LayoutDashboard, Wallet, Receipt, FileText, Database, Menu, X, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Wallet, Receipt, FileText, Database, Menu, X, ChevronDown, Coins } from 'lucide-react';
 
-export type ActiveTab = 'dashboard' | 'input-iuran' | 'kelola-pengeluaran' | 'laporan-keuangan';
+export type ActiveTab = 'dashboard' | 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan';
 
 interface NavigationProps {
   role: UserRole;
@@ -31,6 +31,12 @@ export const Navigation: React.FC<NavigationProps> = ({
       label: 'Input Iuran',
       icon: <Wallet className="w-5 h-5" />,
       desc: 'Bayar Iuran Sekolah'
+    },
+    {
+      id: 'pemasukan-lain',
+      label: 'Pemasukan Lain',
+      icon: <Coins className="w-5 h-5" />,
+      desc: 'Sponsor, Sisa Panitia, dll'
     },
     {
       id: 'kelola-pengeluaran',

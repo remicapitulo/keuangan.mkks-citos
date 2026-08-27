@@ -8,9 +8,13 @@ interface StrukModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: {
+    jenis?: 'iuran' | 'pemasukan-lain';
     noKuitansi: string;
     tanggal: string;
     namaSekolah: string;
+    sumberDana?: string;
+    kategori?: string;
+    keterangan?: string;
     namaKepsek?: string;
     alamatSekolah?: string;
     tahunBuku: number;
@@ -127,6 +131,15 @@ export const StrukModal: React.FC<StrukModalProps> = ({
 
   const bendaharaFullName = data ? resolveNamaBendahara(data.diinputOleh) : 'H. Nurhasan, M.Pd';
 
+  const isPemasukanLain = Boolean(
+    data && (
+      data.jenis === 'pemasukan-lain' ||
+      Boolean(data.kategori) ||
+      data.bulanList.some(b => b.includes('Pemasukan Non-Iuran') || b.includes('Penerimaan')) ||
+      data.noKuitansi?.startsWith('KWT-IN')
+    )
+  );
+
   // Generate QR Code data URL when data is present
   useEffect(() => {
     if (!data) {
@@ -138,7 +151,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
     const appPath = typeof window !== 'undefined' ? window.location.pathname : '/';
     
     // Construct the verification URL that when scanned opens the validasi modal
-    const verifyUrl = `${appOrigin}${appPath}?verify=${encodeURIComponent(data.noKuitansi)}&sekolah=${encodeURIComponent(data.namaSekolah)}&bulan=${encodeURIComponent(data.bulanList.join(','))}&tahun=${data.tahunBuku}&nominal=${data.totalNominal}&tgl=${encodeURIComponent(data.tanggal)}&petugas=${encodeURIComponent(bendaharaFullName)}`;
+    const verifyUrl = `${appOrigin}${appPath}?verify=${encodeURIComponent(data.noKuitansi)}&sekolah=${encodeURIComponent(data.sumberDana || data.namaSekolah)}&bulan=${encodeURIComponent(isPemasukanLain ? (data.kategori || 'Pemasukan Lain') : data.bulanList.join(','))}&tahun=${data.tahunBuku}&nominal=${data.totalNominal}&tgl=${encodeURIComponent(data.tanggal)}&petugas=${encodeURIComponent(bendaharaFullName)}`;
 
     QRCode.toDataURL(verifyUrl, {
       width: 256,
@@ -152,7 +165,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
     }).catch(err => {
       console.error('Failed to generate QR Code:', err);
     });
-  }, [data, bendaharaFullName]);
+  }, [data, bendaharaFullName, isPemasukanLain]);
 
   if (!isOpen || !data) return null;
 
@@ -315,7 +328,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       ctx.font = '900 18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.fillStyle = '#0f172a';
       ctx.textAlign = 'center';
-      ctx.fillText('KUITANSI PEMBAYARAN IURAN', logicalWidth / 2, 85);
+      ctx.fillText(isPemasukanLain ? 'KUITANSI PENERIMAAN DANA' : 'KUITANSI PEMBAYARAN IURAN', logicalWidth / 2, 85);
 
       // No Kuitansi Box
       const prefix = 'No: ';
@@ -381,7 +394,8 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       ctx.fillStyle = '#0f172a';
       ctx.font = '900 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(data.namaSekolah, 520, curY);
+      const terimaDari = isPemasukanLain ? (data.sumberDana || data.namaSekolah) : data.namaSekolah;
+      ctx.fillText(terimaDari, 520, curY);
 
       ctx.strokeStyle = '#f1f5f9';
       ctx.lineWidth = 1;
@@ -390,8 +404,28 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       ctx.lineTo(520, curY + 9);
       ctx.stroke();
 
-      // Row 3: Kepala Sekolah (if present)
-      if (data.namaKepsek && data.namaKepsek.trim()) {
+      // Row 3: Detail Tambahan
+      if (isPemasukanLain) {
+        // Kategori Penerimaan
+        curY += 28;
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('Kategori Penerimaan', 40, curY);
+
+        ctx.fillStyle = '#0f766e';
+        ctx.font = 'bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(data.kategori || 'Pemasukan Non-Iuran', 520, curY);
+
+        ctx.strokeStyle = '#f1f5f9';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(40, curY + 9);
+        ctx.lineTo(520, curY + 9);
+        ctx.stroke();
+      } else if (data.namaKepsek && data.namaKepsek.trim()) {
+        // Kepala Sekolah (Khusus Iuran)
         curY += 28;
         ctx.fillStyle = '#64748b';
         ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -431,14 +465,17 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       ctx.textAlign = 'left';
       ctx.fillText(`"${terbilang(data.totalNominal)}"`, 52, curY + 21);
 
-      // Row 5: Untuk Pembayaran
+      // Row 5: Untuk Pembayaran / Untuk Keperluan
       curY += uangBoxH + 18;
       ctx.fillStyle = '#64748b';
       ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('Untuk Pembayaran', 40, curY);
+      ctx.fillText(isPemasukanLain ? 'Untuk Keperluan' : 'Untuk Pembayaran', 40, curY);
 
-      const pemText = `Iuran Anggota MKKS Bulan ${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`;
+      const pemText = isPemasukanLain
+        ? (data.keterangan || `Penerimaan ${data.kategori || 'Dana'} dari ${data.sumberDana || data.namaSekolah}`)
+        : `Iuran Anggota MKKS Bulan ${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`;
+
       ctx.fillStyle = '#1e293b';
       ctx.font = 'bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'right';
@@ -456,7 +493,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       ctx.lineTo(520, curY + 11);
       ctx.stroke();
 
-      // 5. Highlight Box: TOTAL TERBAYAR
+      // 5. Highlight Box: TOTAL DITERIMA / TOTAL TERBAYAR
       curY += 24;
       const totalBoxW = 480;
       const totalBoxH = 48;
@@ -473,7 +510,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('TOTAL TERBAYAR:', 56, curY + 29);
+      ctx.fillText(isPemasukanLain ? 'TOTAL DITERIMA:' : 'TOTAL TERBAYAR:', 56, curY + 29);
 
       ctx.font = '900 20px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'right';
@@ -616,7 +653,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl mb-3 flex items-center justify-between text-xs font-semibold shadow-sm gap-2">
             <div className="flex items-center space-x-2.5">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>Pembukuan Iuran Terdaftar di Database MKKS Citos!</span>
+              <span>{isPemasukanLain ? 'Penerimaan Kas Non-Iuran Terdaftar di Database MKKS Citos!' : 'Pembukuan Iuran Terdaftar di Database MKKS Citos!'}</span>
             </div>
             {onOpenValidasiModal && (
               <button
@@ -643,7 +680,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                 <span>MKKS CIMANGGIS & TAPOS • DEPOK</span>
               </div>
               <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight mt-0.5">
-                KUITANSI PEMBAYARAN IURAN
+                {isPemasukanLain ? 'KUITANSI PENERIMAAN DANA' : 'KUITANSI PEMBAYARAN IURAN'}
               </h3>
               <div className="mt-1 inline-block bg-white px-3 py-0.5 rounded-md border border-slate-200 text-xs font-mono text-slate-600 font-bold">
                 No: <span className="text-teal-700 font-extrabold">{data.noKuitansi}</span>
@@ -661,15 +698,24 @@ export const StrukModal: React.FC<StrukModalProps> = ({
               <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                 <span className="text-slate-500 font-medium">Telah Terima Dari</span>
                 <span className="font-extrabold text-slate-900 text-sm text-right">
-                  {data.namaSekolah}
+                  {isPemasukanLain ? (data.sumberDana || data.namaSekolah) : data.namaSekolah}
                 </span>
               </div>
 
-              {data.namaKepsek && (
+              {isPemasukanLain ? (
                 <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                  <span className="text-slate-500 font-medium">Kepala Sekolah</span>
-                  <span className="font-semibold text-slate-800 text-right">{data.namaKepsek}</span>
+                  <span className="text-slate-500 font-medium">Kategori Penerimaan</span>
+                  <span className="font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-200 text-right">
+                    {data.kategori || 'Pemasukan Non-Iuran'}
+                  </span>
                 </div>
+              ) : (
+                data.namaKepsek && (
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                    <span className="text-slate-500 font-medium">Kepala Sekolah</span>
+                    <span className="font-semibold text-slate-800 text-right">{data.namaKepsek}</span>
+                  </div>
+                )
               )}
 
               <div className="border-b border-slate-200/80 pb-2 space-y-1">
@@ -680,9 +726,14 @@ export const StrukModal: React.FC<StrukModalProps> = ({
               </div>
 
               <div className="flex items-start justify-between border-b border-slate-200/80 pb-2 gap-2">
-                <span className="text-slate-500 font-medium shrink-0">Untuk Pembayaran</span>
+                <span className="text-slate-500 font-medium shrink-0">
+                  {isPemasukanLain ? 'Untuk Keperluan' : 'Untuk Pembayaran'}
+                </span>
                 <span className="font-bold text-slate-800 text-right max-w-xs leading-snug">
-                  Iuran Anggota MKKS Bulan {data.bulanList.join(', ')} (Tahun {data.tahunBuku})
+                  {isPemasukanLain 
+                    ? (data.keterangan || `Penerimaan ${data.kategori || 'Dana'} dari ${data.sumberDana || data.namaSekolah}`)
+                    : `Iuran Anggota MKKS Bulan ${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`
+                  }
                 </span>
               </div>
 
@@ -697,7 +748,9 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                 }}
                 className="total-terbayar-box bg-gradient-to-r from-teal-700 to-emerald-700 text-white p-3.5 rounded-2xl flex items-center justify-between font-bold mt-3 shadow-md border border-teal-600/30"
               >
-                <span className="text-xs tracking-wider uppercase opacity-95 text-white font-bold">TOTAL TERBAYAR:</span>
+                <span className="text-xs tracking-wider uppercase opacity-95 text-white font-bold">
+                  {isPemasukanLain ? 'TOTAL DITERIMA:' : 'TOTAL TERBAYAR:'}
+                </span>
                 <span className="text-xl font-black text-white">{formatRupiah(data.totalNominal)}</span>
               </div>
             </div>
