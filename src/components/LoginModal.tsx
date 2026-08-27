@@ -90,17 +90,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
 
     // 6. Enrich with sekolahList details if role is Sekolah
-    if (match.role === 'Sekolah' && match.sekolah) {
-      const schoolInList = sekolahList.find(s => 
-        s.namaSekolah.toLowerCase().trim() === match!.sekolah.toLowerCase().trim() ||
-        (match!.sekolah && s.namaSekolah.toLowerCase().trim().includes(match!.sekolah.toLowerCase().trim()))
-      );
-      if (schoolInList && schoolInList.namaKepsek) {
+    if (match.role === 'Sekolah') {
+      // Primary Key Lock: Look up by ID Sekolah (username = idSekolah)
+      const schoolById = sekolahList.find(s => s.idSekolah === match!.username);
+      if (schoolById) {
         match = {
           ...match,
-          sekolah: schoolInList.namaSekolah,
-          namaKepsek: schoolInList.namaKepsek
+          sekolah: schoolById.namaSekolah,
+          namaKepsek: schoolById.namaKepsek
         };
+      } else if (match.sekolah) {
+        // Fallback: Exact school name match only
+        const schoolByName = sekolahList.find(s => 
+          s.namaSekolah.toLowerCase().trim() === match!.sekolah.toLowerCase().trim()
+        );
+        if (schoolByName && schoolByName.namaKepsek) {
+          match = {
+            ...match,
+            sekolah: schoolByName.namaSekolah,
+            namaKepsek: schoolByName.namaKepsek
+          };
+        }
       }
     }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sekolah, Iuran, BULAN_LIST, IURAN_PER_BULAN, PaketDurasi, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
-import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2 } from 'lucide-react';
+import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter } from 'lucide-react';
 
 interface InputIuranProps {
   sekolahList: Sekolah[];
@@ -37,6 +37,8 @@ export const InputIuran: React.FC<InputIuranProps> = ({
   const [searchSchoolQuery, setSearchSchoolQuery] = useState<string>('');
   const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [historyTab, setHistoryTab] = useState<'selected' | 'all'>('selected');
+  const [allHistorySearch, setAllHistorySearch] = useState<string>('');
 
   // Set initial selected school if passed from dashboard
   useEffect(() => {
@@ -55,7 +57,7 @@ export const InputIuran: React.FC<InputIuranProps> = ({
     if (!i.namaSekolah || !school.namaSekolah) return false;
     const a = i.namaSekolah.trim().toLowerCase();
     const b = school.namaSekolah.trim().toLowerCase();
-    return a === b || a.includes(b) || b.includes(a);
+    return a === b;
   };
 
   // Selected school object (or undefined if none chosen)
@@ -410,74 +412,162 @@ export const InputIuran: React.FC<InputIuranProps> = ({
         </div>
 
         {/* Payment History Card for Selected School (1 Column) */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
           <div>
-            <div className="flex items-center space-x-2 mb-3 pb-3 border-b border-slate-100">
-              <History className="w-5 h-5 text-teal-600" />
-              <div>
-                <h3 className="font-bold text-slate-800 text-sm">Riwayat Pembayaran Iuran</h3>
-                <p className="text-[11px] text-slate-500">{activeSchool ? activeSchool.namaSekolah : 'Silakan Pilih Sekolah'}</p>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+              <div className="flex items-center space-x-2">
+                <History className="w-5 h-5 text-teal-600 shrink-0" />
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm">Riwayat Pembayaran Iuran</h3>
+                  <p className="text-[11px] text-slate-500">
+                    {historyTab === 'selected' ? (activeSchool ? activeSchool.namaSekolah : 'Silakan Pilih Sekolah') : 'Seluruh Catatan Iuran Terkini'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {historyForActiveSchool.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 text-xs">
-                <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <span>Belum ada riwayat pembayaran iuran tercatat untuk sekolah ini.</span>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
-                {historyForActiveSchool.map((item, idx) => (
-                  <div
-                    key={`sch-hist-${item.id || 'noid'}-${item.bulan}-${item.tanggalInput}-${idx}`}
-                    className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-teal-50/50 hover:border-teal-200 transition-all text-xs"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800">
-                        Bulan {item.bulan} {item.tahun}
-                      </span>
-                      <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
-                        {formatRupiah(item.nominal)}
-                      </span>
-                    </div>
+            {/* Tab switch between active school and all recent payments */}
+            <div className="flex rounded-xl bg-slate-100 p-1 mb-3 text-xs">
+              <button
+                type="button"
+                onClick={() => setHistoryTab('selected')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-semibold transition-all text-center text-[11px] ${
+                  historyTab === 'selected'
+                    ? 'bg-white text-teal-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Sekolah Ini ({historyForActiveSchool.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryTab('all')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-semibold transition-all text-center text-[11px] ${
+                  historyTab === 'all'
+                    ? 'bg-white text-teal-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Semua Input ({iuranList.length})
+              </button>
+            </div>
 
-                    <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
-                      <span>Tgl: {formatDateIndonesian(item.tanggalInput)}</span>
-                      <span className="font-mono text-[10px]">{item.noKuitansi || 'KWT-LOKAL'}</span>
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-slate-200/50 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">Oleh: {resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const schoolOfItem = sekolahList.find(s => isMatchSchool(item, s)) || activeSchool;
-                          onOpenStrukModal({
-                            noKuitansi: item.noKuitansi || 'KWT-RE-PRINT',
-                            tanggal: item.tanggalInput,
-                            namaSekolah: item.namaSekolah || schoolOfItem?.namaSekolah || 'Sekolah',
-                            namaKepsek: schoolOfItem?.namaKepsek || '-',
-                            alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
-                            tahunBuku: item.tahun,
-                            bulanList: [item.bulan],
-                            totalNominal: item.nominal,
-                            diinputOleh: resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)
-                          });
-                        }}
-                        className="text-teal-600 hover:text-teal-800 font-bold text-[10px] flex items-center space-x-1"
-                      >
-                        <Printer className="w-3 h-3" />
-                        <span>Cetak Struk</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+            {historyTab === 'all' && (
+              <div className="mb-3">
+                <input
+                  type="text"
+                  placeholder="Cari sekolah, bulan, atau kuitansi..."
+                  value={allHistorySearch}
+                  onChange={(e) => setAllHistorySearch(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-500"
+                />
               </div>
             )}
+
+            {(() => {
+              const displayList = historyTab === 'selected'
+                ? historyForActiveSchool
+                : iuranList
+                    .filter(i => {
+                      if (!allHistorySearch.trim()) return true;
+                      const q = allHistorySearch.toLowerCase();
+                      return (
+                        (i.namaSekolah || '').toLowerCase().includes(q) ||
+                        (i.bulan || '').toLowerCase().includes(q) ||
+                        (i.noKuitansi || '').toLowerCase().includes(q) ||
+                        (i.diinputOleh || '').toLowerCase().includes(q)
+                      );
+                    })
+                    .sort((a, b) => new Date(b.tanggalInput).getTime() - new Date(a.tanggalInput).getTime());
+
+              if (displayList.length === 0) {
+                return (
+                  <div className="text-center py-12 text-slate-400 text-xs">
+                    <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <span>
+                      {historyTab === 'selected'
+                        ? 'Belum ada riwayat pembayaran iuran tercatat untuk sekolah ini.'
+                        : 'Tidak ada data pembayaran iuran yang cocok.'}
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                  {displayList.map((item, idx) => {
+                    const schoolOfItem = sekolahList.find(s => isMatchSchool(item, s)) || activeSchool;
+
+                    return (
+                      <div
+                        key={`sch-hist-${item.id || 'noid'}-${item.bulan}-${item.tanggalInput}-${idx}`}
+                        className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-teal-50/50 hover:border-teal-200 transition-all text-xs space-y-1.5"
+                      >
+                        {historyTab === 'all' && (
+                          <div className="font-bold text-slate-900 text-xs truncate flex items-center justify-between">
+                            <span>{item.namaSekolah || 'Sekolah'}</span>
+                            <span className="font-mono text-[9px] text-slate-400">{item.noKuitansi || 'KWT'}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800">
+                            Bulan {item.bulan} {item.tahun}
+                          </span>
+                          <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
+                            {formatRupiah(item.nominal)}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                          <span>Tgl: {formatDateIndonesian(item.tanggalInput)}</span>
+                          {historyTab === 'selected' && (
+                            <span className="font-mono text-[10px]">{item.noKuitansi || 'KWT-LOKAL'}</span>
+                          )}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-200/50 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 truncate max-w-[110px]" title={item.diinputOleh}>
+                            Oleh: {resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)}
+                          </span>
+                          
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onOpenStrukModal({
+                                  noKuitansi: item.noKuitansi || 'KWT-RE-PRINT',
+                                  tanggal: item.tanggalInput,
+                                  namaSekolah: item.namaSekolah || schoolOfItem?.namaSekolah || 'Sekolah',
+                                  namaKepsek: schoolOfItem?.namaKepsek || '-',
+                                  alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                                  tahunBuku: item.tahun,
+                                  bulanList: [item.bulan],
+                                  totalNominal: item.nominal,
+                                  diinputOleh: resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)
+                                });
+                              }}
+                              className="text-teal-600 hover:text-teal-800 font-bold text-[10px] flex items-center space-x-1 hover:underline"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>Cetak Kuitansi</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 text-center">
-            Total Iuran Terbayar: <strong className="text-emerald-700">{formatRupiah(historyForActiveSchool.reduce((a, b) => a + b.nominal, 0))}</strong>
+            {historyTab === 'selected' ? (
+              <>Total Iuran Terbayar: <strong className="text-emerald-700">{formatRupiah(historyForActiveSchool.reduce((a, b) => a + b.nominal, 0))}</strong></>
+            ) : (
+              <>Total Seluruh Iuran Masuk: <strong className="text-emerald-700">{formatRupiah(iuranList.reduce((a, b) => a + b.nominal, 0))}</strong></>
+            )}
           </div>
         </div>
 

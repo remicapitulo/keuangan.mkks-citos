@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain } from './types';
+import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus } from './types';
 import { StorageService } from './services/spreadsheetSync';
 import { Navbar } from './components/Navbar';
 import { Navigation, ActiveTab } from './components/Sidebar';
@@ -11,6 +11,7 @@ import { LaporanKeuangan } from './components/LaporanKeuangan';
 import { StrukModal } from './components/StrukModal';
 import { SpreadsheetModal } from './components/SpreadsheetModal';
 import { LoginModal } from './components/LoginModal';
+import { ModalHapusData, DataHapusTarget } from './components/ModalHapusData';
 import { ValidasiKuitansiModal, ValidasiData } from './components/ValidasiKuitansiModal';
 import { CheckCircle2, ShieldAlert, Lock, UserCheck } from 'lucide-react';
 
@@ -24,6 +25,7 @@ export default function App() {
   const [iuranList, setIuranList] = useState<Iuran[]>(() => StorageService.getIuran());
   const [pengeluaranList, setPengeluaranList] = useState<Pengeluaran[]>(() => StorageService.getPengeluaran());
   const [pemasukanLainList, setPemasukanLainList] = useState<PemasukanLain[]>(() => StorageService.getPemasukanLain());
+  const [riwayatHapusList, setRiwayatHapusList] = useState<RiwayatHapus[]>(() => StorageService.getRiwayatHapus());
   const [spreadsheetId, setSpreadsheetId] = useState<string>(() => StorageService.getSpreadsheetId());
 
   // Modals state
@@ -31,6 +33,10 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(() => StorageService.getCurrentUser() === null);
   const [isStrukModalOpen, setIsStrukModalOpen] = useState<boolean>(false);
   const [strukData, setStrukData] = useState<any>(null);
+
+  // Modal Hapus Data State
+  const [isHapusModalOpen, setIsHapusModalOpen] = useState<boolean>(false);
+  const [targetHapusData, setTargetHapusData] = useState<DataHapusTarget | null>(null);
 
   // Digital Validation Modal state (for Barcode / QR Code scan)
   const [isValidasiModalOpen, setIsValidasiModalOpen] = useState<boolean>(false);
@@ -47,6 +53,7 @@ export default function App() {
     setIuranList(StorageService.getIuran());
     setPengeluaranList(StorageService.getPengeluaran());
     setPemasukanLainList(StorageService.getPemasukanLain());
+    setRiwayatHapusList(StorageService.getRiwayatHapus());
 
     StorageService.fetchFromAppsScript().then((success) => {
       if (success) {
@@ -55,6 +62,7 @@ export default function App() {
         setIuranList(StorageService.getIuran());
         setPengeluaranList(StorageService.getPengeluaran());
         setPemasukanLainList(StorageService.getPemasukanLain());
+        setRiwayatHapusList(StorageService.getRiwayatHapus());
       }
     });
 
@@ -129,18 +137,6 @@ export default function App() {
     }
   };
 
-  // Delete Pemasukan Lain item
-  const handleDeletePemasukanLain = async (id: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus catatan pemasukan non-iuran ini?')) {
-      const updated = pemasukanLainList.filter(p => p.id !== id);
-      setPemasukanLainList(updated);
-      StorageService.savePemasukanLain(updated);
-      
-      const syncRes = await StorageService.syncToAppsScript();
-      showToast(syncRes.status === 'connected' ? 'Pemasukan non-iuran dihapus dari Database Google Sheet.' : 'Pemasukan non-iuran dihapus lokal.');
-    }
-  };
-
   // Save new Pengeluaran item
   const handleSavePengeluaran = async (newExpense: Omit<Pengeluaran, 'id'>) => {
     const created: Pengeluaran = {
@@ -160,16 +156,98 @@ export default function App() {
     }
   };
 
-  // Delete Pengeluaran item
-  const handleDeletePengeluaran = async (id: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus catatan pengeluaran ini?')) {
-      const updated = pengeluaranList.filter(p => p.id !== id);
+  // Triggers for Deletion from Laporan Keuangan
+  const handleRequestDeleteIuran = (item: Iuran) => {
+    setTargetHapusData({
+      id: item.id,
+      jenis: 'Iuran',
+      title: `Iuran ${item.namaSekolah} (${item.bulan} ${item.tahun})`,
+      subtitle: `Tahun Buku ${item.tahun}`,
+      nominal: item.nominal,
+      tanggal: item.tanggalInput,
+      noKuitansi: item.noKuitansi,
+      diinputOleh: item.diinputOleh,
+      rawData: item
+    });
+    setIsHapusModalOpen(true);
+  };
+
+  const handleRequestDeletePemasukanLain = (item: PemasukanLain) => {
+    setTargetHapusData({
+      id: item.id,
+      jenis: 'Pemasukan Lain',
+      title: `${item.kategori} - ${item.sumberDana}`,
+      subtitle: item.keterangan || `Pemasukan Non-Iuran`,
+      nominal: item.nominal,
+      tanggal: item.tanggal,
+      noKuitansi: item.noKuitansi,
+      diinputOleh: item.diinputOleh,
+      rawData: item
+    });
+    setIsHapusModalOpen(true);
+  };
+
+  const handleRequestDeletePengeluaran = (item: Pengeluaran) => {
+    setTargetHapusData({
+      id: item.id,
+      jenis: 'Pengeluaran',
+      title: item.project,
+      subtitle: item.keterangan || 'Pengeluaran Operasional MKKS',
+      nominal: item.nominal,
+      tanggal: item.tanggal,
+      diinputOleh: item.diinputOleh,
+      rawData: item
+    });
+    setIsHapusModalOpen(true);
+  };
+
+  // Confirm Delete Handler with Audit Logging
+  const handleConfirmDelete = async (
+    target: DataHapusTarget,
+    alasan: string,
+    namaPetugas: string,
+    roleUser: string
+  ) => {
+    const newRiwayat: RiwayatHapus = {
+      id: `DEL-${Date.now()}`,
+      idTransaksi: target.id,
+      jenisTransaksi: target.jenis,
+      rincianData: target.title,
+      nominal: target.nominal,
+      tanggalHapus: new Date().toISOString(),
+      dihapusOleh: namaPetugas,
+      roleUser: roleUser,
+      alasanHapus: alasan,
+      noKuitansi: target.noKuitansi,
+      tanggalTransaksiAsli: target.tanggal,
+      dataOriginal: target.rawData,
+      judul: target.title,
+      judulItem: target.title,
+      alasan: alasan,
+      role: roleUser,
+      rolePenghapus: roleUser,
+      jenis: target.jenis === 'Iuran' ? 'iuran' : target.jenis === 'Pengeluaran' ? 'pengeluaran' : 'pemasukan-lain'
+    };
+
+    if (target.jenis === 'Iuran') {
+      const updated = iuranList.filter(i => i.id !== target.id);
+      setIuranList(updated);
+      StorageService.saveIuran(updated, false);
+    } else if (target.jenis === 'Pemasukan Lain') {
+      const updated = pemasukanLainList.filter(p => p.id !== target.id);
+      setPemasukanLainList(updated);
+      StorageService.savePemasukanLain(updated, false);
+    } else if (target.jenis === 'Pengeluaran') {
+      const updated = pengeluaranList.filter(p => p.id !== target.id);
       setPengeluaranList(updated);
-      StorageService.savePengeluaran(updated);
-      
-      const syncRes = await StorageService.syncToAppsScript();
-      showToast(syncRes.status === 'connected' ? 'Transaksi pengeluaran dihapus dari Database Google Sheet.' : 'Transaksi pengeluaran dihapus lokal.');
+      StorageService.savePengeluaran(updated, false);
     }
+
+    const updatedRiwayat = [newRiwayat, ...riwayatHapusList];
+    setRiwayatHapusList(updatedRiwayat);
+    StorageService.saveRiwayatHapus(updatedRiwayat, true);
+
+    showToast(`Data ${target.jenis} berhasil dihapus & dicatat di Riwayat Hapus.`);
   };
 
   // Open Struk Modal
@@ -213,6 +291,7 @@ export default function App() {
     setIuranList(StorageService.getIuran());
     setPengeluaranList(StorageService.getPengeluaran());
     setPemasukanLainList(StorageService.getPemasukanLain());
+    setRiwayatHapusList(StorageService.getRiwayatHapus());
     setCurrentUser(StorageService.getCurrentUser());
     showToast('Data aplikasi di-reset ke data default awal.');
   };
@@ -308,7 +387,6 @@ export default function App() {
                 <InputPemasukanLain
                   pemasukanLainList={pemasukanLainList}
                   onSavePemasukanLain={handleSavePemasukanLain}
-                  onDeletePemasukanLain={handleDeletePemasukanLain}
                   onOpenStrukModal={handleOpenStrukModal}
                   currentUser={currentUser}
                 />
@@ -318,7 +396,6 @@ export default function App() {
                 <KelolaPengeluaran
                   pengeluaranList={pengeluaranList}
                   onSavePengeluaran={handleSavePengeluaran}
-                  onDeletePengeluaran={handleDeletePengeluaran}
                   currentUser={currentUser}
                 />
               )}
@@ -329,9 +406,13 @@ export default function App() {
                   iuranList={iuranList}
                   pengeluaranList={pengeluaranList}
                   pemasukanLainList={pemasukanLainList}
+                  riwayatHapusList={riwayatHapusList}
                   userSchoolName={currentUser?.sekolah}
                   currentUser={currentUser}
                   onOpenStrukModal={handleOpenStrukModal}
+                  onDeleteIuran={handleRequestDeleteIuran}
+                  onDeletePemasukanLain={handleRequestDeletePemasukanLain}
+                  onDeletePengeluaran={handleRequestDeletePengeluaran}
                 />
               )}
 
@@ -357,6 +438,17 @@ export default function App() {
       </div>
 
       {/* App Modals */}
+      <ModalHapusData
+        isOpen={isHapusModalOpen}
+        targetData={targetHapusData}
+        currentUser={currentUser}
+        onClose={() => {
+          setIsHapusModalOpen(false);
+          setTargetHapusData(null);
+        }}
+        onConfirmDelete={handleConfirmDelete}
+      />
+
       <StrukModal
         isOpen={isStrukModalOpen}
         onClose={() => setIsStrukModalOpen(false)}

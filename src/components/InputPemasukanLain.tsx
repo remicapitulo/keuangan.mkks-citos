@@ -24,7 +24,6 @@ import {
 interface InputPemasukanLainProps {
   pemasukanLainList: PemasukanLain[];
   onSavePemasukanLain: (newIncome: Omit<PemasukanLain, 'id'>) => void;
-  onDeletePemasukanLain?: (id: string) => void;
   onOpenStrukModal?: (kuitansiData: any) => void;
   currentUser?: User | null;
 }
@@ -50,7 +49,6 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
 export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
   pemasukanLainList,
   onSavePemasukanLain,
-  onDeletePemasukanLain,
   onOpenStrukModal,
   currentUser
 }) => {
@@ -583,20 +581,6 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
                         <Printer className="w-3.5 h-3.5" />
                         <span>Cetak Kuitansi / Bukti</span>
                       </button>
-
-                      {onDeletePemasukanLain && (
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Hapus catatan pemasukan dari ${item.sumberDana} senilai ${formatRupiah(item.nominal)}?`)) {
-                              onDeletePemasukanLain(item.id);
-                            }
-                          }}
-                          className="inline-flex items-center space-x-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors cursor-pointer text-[11px]"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Hapus</span>
-                        </button>
-                      )}
                     </div>
                   </div>
                 );

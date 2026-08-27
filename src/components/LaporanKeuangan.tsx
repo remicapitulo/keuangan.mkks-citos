@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
+import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
-import { exportToExcel, exportToPDF } from '../services/exportUtils';
+import { exportToExcel, exportToPDF, exportRiwayatHapusToExcel, exportRiwayatHapusToPDF } from '../services/exportUtils';
 import { 
   FileSpreadsheet, 
   FileText, 
@@ -22,7 +22,13 @@ import {
   ShieldCheck,
   UserCheck,
   HandCoins,
-  Printer
+  Printer,
+  Trash2,
+  History,
+  AlertTriangle,
+  Clock,
+  User as UserIcon,
+  Tag
 } from 'lucide-react';
 
 interface LaporanKeuanganProps {
@@ -30,9 +36,13 @@ interface LaporanKeuanganProps {
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
   pemasukanLainList?: PemasukanLain[];
+  riwayatHapusList?: RiwayatHapus[];
   userSchoolName?: string;
   currentUser?: User | null;
   onOpenStrukModal?: (data: any) => void;
+  onDeleteIuran?: (item: Iuran) => void;
+  onDeletePemasukanLain?: (item: PemasukanLain) => void;
+  onDeletePengeluaran?: (item: Pengeluaran) => void;
 }
 
 export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
@@ -40,15 +50,20 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   iuranList,
   pengeluaranList,
   pemasukanLainList = [],
+  riwayatHapusList = [],
   userSchoolName,
   currentUser,
-  onOpenStrukModal
+  onOpenStrukModal,
+  onDeleteIuran,
+  onDeletePemasukanLain,
+  onDeletePengeluaran
 }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap' | 'riwayat-hapus'>('matrix');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [matrixViewMode, setMatrixViewMode] = useState<'cards' | 'table'>('cards');
+  const [filterJenisHapus, setFilterJenisHapus] = useState<string>('all');
 
   // Filter dataset by year
   const iuranYear = iuranList.filter(i => i.tahun === selectedYear);
@@ -64,7 +79,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
   // Export handlers
   const handleExportExcel = () => {
-    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList);
+    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList, riwayatHapusList);
   };
 
   const handleExportPDF = () => {
@@ -91,21 +106,42 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
     (s.namaKepsek || '').toLowerCase().includes(query)
   );
 
-  const filteredKasMasuk = iuranYear.filter(i =>
-    (i.namaSekolah || '').toLowerCase().includes(query) ||
-    (i.bulan || '').toLowerCase().includes(query)
-  );
+  const filteredKasMasuk = iuranYear
+    .filter(i =>
+      (i.namaSekolah || '').toLowerCase().includes(query) ||
+      (i.bulan || '').toLowerCase().includes(query)
+    )
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggalInput).getTime() || 0;
+      const dateB = new Date(b.tanggalInput).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
-  const filteredPemasukanLain = pemasukanLainYear.filter(p =>
-    (p.sumberDana || '').toLowerCase().includes(query) ||
-    (p.kategori || '').toLowerCase().includes(query) ||
-    (p.keterangan || '').toLowerCase().includes(query)
-  );
+  const filteredPemasukanLain = pemasukanLainYear
+    .filter(p =>
+      (p.sumberDana || '').toLowerCase().includes(query) ||
+      (p.kategori || '').toLowerCase().includes(query) ||
+      (p.keterangan || '').toLowerCase().includes(query)
+    )
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggal).getTime() || 0;
+      const dateB = new Date(b.tanggal).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
-  const filteredKasKeluar = pengeluaranYear.filter(p =>
-    (p.project || '').toLowerCase().includes(query) ||
-    (p.keterangan || '').toLowerCase().includes(query)
-  );
+  const filteredKasKeluar = pengeluaranYear
+    .filter(p =>
+      (p.project || '').toLowerCase().includes(query) ||
+      (p.keterangan || '').toLowerCase().includes(query)
+    )
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggal).getTime() || 0;
+      const dateB = new Date(b.tanggal).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
   return (
     <div id="laporan-keuangan-container" className="space-y-4 sm:space-y-6">
@@ -334,6 +370,26 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             <span>Rekap Bulanan</span>
           </button>
 
+          {isBendahara && (
+            <button
+              id="tab-laporan-riwayat-hapus"
+              onClick={() => setActiveTab('riwayat-hapus')}
+              className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+                activeTab === 'riwayat-hapus'
+                  ? 'bg-rose-700 text-white shadow-md'
+                  : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/60'
+              }`}
+            >
+              <History className="w-3.5 h-3.5 text-rose-500" />
+              <span>Riwayat Hapus</span>
+              {riwayatHapusList.length > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeTab === 'riwayat-hapus' ? 'bg-rose-900 text-rose-100' : 'bg-rose-200 text-rose-900'}`}>
+                  {riwayatHapusList.length}
+                </span>
+              )}
+            </button>
+          )}
+
         </div>
 
         {/* Search Input */}
@@ -420,16 +476,13 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             ) : (
               filteredSekolah.map((sek, idx) => {
                 let lunasCount = 0;
-                const isUserSchool = userSchoolName && userSchoolName === sek.namaSekolah;
+                const isUserSchool = (currentUser?.username && sek.idSekolah === currentUser.username) || (userSchoolName && userSchoolName === sek.namaSekolah);
 
                 const monthStatusList = BULAN_LIST.map((bulan) => {
                   const isPaid = iuranYear.some(i => 
                     ((i.idSekolah && sek.idSekolah && i.idSekolah === sek.idSekolah) || 
-                     (i.namaSekolah && sek.namaSekolah && (
-                       i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim() ||
-                       i.namaSekolah.toLowerCase().includes(sek.namaSekolah.toLowerCase().trim()) ||
-                       sek.namaSekolah.toLowerCase().includes(i.namaSekolah.toLowerCase().trim())
-                     ))) &&
+                     (i.namaSekolah && sek.namaSekolah && i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim())
+                    ) &&
                     i.bulan === bulan
                   );
                   if (isPaid) lunasCount++;
@@ -545,16 +598,13 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <tbody className="divide-y divide-slate-200 bg-white">
                 {filteredSekolah.map((sek, idx) => {
                   let lunasCount = 0;
-                  const isUserSchool = userSchoolName && userSchoolName === sek.namaSekolah;
+                  const isUserSchool = (currentUser?.username && sek.idSekolah === currentUser.username) || (userSchoolName && userSchoolName === sek.namaSekolah);
 
                   const monthStatuses = BULAN_LIST.map(bulan => {
                     const isPaid = iuranYear.some(i => 
                       ((i.idSekolah && sek.idSekolah && i.idSekolah === sek.idSekolah) || 
-                       (i.namaSekolah && sek.namaSekolah && (
-                         i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim() ||
-                         i.namaSekolah.toLowerCase().includes(sek.namaSekolah.toLowerCase().trim()) ||
-                         sek.namaSekolah.toLowerCase().includes(i.namaSekolah.toLowerCase().trim())
-                       ))) &&
+                       (i.namaSekolah && sek.namaSekolah && i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim())
+                      ) &&
                       i.bulan === bulan
                     );
                     if (isPaid) lunasCount++;
@@ -690,30 +740,43 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   </div>
                   <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1.5 border-t border-emerald-100">
                     <span>Diinput: {resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</span>
-                    {isBendahara && onOpenStrukModal && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const schoolOfItem = sekolahList.find(s => s.namaSekolah === i.namaSekolah);
-                          onOpenStrukModal({
-                            jenis: 'iuran',
-                            noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
-                            tanggal: i.tanggalInput,
-                            namaSekolah: i.namaSekolah,
-                            namaKepsek: schoolOfItem?.namaKepsek || '-',
-                            alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
-                            tahunBuku: i.tahun,
-                            bulanList: [i.bulan],
-                            totalNominal: i.nominal,
-                            diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
-                          });
-                        }}
-                        className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-emerald-200"
-                      >
-                        <Printer className="w-3 h-3" />
-                        <span>Kuitansi</span>
-                      </button>
-                    )}
+                    <div className="flex items-center space-x-1.5">
+                      {isBendahara && onOpenStrukModal && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const schoolOfItem = sekolahList.find(s => (i.idSekolah && s.idSekolah === i.idSekolah) || s.namaSekolah.toLowerCase().trim() === i.namaSekolah.toLowerCase().trim());
+                            onOpenStrukModal({
+                              jenis: 'iuran',
+                              noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
+                              tanggal: i.tanggalInput,
+                              namaSekolah: i.namaSekolah,
+                              namaKepsek: schoolOfItem?.namaKepsek || '-',
+                              alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                              tahunBuku: i.tahun,
+                              bulanList: [i.bulan],
+                              totalNominal: i.nominal,
+                              diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
+                            });
+                          }}
+                          className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-emerald-200"
+                        >
+                          <Printer className="w-3 h-3" />
+                          <span>Kuitansi</span>
+                        </button>
+                      )}
+                      {isBendahara && onDeleteIuran && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteIuran(i)}
+                          className="text-rose-600 hover:text-rose-800 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-rose-200"
+                          title="Hapus Catatan Iuran Ini"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
@@ -749,31 +812,44 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</td>
                     {isBendahara && (
                       <td className="py-3 px-3 text-center">
-                        {onOpenStrukModal && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const schoolOfItem = sekolahList.find(s => s.namaSekolah === i.namaSekolah);
-                              onOpenStrukModal({
-                                jenis: 'iuran',
-                                noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
-                                tanggal: i.tanggalInput,
-                                namaSekolah: i.namaSekolah,
-                                namaKepsek: schoolOfItem?.namaKepsek || '-',
-                                alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
-                                tahunBuku: i.tahun,
-                                bulanList: [i.bulan],
-                                totalNominal: i.nominal,
-                                diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
-                              });
-                            }}
-                            className="inline-flex items-center space-x-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold text-[11px] transition-colors cursor-pointer"
-                            title="Cetak Kuitansi Iuran"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>Kuitansi</span>
-                          </button>
-                        )}
+                        <div className="flex items-center justify-center space-x-1.5">
+                          {onOpenStrukModal && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const schoolOfItem = sekolahList.find(s => (i.idSekolah && s.idSekolah === i.idSekolah) || s.namaSekolah.toLowerCase().trim() === i.namaSekolah.toLowerCase().trim());
+                                onOpenStrukModal({
+                                  jenis: 'iuran',
+                                  noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
+                                  tanggal: i.tanggalInput,
+                                  namaSekolah: i.namaSekolah,
+                                  namaKepsek: schoolOfItem?.namaKepsek || '-',
+                                  alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                                  tahunBuku: i.tahun,
+                                  bulanList: [i.bulan],
+                                  totalNominal: i.nominal,
+                                  diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
+                                });
+                              }}
+                              className="inline-flex items-center space-x-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold text-[11px] transition-colors cursor-pointer"
+                              title="Cetak Kuitansi Iuran"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>Kuitansi</span>
+                            </button>
+                          )}
+                          {onDeleteIuran && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteIuran(i)}
+                              className="inline-flex items-center space-x-1 text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 font-bold text-[11px] transition-colors cursor-pointer"
+                              title="Hapus Catatan Iuran Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -827,32 +903,45 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   {l.keterangan && <p className="text-[11px] text-slate-600">{l.keterangan}</p>}
                   <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1.5 border-t border-teal-100">
                     <span>Diinput: {resolveNamaBendahara(l.diinputOleh, undefined, sekolahList)}</span>
-                    {isBendahara && onOpenStrukModal && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const year = new Date(l.tanggal).getFullYear();
-                          onOpenStrukModal({
-                            jenis: 'pemasukan-lain',
-                            noKuitansi: l.noKuitansi || `KWT-IN/MKKS-CITOS/${year}/${l.id}`,
-                            tanggal: l.tanggal,
-                            namaSekolah: l.sumberDana,
-                            sumberDana: l.sumberDana,
-                            kategori: l.kategori,
-                            keterangan: l.keterangan || `Penerimaan ${l.kategori} dari ${l.sumberDana}`,
-                            alamatSekolah: l.keterangan || '-',
-                            tahunBuku: year,
-                            bulanList: [`Penerimaan ${l.kategori}`],
-                            totalNominal: l.nominal,
-                            diinputOleh: l.diinputOleh
-                          });
-                        }}
-                        className="text-teal-700 hover:text-teal-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-teal-200"
-                      >
-                        <Printer className="w-3 h-3" />
-                        <span>Kuitansi</span>
-                      </button>
-                    )}
+                    <div className="flex items-center space-x-1.5">
+                      {isBendahara && onOpenStrukModal && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const year = new Date(l.tanggal).getFullYear();
+                            onOpenStrukModal({
+                              jenis: 'pemasukan-lain',
+                              noKuitansi: l.noKuitansi || `KWT-IN/MKKS-CITOS/${year}/${l.id}`,
+                              tanggal: l.tanggal,
+                              namaSekolah: l.sumberDana,
+                              sumberDana: l.sumberDana,
+                              kategori: l.kategori,
+                              keterangan: l.keterangan || `Penerimaan ${l.kategori} dari ${l.sumberDana}`,
+                              alamatSekolah: l.keterangan || '-',
+                              tahunBuku: year,
+                              bulanList: [`Penerimaan ${l.kategori}`],
+                              totalNominal: l.nominal,
+                              diinputOleh: l.diinputOleh
+                            });
+                          }}
+                          className="text-teal-700 hover:text-teal-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-teal-200"
+                        >
+                          <Printer className="w-3 h-3" />
+                          <span>Kuitansi</span>
+                        </button>
+                      )}
+                      {isBendahara && onDeletePemasukanLain && (
+                        <button
+                          type="button"
+                          onClick={() => onDeletePemasukanLain(l)}
+                          className="text-rose-600 hover:text-rose-800 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-rose-200"
+                          title="Hapus Catatan Pemasukan Ini"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
@@ -892,33 +981,46 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(l.diinputOleh, undefined, sekolahList)}</td>
                     {isBendahara && (
                       <td className="py-3 px-3 text-center">
-                        {onOpenStrukModal && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const year = new Date(l.tanggal).getFullYear();
-                              onOpenStrukModal({
-                                jenis: 'pemasukan-lain',
-                                noKuitansi: l.noKuitansi || `KWT-IN/MKKS-CITOS/${year}/${l.id}`,
-                                tanggal: l.tanggal,
-                                namaSekolah: l.sumberDana,
-                                sumberDana: l.sumberDana,
-                                kategori: l.kategori,
-                                keterangan: l.keterangan || `Penerimaan ${l.kategori} dari ${l.sumberDana}`,
-                                alamatSekolah: l.keterangan || '-',
-                                tahunBuku: year,
-                                bulanList: [`Penerimaan ${l.kategori}`],
-                                totalNominal: l.nominal,
-                                diinputOleh: l.diinputOleh
-                              });
-                            }}
-                            className="inline-flex items-center space-x-1 text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-lg border border-teal-200 font-bold text-[11px] transition-colors cursor-pointer"
-                            title="Cetak Kuitansi Pemasukan"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>Kuitansi</span>
-                          </button>
-                        )}
+                        <div className="flex items-center justify-center space-x-1.5">
+                          {onOpenStrukModal && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const year = new Date(l.tanggal).getFullYear();
+                                onOpenStrukModal({
+                                  jenis: 'pemasukan-lain',
+                                  noKuitansi: l.noKuitansi || `KWT-IN/MKKS-CITOS/${year}/${l.id}`,
+                                  tanggal: l.tanggal,
+                                  namaSekolah: l.sumberDana,
+                                  sumberDana: l.sumberDana,
+                                  kategori: l.kategori,
+                                  keterangan: l.keterangan || `Penerimaan ${l.kategori} dari ${l.sumberDana}`,
+                                  alamatSekolah: l.keterangan || '-',
+                                  tahunBuku: year,
+                                  bulanList: [`Penerimaan ${l.kategori}`],
+                                  totalNominal: l.nominal,
+                                  diinputOleh: l.diinputOleh
+                                });
+                              }}
+                              className="inline-flex items-center space-x-1 text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-lg border border-teal-200 font-bold text-[11px] transition-colors cursor-pointer"
+                              title="Cetak Kuitansi Pemasukan"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>Kuitansi</span>
+                            </button>
+                          )}
+                          {onDeletePemasukanLain && (
+                            <button
+                              type="button"
+                              onClick={() => onDeletePemasukanLain(l)}
+                              className="inline-flex items-center space-x-1 text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 font-bold text-[11px] transition-colors cursor-pointer"
+                              title="Hapus Catatan Pemasukan Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -968,7 +1070,20 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   <p className="text-[11px] text-slate-600">{p.keterangan}</p>
                   <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-rose-200/50">
                     <span>Tgl: {formatDateIndonesian(p.tanggal)}</span>
-                    <span>Diinput: {resolveNamaBendahara(p.diinputOleh, undefined, sekolahList)}</span>
+                    <div className="flex items-center space-x-1.5">
+                      <span>Diinput: {resolveNamaBendahara(p.diinputOleh, undefined, sekolahList)}</span>
+                      {isBendahara && onDeletePengeluaran && (
+                        <button
+                          type="button"
+                          onClick={() => onDeletePengeluaran(p)}
+                          className="text-rose-600 hover:text-rose-800 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-rose-200"
+                          title="Hapus Catatan Pengeluaran Ini"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Hapus</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
@@ -985,7 +1100,10 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   <th className="py-3 px-4">Alokasi Project / Kegiatan</th>
                   <th className="py-3 px-4">Keterangan Tambahan</th>
                   <th className="py-3 px-3 text-right">Jumlah Nominal</th>
-                  <th className="py-3 px-3 text-center rounded-tr-xl">Diinput Oleh</th>
+                  <th className={`py-3 px-3 text-center ${!isBendahara ? 'rounded-tr-xl' : ''}`}>Diinput Oleh</th>
+                  {isBendahara && (
+                    <th className="py-3 px-3 text-center rounded-tr-xl">Aksi</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -997,6 +1115,21 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <td className="py-3 px-4 text-slate-600 max-w-sm">{p.keterangan}</td>
                     <td className="py-3 px-3 text-right font-black text-rose-600 whitespace-nowrap">{formatRupiah(p.nominal)}</td>
                     <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(p.diinputOleh, undefined, sekolahList)}</td>
+                    {isBendahara && (
+                      <td className="py-3 px-3 text-center">
+                        {onDeletePengeluaran && (
+                          <button
+                            type="button"
+                            onClick={() => onDeletePengeluaran(p)}
+                            className="inline-flex items-center space-x-1 text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 font-bold text-[11px] transition-colors cursor-pointer"
+                            title="Hapus Catatan Pengeluaran Ini"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -1004,7 +1137,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                 <tr className="bg-slate-800 text-white font-bold text-xs">
                   <td colSpan={4} className="py-3 px-4 text-right rounded-bl-xl">TOTAL KAS KELUAR ({selectedYear}):</td>
                   <td className="py-3 px-3 text-right text-rose-400 font-black text-sm">{formatRupiah(totalKasKeluar)}</td>
-                  <td className="rounded-br-xl"></td>
+                  <td colSpan={isBendahara ? 2 : 1} className="rounded-br-xl"></td>
                 </tr>
               </tfoot>
             </table>
@@ -1159,6 +1292,324 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           </div>
         </div>
       )}
+
+      {/* TAB 6: LAPORAN RIWAYAT PENGHAPUSAN DATA (AUDIT LOG) */}
+      {activeTab === 'riwayat-hapus' && isBendahara && (() => {
+        // Filter and sort dataset for Riwayat Hapus (newest deletion first)
+        const filteredRiwayatHapus = riwayatHapusList
+          .filter(item => {
+            // Filter by category
+            if (filterJenisHapus !== 'all' && item.jenis !== filterJenisHapus) {
+              return false;
+            }
+            // Filter by search query
+            if (searchFilter.trim()) {
+              const query = searchFilter.toLowerCase();
+              const matchJudul = item.judul?.toLowerCase().includes(query);
+              const matchAlasan = item.alasan?.toLowerCase().includes(query);
+              const matchUser = item.dihapusOleh?.toLowerCase().includes(query);
+              const matchKet = item.keteranganAsli?.toLowerCase().includes(query);
+              const matchSekolah = item.namaSekolah?.toLowerCase().includes(query);
+              return matchJudul || matchAlasan || matchUser || matchKet || matchSekolah;
+            }
+            return true;
+          })
+          .sort((a, b) => {
+            const timeA = new Date(a.tanggalHapus || a.timestamp || '').getTime() || 0;
+            const timeB = new Date(b.tanggalHapus || b.timestamp || '').getTime() || 0;
+            if (timeB !== timeA) return timeB - timeA;
+            return String(b.id || '').localeCompare(String(a.id || ''));
+          });
+
+        // Summary calculations
+        const totalNominalHapus = riwayatHapusList.reduce((acc, curr) => acc + (curr.nominal || 0), 0);
+        const countIuranHapus = riwayatHapusList.filter(r => r.jenis === 'iuran').length;
+        const countPemasukanLainHapus = riwayatHapusList.filter(r => r.jenis === 'pemasukan-lain').length;
+        const countPengeluaranHapus = riwayatHapusList.filter(r => r.jenis === 'pengeluaran').length;
+
+        const getJenisBadge = (jenis: string) => {
+          switch (jenis) {
+            case 'iuran':
+              return <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded font-bold text-[10px]">Iuran Masuk</span>;
+            case 'pemasukan-lain':
+              return <span className="bg-teal-100 text-teal-800 border border-teal-300 px-2 py-0.5 rounded font-bold text-[10px]">Non-Iuran</span>;
+            case 'pengeluaran':
+              return <span className="bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded font-bold text-[10px]">Kas Keluar</span>;
+            default:
+              return <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold text-[10px]">{jenis}</span>;
+          }
+        };
+
+        return (
+          <div className="space-y-4">
+            {/* Header & Export Actions */}
+            <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <History className="w-5 h-5 text-rose-600" />
+                    <h3 className="font-bold text-slate-800 text-base sm:text-lg">
+                      Laporan Riwayat Penghapusan Data
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Audit log lengkap seluruh transaksi yang dihapus beserta tanggal, penanggung jawab, dan alasan penghapusan.
+                  </p>
+                </div>
+
+                {/* Audit Log Dedicated Export Buttons */}
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => exportRiwayatHapusToExcel(riwayatHapusList)}
+                    disabled={riwayatHapusList.length === 0}
+                    className="flex items-center space-x-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    title="Export Audit Log ke Excel"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Excel Audit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportRiwayatHapusToPDF(riwayatHapusList, currentUser)}
+                    disabled={riwayatHapusList.length === 0}
+                    className="flex items-center space-x-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    title="Export Audit Log ke PDF"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>PDF Audit</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary Stats Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-rose-50/80 border border-rose-200/80 rounded-xl p-3">
+                  <div className="flex items-center justify-between text-rose-700 text-xs font-semibold">
+                    <span>Total Dihapus</span>
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                  </div>
+                  <div className="text-xl font-black text-rose-900 mt-1">
+                    {riwayatHapusList.length} <span className="text-xs font-normal text-rose-600">Catatan</span>
+                  </div>
+                  <p className="text-[10px] text-rose-600 mt-0.5">Semua jenis transaksi</p>
+                </div>
+
+                <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3">
+                  <div className="flex items-center justify-between text-amber-700 text-xs font-semibold">
+                    <span>Nominal Dihapus</span>
+                    <Wallet className="w-3.5 h-3.5 text-amber-500" />
+                  </div>
+                  <div className="text-sm sm:text-base font-black text-amber-900 mt-1 truncate">
+                    {formatRupiah(totalNominalHapus)}
+                  </div>
+                  <p className="text-[10px] text-amber-600 mt-0.5">Akumulasi nilai transaksi</p>
+                </div>
+
+                <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-3">
+                  <div className="flex items-center justify-between text-emerald-700 text-xs font-semibold">
+                    <span>Iuran Masuk</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                  </div>
+                  <div className="text-xl font-black text-emerald-900 mt-1">
+                    {countIuranHapus} <span className="text-xs font-normal text-emerald-600">Items</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-600 mt-0.5">Pemasukan kas bulanan</p>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                  <div className="flex items-center justify-between text-slate-600 text-xs font-semibold">
+                    <span>Non-Iuran & Keluar</span>
+                    <Tag className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                  <div className="text-xl font-black text-slate-800 mt-1">
+                    {countPemasukanLainHapus + countPengeluaranHapus} <span className="text-xs font-normal text-slate-500">Items</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{countPemasukanLainHapus} Masuk / {countPengeluaranHapus} Keluar</p>
+                </div>
+              </div>
+
+              {/* Category Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+                <button
+                  type="button"
+                  onClick={() => setFilterJenisHapus('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    filterJenisHapus === 'all'
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Semua ({riwayatHapusList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterJenisHapus('iuran')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    filterJenisHapus === 'iuran'
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                >
+                  Iuran Masuk ({countIuranHapus})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterJenisHapus('pemasukan-lain')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    filterJenisHapus === 'pemasukan-lain'
+                      ? 'bg-teal-700 text-white'
+                      : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                  }`}
+                >
+                  Non-Iuran ({countPemasukanLainHapus})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterJenisHapus('pengeluaran')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    filterJenisHapus === 'pengeluaran'
+                      ? 'bg-rose-700 text-white'
+                      : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                  }`}
+                >
+                  Kas Keluar ({countPengeluaranHapus})
+                </button>
+              </div>
+            </div>
+
+            {/* Content Table / Cards */}
+            <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-3">
+              {/* Empty State */}
+              {filteredRiwayatHapus.length === 0 ? (
+                <div className="py-12 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                    <History className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-slate-700 text-sm">Tidak ada riwayat penghapusan data</h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    {searchFilter || filterJenisHapus !== 'all' 
+                      ? 'Tidak ada data penghapusan yang cocok dengan filter pencarian saat ini.' 
+                      : 'Belum ada transaksi yang pernah dihapus oleh bendahara.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile View */}
+                  <div className="block sm:hidden space-y-3">
+                    {filteredRiwayatHapus.map((item, idx) => (
+                      <div
+                        key={`riwayat-hapus-card-${item.id || idx}`}
+                        className="p-3.5 rounded-xl border border-rose-100 bg-rose-50/20 space-y-2 text-xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center space-x-1.5">
+                              {getJenisBadge(item.jenis)}
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {formatDateIndonesian(item.tanggalHapus)}
+                              </span>
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-xs mt-1">{item.judul}</h4>
+                          </div>
+                          <span className="font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded text-[11px] shrink-0">
+                            {formatRupiah(item.nominal)}
+                          </span>
+                        </div>
+
+                        {/* Reason Box */}
+                        <div className="bg-amber-50/80 border border-amber-200/80 rounded-lg p-2 text-amber-900 space-y-0.5">
+                          <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-700 block">
+                            Alasan Penghapusan:
+                          </span>
+                          <p className="text-[11px] font-semibold italic">"{item.alasan}"</p>
+                        </div>
+
+                        {/* Meta info */}
+                        <div className="text-[10px] text-slate-500 pt-1 border-t border-rose-100 flex items-center justify-between">
+                          <span className="flex items-center space-x-1">
+                            <UserCheck className="w-3 h-3 text-rose-500" />
+                            <span>Dihapus oleh: <strong className="text-slate-800">{item.dihapusOleh}</strong></span>
+                          </span>
+                          <span className="bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded font-bold text-[9px]">
+                            {item.role || 'Bendahara'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800 text-white font-bold text-[11px]">
+                          <th className="py-3 px-3 rounded-tl-xl w-10">No</th>
+                          <th className="py-3 px-3 w-28">Waktu Hapus</th>
+                          <th className="py-3 px-3 w-24">Jenis</th>
+                          <th className="py-3 px-4">Deskripsi Data Asli</th>
+                          <th className="py-3 px-3 text-right w-28">Nominal</th>
+                          <th className="py-3 px-4">Alasan Penghapusan</th>
+                          <th className="py-3 px-3 text-center rounded-tr-xl w-36">Dihapus Oleh</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {filteredRiwayatHapus.map((item, idx) => (
+                          <tr key={`riwayat-hapus-row-${item.id || idx}`} className="hover:bg-rose-50/40 transition-colors">
+                            <td className="py-3 px-3 font-mono font-semibold text-slate-500 text-center">{idx + 1}</td>
+                            <td className="py-3 px-3 text-slate-600 whitespace-nowrap text-[11px]">
+                              {formatDateIndonesian(item.tanggalHapus)}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              {getJenisBadge(item.jenis)}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-900 text-xs">{item.judul}</div>
+                              {item.keteranganAsli && (
+                                <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{item.keteranganAsli}</div>
+                              )}
+                              {item.tanggalTransaksi && (
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  Tgl Transaksi: {formatDateIndonesian(item.tanggalTransaksi)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right font-black text-rose-700 whitespace-nowrap">
+                              {formatRupiah(item.nominal)}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="bg-amber-50 border border-amber-200/80 rounded-lg p-2 text-[11px] text-amber-900 font-medium italic">
+                                "{item.alasan}"
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <div className="font-bold text-slate-800 text-[11px]">{item.dihapusOleh}</div>
+                              <span className="inline-block bg-rose-100 text-rose-800 text-[9px] font-bold px-1.5 py-0.2 rounded mt-0.5">
+                                {item.role || 'Bendahara'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-900 text-white font-bold text-xs">
+                          <td colSpan={4} className="py-3 px-4 text-right rounded-bl-xl">
+                            TOTAL TRANSAKSI DIHAPUS ({filteredRiwayatHapus.length} Item):
+                          </td>
+                          <td className="py-3 px-3 text-right text-rose-400 font-black text-sm">
+                            {formatRupiah(filteredRiwayatHapus.reduce((a, b) => a + (b.nominal || 0), 0))}
+                          </td>
+                          <td colSpan={2} className="rounded-br-xl"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* PRINT-ONLY COMPLETE REPORT VIEW */}
       <div id="printable-laporan-keuangan" className="hidden print:block space-y-6 text-slate-900 bg-white p-4">
@@ -1377,6 +1828,41 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* 5. Riwayat Penghapusan Data (Audit Log if exists) */}
+        {isBendahara && riwayatHapusList.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+              {pemasukanLainYear.length > 0 ? '5' : '4'}. Catatan Audit Riwayat Penghapusan Data
+            </h4>
+            <table className="w-full text-left text-[10px] border-collapse border border-slate-300">
+              <thead>
+                <tr className="bg-rose-800 text-white font-bold">
+                  <th className="p-1.5 border border-rose-900 text-center w-6">No</th>
+                  <th className="p-1.5 border border-rose-900">Waktu Hapus</th>
+                  <th className="p-1.5 border border-rose-900">Jenis</th>
+                  <th className="p-1.5 border border-rose-900">Deskripsi Data Asli</th>
+                  <th className="p-1.5 border border-rose-900 text-right">Nominal</th>
+                  <th className="p-1.5 border border-rose-900">Alasan Penghapusan</th>
+                  <th className="p-1.5 border border-rose-900 text-center">Dihapus Oleh</th>
+                </tr>
+              </thead>
+              <tbody>
+                {riwayatHapusList.map((r, idx) => (
+                  <tr key={`print-hapus-${r.id || idx}`} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
+                    <td className="p-1.5 border border-slate-300 text-center">{idx + 1}</td>
+                    <td className="p-1.5 border border-slate-300 whitespace-nowrap">{formatDateIndonesian(r.tanggalHapus)}</td>
+                    <td className="p-1.5 border border-slate-300 font-bold uppercase text-[9px] text-rose-800">{r.jenis}</td>
+                    <td className="p-1.5 border border-slate-300 font-semibold">{r.judul}</td>
+                    <td className="p-1.5 border border-slate-300 text-right font-bold text-rose-700">{formatRupiah(r.nominal)}</td>
+                    <td className="p-1.5 border border-slate-300 italic text-slate-700">"{r.alasan}"</td>
+                    <td className="p-1.5 border border-slate-300 text-center font-bold text-slate-800">{r.dihapusOleh}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Tanda Tangan */}
         <div className="pt-6 flex justify-end">

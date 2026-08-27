@@ -1,5 +1,5 @@
-import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole } from '../types';
-import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
+import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole, RiwayatHapus } from '../types';
+import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, INITIAL_RIWAYAT_HAPUS, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
 
 const STORAGE_KEYS = {
   SEKOLAH: 'mkks_citos_sekolah',
@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   IURAN: 'mkks_citos_iuran',
   PENGELUARAN: 'mkks_citos_pengeluaran',
   PEMASUKAN_LAIN: 'mkks_citos_pemasukan_lain',
+  RIWAYAT_HAPUS: 'mkks_citos_riwayat_hapus',
   SPREADSHEET_ID: 'mkks_citos_sheet_id',
   APPS_SCRIPT_URL: 'mkks_citos_apps_script_url',
   CURRENT_USER: 'mkks_citos_current_user'
@@ -151,22 +152,30 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
       }
     }
 
-    if (!sekolah && role === 'Sekolah') {
-      const match = sekolahList.find(s => s.namaSekolah.toLowerCase().includes(username.toLowerCase()));
-      if (match) {
-        sekolah = match.namaSekolah;
-        if (!namaKepsek) namaKepsek = match.namaKepsek;
+    if (role === 'Sekolah') {
+      // Primary Key Lock: ID Sekolah = username
+      const matchById = sekolahList.find(s => s.idSekolah === username);
+      if (matchById) {
+        sekolah = matchById.namaSekolah;
+        if (!namaKepsek) namaKepsek = matchById.namaKepsek;
+      } else if (!sekolah) {
+        const matchByName = sekolahList.find(s => s.namaSekolah.toLowerCase().trim() === username.toLowerCase().trim());
+        if (matchByName) {
+          sekolah = matchByName.namaSekolah;
+          if (!namaKepsek) namaKepsek = matchByName.namaKepsek;
+        }
       }
     }
 
-    if (!namaKepsek && sekolah) {
-      const match = sekolahList.find(s => 
-        s.namaSekolah.toLowerCase().trim() === sekolah.toLowerCase().trim() ||
-        s.namaSekolah.toLowerCase().includes(sekolah.toLowerCase().trim()) ||
-        sekolah.toLowerCase().includes(s.namaSekolah.toLowerCase().trim())
-      );
-      if (match && match.namaKepsek) {
-        namaKepsek = match.namaKepsek;
+    if (!namaKepsek && role === 'Sekolah') {
+      const matchById = sekolahList.find(s => s.idSekolah === username);
+      if (matchById && matchById.namaKepsek) {
+        namaKepsek = matchById.namaKepsek;
+      } else if (sekolah) {
+        const matchByName = sekolahList.find(s => s.namaSekolah.toLowerCase().trim() === sekolah.toLowerCase().trim());
+        if (matchByName && matchByName.namaKepsek) {
+          namaKepsek = matchByName.namaKepsek;
+        }
       }
     }
 
@@ -193,11 +202,15 @@ export function normalizeIuranList(rawList: any[], sekolahList: Sekolah[] = INIT
     let namaSekolah = String(i.namaSekolah || i['Nama Sekolah'] || i.nama_sekolah || i.sekolah || i.Sekolah || '').trim();
 
     if (sekolahList && sekolahList.length > 0) {
-      const match = sekolahList.find(s => 
-        (idSekolah && s.idSekolah === idSekolah) ||
-        (namaSekolah && s.namaSekolah.toLowerCase().trim() === namaSekolah.toLowerCase().trim()) ||
-        (namaSekolah && (s.namaSekolah.toLowerCase().includes(namaSekolah.toLowerCase().trim()) || namaSekolah.toLowerCase().includes(s.namaSekolah.toLowerCase().trim())))
-      );
+      // Primary Key Lock: Match by ID Sekolah first!
+      let match: Sekolah | undefined = undefined;
+      if (idSekolah) {
+        match = sekolahList.find(s => s.idSekolah === idSekolah);
+      }
+      if (!match && namaSekolah) {
+        // Fallback: Exact name match ONLY (never substring includes)
+        match = sekolahList.find(s => s.namaSekolah.toLowerCase().trim() === namaSekolah.toLowerCase().trim());
+      }
       if (match) {
         idSekolah = match.idSekolah;
         namaSekolah = match.namaSekolah;
@@ -342,6 +355,58 @@ export function normalizePemasukanLainList(rawList: any[]): PemasukanLain[] {
     };
     return result;
   }).filter((item): item is PemasukanLain => item !== null);
+}
+
+export function normalizeRiwayatHapusList(rawList: any[]): RiwayatHapus[] {
+  if (!Array.isArray(rawList)) return [];
+
+  return rawList.map((r, idx) => {
+    if (!r || typeof r !== 'object') return null;
+
+    const id = String(r.id || r.ID || `DEL-${idx + 1}`).trim();
+    const idTransaksi = String(r.idTransaksi || r['ID Transaksi'] || r.id_transaksi || `TX-${idx + 1}`).trim();
+    const jenisTransaksi = (r.jenisTransaksi || r['Jenis Transaksi'] || r.jenis || 'Iuran') as any;
+    const rincianData = String(r.rincianData || r['Rincian Data'] || r.rincian || r.keterangan || '-').trim();
+    
+    let nominalRaw = r.nominal ?? r.Nominal ?? r['Jumlah Nominal (Rp)'] ?? r['Nominal (Rp)'] ?? r.jumlah ?? 0;
+    if (typeof nominalRaw === 'string') {
+      nominalRaw = nominalRaw.replace(/[^0-9]/g, '');
+    }
+    const nominal = Number(nominalRaw) || 0;
+
+    const tanggalHapus = String(r.tanggalHapus || r['Tanggal Hapus'] || r['Waktu Penghapusan'] || new Date().toISOString()).trim();
+    const dihapusOleh = String(r.dihapusOleh || r['Dihapus Oleh'] || r.petugas || 'Bendahara MKKS').trim();
+    const roleUser = String(r.roleUser || r['Role User'] || r.role || 'Bendahara').trim();
+    const alasanHapus = String(r.alasanHapus || r['Alasan Hapus'] || r['Keterangan Hapus'] || r.alasan || 'Koreksi Data').trim();
+    const noKuitansi = String(r.noKuitansi || r['No Kuitansi'] || '').trim() || undefined;
+    const tanggalTransaksiAsli = String(r.tanggalTransaksiAsli || r['Tanggal Transaksi Asli'] || '').trim() || undefined;
+
+    return {
+      id,
+      idTransaksi,
+      jenisTransaksi,
+      rincianData,
+      dataOriginal: r.dataOriginal || null,
+      nominal,
+      tanggalHapus,
+      dihapusOleh,
+      roleUser,
+      alasanHapus,
+      noKuitansi,
+      tanggalTransaksiAsli,
+      // aliases for UI consumption
+      judul: rincianData,
+      judulItem: rincianData,
+      alasan: alasanHapus,
+      role: roleUser,
+      rolePenghapus: roleUser,
+      jenis: jenisTransaksi.toLowerCase().includes('iuran') && !jenisTransaksi.toLowerCase().includes('non')
+        ? 'iuran'
+        : jenisTransaksi.toLowerCase().includes('pengeluaran') || jenisTransaksi.toLowerCase().includes('keluar')
+        ? 'pengeluaran'
+        : 'pemasukan-lain'
+    } as RiwayatHapus;
+  }).filter((item): item is RiwayatHapus => item !== null);
 }
 
 export class StorageService {
@@ -496,6 +561,37 @@ export class StorageService {
     }
   }
 
+  // Riwayat Hapus
+  public static getRiwayatHapus(): RiwayatHapus[] {
+    const data = localStorage.getItem(STORAGE_KEYS.RIWAYAT_HAPUS);
+    if (!data) {
+      const normalized = normalizeRiwayatHapusList(INITIAL_RIWAYAT_HAPUS);
+      this.saveRiwayatHapus(normalized, false);
+      return normalized;
+    }
+    try {
+      const parsed = JSON.parse(data);
+      return normalizeRiwayatHapusList(parsed);
+    } catch {
+      return INITIAL_RIWAYAT_HAPUS;
+    }
+  }
+
+  public static saveRiwayatHapus(riwayatList: RiwayatHapus[], syncToRemote = true): void {
+    const normalized = normalizeRiwayatHapusList(riwayatList);
+    localStorage.setItem(STORAGE_KEYS.RIWAYAT_HAPUS, JSON.stringify(normalized));
+    if (syncToRemote) {
+      this.syncToAppsScript();
+    }
+  }
+
+  public static addRiwayatHapus(item: RiwayatHapus): RiwayatHapus[] {
+    const current = this.getRiwayatHapus();
+    const updated = [item, ...current];
+    this.saveRiwayatHapus(updated, true);
+    return updated;
+  }
+
   // Current logged in user
   public static getCurrentUser(): User | null {
     const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -524,6 +620,7 @@ export class StorageService {
     this.saveIuran(INITIAL_IURAN, false);
     this.savePengeluaran(INITIAL_PENGELUARAN, false);
     this.savePemasukanLain(INITIAL_PEMASUKAN_LAIN, false);
+    this.saveRiwayatHapus(INITIAL_RIWAYAT_HAPUS, false);
     this.setSpreadsheetId(DEFAULT_SPREADSHEET_ID);
     this.setAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
     this.setCurrentUser(INITIAL_USER[0]);
@@ -599,6 +696,32 @@ export class StorageService {
       noKuitansi: item.noKuitansi
     }));
 
+    const rawRiwayatHapus = this.getRiwayatHapus();
+    const formattedRiwayatHapus = rawRiwayatHapus.map(item => ({
+      'ID Log': item.id,
+      'ID Transaksi Asli': item.idTransaksi,
+      'Jenis Transaksi': item.jenisTransaksi,
+      'Rincian Data': item.rincianData,
+      'Jumlah Nominal (Rp)': item.nominal,
+      'Waktu Penghapusan': item.tanggalHapus,
+      'Dihapus Oleh': item.dihapusOleh,
+      'Role User': item.roleUser,
+      'Alasan Penghapusan': item.alasanHapus,
+      'No Kuitansi': item.noKuitansi || '',
+      'Tanggal Transaksi Asli': item.tanggalTransaksiAsli || '',
+      id: item.id,
+      idTransaksi: item.idTransaksi,
+      jenisTransaksi: item.jenisTransaksi,
+      rincianData: item.rincianData,
+      nominal: item.nominal,
+      tanggalHapus: item.tanggalHapus,
+      dihapusOleh: item.dihapusOleh,
+      roleUser: item.roleUser,
+      alasanHapus: item.alasanHapus,
+      noKuitansi: item.noKuitansi,
+      tanggalTransaksiAsli: item.tanggalTransaksiAsli
+    }));
+
     const payload = {
       action: 'syncAll',
       spreadsheetId: this.getSpreadsheetId(),
@@ -606,7 +729,8 @@ export class StorageService {
       users: this.getUsers(),
       iuran: formattedIuran,
       pengeluaran: formattedPengeluaran,
-      pemasukanLain: formattedPemasukanLain
+      pemasukanLain: formattedPemasukanLain,
+      riwayatHapus: formattedRiwayatHapus
     };
 
     let data: any = null;
@@ -743,6 +867,7 @@ export class StorageService {
       if (Array.isArray(data.iuran)) this.saveIuran(data.iuran, false);
       if (Array.isArray(data.pengeluaran)) this.savePengeluaran(data.pengeluaran, false);
       if (Array.isArray(data.pemasukanLain)) this.savePemasukanLain(data.pemasukanLain, false);
+      if (Array.isArray(data.riwayatHapus)) this.saveRiwayatHapus(data.riwayatHapus, false);
       return true;
     }
 
@@ -755,16 +880,16 @@ export class StorageService {
  */
 export const GOOGLE_APPS_SCRIPT_CODE = `
 /**
- * Apps Script Web App backend untuk Aplikasi MKKS Citos
+ * Apps Script Web App backend untuk Aplikasi MKKS Citos (Versi 6 Sheet Lengkap dengan Riwayat Hapus)
  * Salin kode ini ke Google Spreadsheet -> Ekstensi -> Apps Script
- * Lalu klik "Deploy" -> "New Deployment" -> Select type: "Web app"
- * Execute as: "Me" | Who has access: "Anyone"
+ * Lalu klik "Deploy" -> "Manage deployments" -> Klik ikon pensil (Edit) -> Version: "New version" -> "Deploy"
  */
 
 function doGet(e) {
   var action = e && e.parameter ? e.parameter.action : '';
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
+  // 1. Ambil Data dari Google Sheet (6 Sheet Lengkap)
   if (action === 'getData') {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'success',
@@ -772,10 +897,12 @@ function doGet(e) {
       users: getSheetData(ss, 'User'),
       iuran: getSheetData(ss, 'Iuran'),
       pengeluaran: getSheetData(ss, 'Pengeluaran'),
-      pemasukanLain: getSheetData(ss, 'PemasukanLain')
+      pemasukanLain: getSheetData(ss, 'Pemasukan_Lain') || getSheetData(ss, 'PemasukanLain'),
+      riwayatHapus: getSheetData(ss, 'Riwayat_Hapus') || getSheetData(ss, 'RiwayatHapus')
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 2. Fallback Sync via GET jika POST terhalang proxy
   if (action === 'syncAll' && e && e.parameter && e.parameter.data) {
     try {
       var data = JSON.parse(e.parameter.data);
@@ -783,7 +910,9 @@ function doGet(e) {
       if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
-      if (data.pemasukanLain) writeSheetData(ss, 'PemasukanLain', data.pemasukanLain);
+      if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
+      if (data.riwayatHapus) writeSheetData(ss, 'Riwayat_Hapus', data.riwayatHapus);
+      
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed via GET' }))
         .setMimeType(ContentService.MimeType.JSON);
     } catch(err) {
@@ -792,7 +921,7 @@ function doGet(e) {
     }
   }
   
-  return ContentService.createTextOutput(JSON.stringify({ status: 'active', message: 'API MKKS Citos Ready' }))
+  return ContentService.createTextOutput(JSON.stringify({ status: 'active', message: 'API MKKS Citos Ready (6 Sheets)' }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -804,6 +933,7 @@ function doPost(e) {
     } else if (e && e.parameter && e.parameter.data) {
       data = JSON.parse(e.parameter.data);
     }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     if (data && data.action === 'syncAll') {
@@ -811,7 +941,8 @@ function doPost(e) {
       if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
-      if (data.pemasukanLain) writeSheetData(ss, 'PemasukanLain', data.pemasukanLain);
+      if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
+      if (data.riwayatHapus) writeSheetData(ss, 'Riwayat_Hapus', data.riwayatHapus);
       
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed' }))
         .setMimeType(ContentService.MimeType.JSON);
@@ -846,14 +977,19 @@ function writeSheetData(ss, sheetName, rows) {
   var sheet = findSheetByName(ss, sheetName) || ss.insertSheet(sheetName);
   if (!rows || rows.length === 0) return;
 
+  // Header Rapi Standar MKKS Citos
   var headerMap = {
     'Iuran': ['Tahun', 'Bulan', 'ID Sekolah', 'Nama Sekolah', 'Nominal', 'Tanggal Input', 'Diinput Oleh', 'No Kuitansi'],
     'Pengeluaran': ['No', 'Tanggal Transaksi', 'Alokasi Project / Kegiatan', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh'],
+    'Pemasukan_Lain': ['No', 'Tanggal Transaksi', 'Kategori', 'Sumber Dana / Pihak Terkait', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh', 'No Kuitansi'],
     'PemasukanLain': ['No', 'Tanggal Transaksi', 'Kategori', 'Sumber Dana / Pihak Terkait', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh', 'No Kuitansi'],
+    'Riwayat_Hapus': ['ID Log', 'ID Transaksi Asli', 'Jenis Transaksi', 'Rincian Data', 'Jumlah Nominal (Rp)', 'Waktu Penghapusan', 'Dihapus Oleh', 'Role User', 'Alasan Penghapusan', 'No Kuitansi', 'Tanggal Transaksi Asli'],
+    'RiwayatHapus': ['ID Log', 'ID Transaksi Asli', 'Jenis Transaksi', 'Rincian Data', 'Jumlah Nominal (Rp)', 'Waktu Penghapusan', 'Dihapus Oleh', 'Role User', 'Alasan Penghapusan', 'No Kuitansi', 'Tanggal Transaksi Asli'],
     'Sekolah': ['ID Sekolah', 'Nama Sekolah', 'Nama Kepsek', 'Alamat', 'Kelurahan', 'Kecamatan'],
     'User': ['Username', 'Password', 'Role', 'Sekolah', 'Aktif', 'Nama Kepsek']
   };
 
+  // Pemetaan kata kunci alternatif
   var keyAlias = {
     'Tahun': ['Tahun', 'tahun'],
     'Bulan': ['Bulan', 'bulan'],
@@ -870,6 +1006,15 @@ function writeSheetData(ss, sheetName, rows) {
     'Sumber Dana / Pihak Terkait': ['Sumber Dana / Pihak Terkait', 'sumberDana', 'sumber', 'Dari', 'Diterima Dari'],
     'Keterangan Tambahan': ['Keterangan Tambahan', 'keterangan', 'Keterangan', 'Catatan'],
     'Jumlah Nominal (Rp)': ['Jumlah Nominal (Rp)', 'nominal', 'Nominal', 'Jumlah'],
+    'ID Log': ['ID Log', 'id', 'ID'],
+    'ID Transaksi Asli': ['ID Transaksi Asli', 'idTransaksi', 'id_transaksi'],
+    'Jenis Transaksi': ['Jenis Transaksi', 'jenisTransaksi', 'jenis'],
+    'Rincian Data': ['Rincian Data', 'rincianData', 'rincian'],
+    'Waktu Penghapusan': ['Waktu Penghapusan', 'tanggalHapus', 'tanggal_hapus'],
+    'Dihapus Oleh': ['Dihapus Oleh', 'dihapusOleh', 'petugas'],
+    'Role User': ['Role User', 'roleUser', 'role'],
+    'Alasan Penghapusan': ['Alasan Penghapusan', 'alasanHapus', 'alasan'],
+    'Tanggal Transaksi Asli': ['Tanggal Transaksi Asli', 'tanggalTransaksiAsli'],
     'Nama Kepsek': ['Nama Kepsek', 'namaKepsek', 'Kepala Sekolah'],
     'Alamat': ['Alamat', 'alamat'],
     'Kelurahan': ['Kelurahan', 'kelurahan'],
@@ -881,10 +1026,7 @@ function writeSheetData(ss, sheetName, rows) {
     'Aktif': ['Aktif', 'aktif']
   };
 
-  var headers = headerMap[sheetName];
-  if (!headers) {
-    headers = Object.keys(rows[0]);
-  }
+  var headers = headerMap[sheetName] || Object.keys(rows[0]);
 
   var values = [headers];
   rows.forEach(function(r) {
@@ -911,10 +1053,10 @@ function findSheetByName(ss, sheetName) {
   var sheet = ss.getSheetByName(sheetName);
   if (sheet) return sheet;
   var sheets = ss.getSheets();
-  var target = sheetName.toLowerCase().trim();
+  var target = sheetName.toLowerCase().replace(/[^a-z0-9]/g, '');
   for (var i = 0; i < sheets.length; i++) {
-    var sName = sheets[i].getName().toLowerCase().trim();
-    if (sName === target || sName.includes(target) || target.includes(sName)) {
+    var sName = sheets[i].getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (sName === target || sName.indexOf(target) !== -1 || target.indexOf(sName) !== -1) {
       return sheets[i];
     }
   }

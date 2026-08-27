@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
+import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
 
 export function exportToExcel(
@@ -9,12 +9,20 @@ export function exportToExcel(
   sekolahList: Sekolah[],
   iuranList: Iuran[],
   pengeluaranList: Pengeluaran[],
-  pemasukanLainList: PemasukanLain[] = []
+  pemasukanLainList: PemasukanLain[] = [],
+  riwayatHapusList: RiwayatHapus[] = []
 ) {
   const wb = XLSX.utils.book_new();
 
   // 1. Sheet Matriks Iuran
-  const iuranTahunThis = iuranList.filter(i => i.tahun === tahun);
+  const iuranTahunThis = iuranList
+    .filter(i => i.tahun === tahun)
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggalInput).getTime() || 0;
+      const dateB = new Date(b.tanggalInput).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
   
   const matrixData = sekolahList.map((s, index) => {
     const row: Record<string, any> = {
@@ -75,7 +83,14 @@ export function exportToExcel(
   XLSX.utils.book_append_sheet(wb, wsKasMasuk, `Kas Masuk Iuran ${tahun}`);
 
   // 3. Sheet Rincian Pemasukan Lain (Non-Iuran)
-  const pemasukanLainTahunThis = pemasukanLainList.filter(p => p.tanggal.startsWith(`${tahun}`));
+  const pemasukanLainTahunThis = pemasukanLainList
+    .filter(p => p.tanggal.startsWith(`${tahun}`))
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggal).getTime() || 0;
+      const dateB = new Date(b.tanggal).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
   const pemasukanLainData = pemasukanLainTahunThis.map((p, idx) => ({
     'No': idx + 1,
     'Tanggal Transaksi': p.tanggal,
@@ -103,7 +118,14 @@ export function exportToExcel(
   XLSX.utils.book_append_sheet(wb, wsPemasukanLain, `Pemasukan Non-Iuran ${tahun}`);
 
   // 4. Sheet Rincian Kas Keluar
-  const pengeluaranTahunThis = pengeluaranList.filter(p => p.tanggal.startsWith(`${tahun}`));
+  const pengeluaranTahunThis = pengeluaranList
+    .filter(p => p.tanggal.startsWith(`${tahun}`))
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggal).getTime() || 0;
+      const dateB = new Date(b.tanggal).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
   const kasKeluarData = pengeluaranTahunThis.map((p, idx) => ({
     'No': idx + 1,
     'Tanggal Transaksi': p.tanggal,
@@ -162,6 +184,24 @@ export function exportToExcel(
   const wsRekap = XLSX.utils.json_to_sheet(rekapData);
   XLSX.utils.book_append_sheet(wb, wsRekap, `Rekap Arus Kas ${tahun}`);
 
+  // 6. Sheet Riwayat Penghapusan Data (Audit Log)
+  if (riwayatHapusList && riwayatHapusList.length > 0) {
+    const logData = riwayatHapusList.map((r, idx) => ({
+      'No': idx + 1,
+      'Waktu Penghapusan': r.timestamp || r.tanggalHapus,
+      'Jenis Transaksi': (r.jenisTransaksi || r.jenis || '').toUpperCase(),
+      'Identitas Transaksi': r.judulItem || r.judul || r.rincianData || '-',
+      'Nominal Transaksi (Rp)': r.nominal || 0,
+      'Alasan / Keterangan Penghapusan': r.alasanHapus || r.alasan || '-',
+      'Dihapus Oleh': r.dihapusOleh || '-',
+      'Role Penghapus': r.rolePenghapus || r.role || r.roleUser || 'Bendahara',
+      'ID Data Asli': r.idItemAsli || r.idTransaksi || r.id
+    }));
+
+    const wsLog = XLSX.utils.json_to_sheet(logData);
+    XLSX.utils.book_append_sheet(wb, wsLog, `Log Hapus Data`);
+  }
+
   // Trigger browser download
   XLSX.writeFile(wb, `Laporan_Keuangan_MKKS_Citos_${tahun}.xlsx`);
 }
@@ -177,9 +217,30 @@ export function exportToPDF(
   const doc = new jsPDF('landscape', 'mm', 'a4');
 
   // Pre-calculate financial totals
-  const iuranTahunThis = iuranList.filter(i => i.tahun === tahun);
-  const pemasukanLainTahunThis = pemasukanLainList.filter(p => p.tanggal.startsWith(`${tahun}`));
-  const pengeluaranTahunThis = pengeluaranList.filter(p => p.tanggal.startsWith(`${tahun}`));
+  const iuranTahunThis = iuranList
+    .filter(i => i.tahun === tahun)
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggalInput).getTime() || 0;
+      const dateB = new Date(b.tanggalInput).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
+  const pemasukanLainTahunThis = pemasukanLainList
+    .filter(p => p.tanggal.startsWith(`${tahun}`))
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggal).getTime() || 0;
+      const dateB = new Date(b.tanggal).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
+  const pengeluaranTahunThis = pengeluaranList
+    .filter(p => p.tanggal.startsWith(`${tahun}`))
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggal).getTime() || 0;
+      const dateB = new Date(b.tanggal).getTime() || 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
   const totalIuranMasuk = iuranTahunThis.reduce((acc, curr) => acc + curr.nominal, 0);
   const totalPemasukanLain = pemasukanLainTahunThis.reduce((acc, curr) => acc + curr.nominal, 0);
@@ -565,4 +626,113 @@ export function exportToPDF(
   doc.text(bendaharaName, 220, signatureY + 25);
 
   doc.save(`Laporan_Keuangan_MKKS_${tahun}.pdf`);
+}
+
+export function exportRiwayatHapusToExcel(
+  riwayatHapusList: RiwayatHapus[],
+  tahun?: number
+) {
+  const wb = XLSX.utils.book_new();
+  const sortedList = [...riwayatHapusList].sort((a, b) => {
+    const timeA = new Date(a.tanggalHapus || a.timestamp || '').getTime() || 0;
+    const timeB = new Date(b.tanggalHapus || b.timestamp || '').getTime() || 0;
+    if (timeB !== timeA) return timeB - timeA;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
+
+  const logData = sortedList.map((r, idx) => ({
+    'No': idx + 1,
+    'Waktu Penghapusan': r.timestamp || r.tanggalHapus,
+    'Jenis Transaksi': (r.jenisTransaksi || r.jenis || '').toUpperCase(),
+    'Identitas Transaksi': r.judulItem || r.judul || r.rincianData || '-',
+    'Nominal Transaksi (Rp)': r.nominal || 0,
+    'Alasan / Keterangan Penghapusan': r.alasanHapus || r.alasan || '-',
+    'Dihapus Oleh': r.dihapusOleh || '-',
+    'Role': r.rolePenghapus || r.role || r.roleUser || 'Bendahara',
+    'ID Data Asli': r.idItemAsli || r.idTransaksi || r.id
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(logData);
+  XLSX.utils.book_append_sheet(wb, ws, `Riwayat Penghapusan`);
+  XLSX.writeFile(wb, `Laporan_Riwayat_Penghapusan_Data_${tahun || 'Semua'}.xlsx`);
+}
+
+export function exportRiwayatHapusToPDF(
+  riwayatHapusList: RiwayatHapus[],
+  currentUser?: User | null,
+  sekolahList: Sekolah[] = []
+) {
+  const doc = new jsPDF('landscape', 'mm', 'a4');
+  const sortedList = [...riwayatHapusList].sort((a, b) => {
+    const timeA = new Date(a.tanggalHapus || a.timestamp || '').getTime() || 0;
+    const timeB = new Date(b.tanggalHapus || b.timestamp || '').getTime() || 0;
+    if (timeB !== timeA) return timeB - timeA;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
+
+  // Header Laporan
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(15, 23, 42);
+  doc.text('MUSYAWARAH KERJA KEPALA SEKOLAH (MKKS)', 147, 13, { align: 'center' });
+  doc.setFontSize(12);
+  doc.setTextColor(225, 29, 72); // rose-600
+  doc.text('AUDIT LOG & LAPORAN RIWAYAT PENGHAPUSAN DATA KEUANGAN', 147, 19.5, { align: 'center' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Kecamatan Cimanggis dan Tapos • Total ${sortedList.length} Catatan Data Dihapus`, 147, 25.5, { align: 'center' });
+  
+  doc.setLineWidth(0.4);
+  doc.setDrawColor(244, 63, 94);
+  doc.line(14, 28.5, 283, 28.5);
+
+  const tableBody = sortedList.map((r, idx) => [
+    idx + 1,
+    r.timestamp || r.tanggalHapus,
+    (r.jenisTransaksi || r.jenis || '').toUpperCase(),
+    r.judulItem || r.judul || r.rincianData || '-',
+    formatRupiah(r.nominal || 0),
+    r.alasanHapus || r.alasan || '-',
+    `${r.dihapusOleh || '-'} (${r.rolePenghapus || r.role || r.roleUser || 'Bendahara'})`
+  ]);
+
+  autoTable(doc, {
+    startY: 33,
+    head: [['No', 'Waktu Hapus', 'Jenis', 'Item / Rincian', 'Nominal', 'Alasan / Keterangan Dihapus', 'Dihapus Oleh']],
+    body: tableBody,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [159, 18, 57], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 28, fontStyle: 'bold' },
+      3: { cellWidth: 55, fontStyle: 'bold' },
+      4: { cellWidth: 32, halign: 'right', fontStyle: 'bold' },
+      5: { cellWidth: 65 },
+      6: { cellWidth: 44 }
+    },
+    alternateRowStyles: { fillColor: [255, 241, 242] },
+    theme: 'grid'
+  });
+
+  const finalY = (doc as any).lastAutoTable?.finalY || 140;
+  let signatureY = finalY + 10;
+  if (signatureY > 165) {
+    doc.addPage('a4', 'landscape');
+    signatureY = 25;
+  }
+
+  const bendaharaName = resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList);
+  const printDate = formatDateIndonesian(new Date().toISOString().split('T')[0]);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Depok, ${printDate}`, 220, signatureY);
+  doc.text('Mengetahui / Penanggung Jawab,', 220, signatureY + 6);
+  doc.setFont('helvetica', 'bold');
+  doc.text(bendaharaName, 220, signatureY + 25);
+
+  doc.save(`Laporan_Riwayat_Penghapusan_Data_${new Date().toISOString().split('T')[0]}.pdf`);
 }

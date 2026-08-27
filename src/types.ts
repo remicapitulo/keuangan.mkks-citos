@@ -76,3 +76,31 @@ export const BULAN_SINGKAT = [
 ] as const;
 
 export const IURAN_PER_BULAN = 100000; // Rp 100.000 per bulan
+
+export type JenisTransaksiHapus = 'Iuran' | 'Pemasukan Lain' | 'Pengeluaran' | string;
+
+export interface RiwayatHapus {
+  id: string;
+  idTransaksi?: string;
+  idItemAsli?: string;
+  jenisTransaksi?: JenisTransaksiHapus;
+  jenis?: string; // 'iuran' | 'pemasukan-lain' | 'pengeluaran'
+  rincianData?: string;
+  judul?: string;
+  judulItem?: string;
+  dataOriginal?: any;
+  nominal: number;
+  tanggalHapus: string; // YYYY-MM-DD HH:mm:ss
+  timestamp?: string;
+  dihapusOleh: string;
+  roleUser?: string;
+  role?: string;
+  rolePenghapus?: string;
+  alasanHapus?: string;
+  alasan?: string;
+  noKuitansi?: string;
+  tanggalTransaksiAsli?: string;
+  tanggalTransaksi?: string;
+  keteranganAsli?: string;
+  namaSekolah?: string;
+}

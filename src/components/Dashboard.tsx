@@ -108,14 +108,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const isBendahara = currentUser?.role === 'Bendahara' || isAdmin;
   
-  // Sekolah role data
+  // Sekolah role data - Primary Key Lock on ID Sekolah (username = idSekolah)
   const mySekolahObj = sekolahList.find(s => 
-    s.namaSekolah.toLowerCase().trim() === (currentUser?.sekolah || '').toLowerCase().trim() ||
-    s.namaSekolah.toLowerCase().includes((currentUser?.sekolah || '').toLowerCase().trim())
+    (currentUser?.username && s.idSekolah === currentUser.username) ||
+    (currentUser?.sekolah && s.namaSekolah.toLowerCase().trim() === currentUser.sekolah.toLowerCase().trim())
   );
   const myIuran = iuranYear.filter(i => 
-    (mySekolahObj && i.idSekolah === mySekolahObj.idSekolah) ||
-    i.namaSekolah.toLowerCase().trim() === (currentUser?.sekolah || '').toLowerCase().trim()
+    (mySekolahObj && i.idSekolah && i.idSekolah === mySekolahObj.idSekolah) ||
+    (currentUser?.username && i.idSekolah && i.idSekolah === currentUser.username) ||
+    (mySekolahObj 
+      ? i.namaSekolah.toLowerCase().trim() === mySekolahObj.namaSekolah.toLowerCase().trim() 
+      : (currentUser?.sekolah ? i.namaSekolah.toLowerCase().trim() === currentUser.sekolah.toLowerCase().trim() : false)
+    )
   );
   const myTotalPaidMonths = myIuran.length;
   const myTotalPaidNominal = myIuran.reduce((a, b) => a + b.nominal, 0);
@@ -564,7 +568,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Combined recent transactions array */}
           {(() => {
             const recentList = [
-              ...iuranYear.slice(-10).map(i => ({
+              ...iuranYear.map(i => ({
                 type: 'MASUK' as const,
                 date: i.tanggalInput,
                 title: i.namaSekolah,
@@ -572,7 +576,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 amount: i.nominal,
                 by: i.diinputOleh
               })),
-              ...pemasukanLainYear.slice(-10).map(l => ({
+              ...pemasukanLainYear.map(l => ({
                 type: 'MASUK' as const,
                 date: l.tanggal,
                 title: `${l.sumberDana} (${l.kategori})`,
@@ -580,7 +584,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 amount: l.nominal,
                 by: l.diinputOleh
               })),
-              ...pengeluaranYear.slice(-10).map(p => ({
+              ...pengeluaranYear.map(p => ({
                 type: 'KELUAR' as const,
                 date: p.tanggal,
                 title: p.project,

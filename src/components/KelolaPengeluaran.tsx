@@ -6,7 +6,6 @@ import { Receipt, PlusCircle, Calendar, FileText, TrendingDown, Tag, AlertCircle
 interface KelolaPengeluaranProps {
   pengeluaranList: Pengeluaran[];
   onSavePengeluaran: (newExpense: Omit<Pengeluaran, 'id'>) => void;
-  onDeletePengeluaran?: (id: string) => void;
   currentUser?: User | null;
 }
 

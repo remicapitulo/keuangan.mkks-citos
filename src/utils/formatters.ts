@@ -115,12 +115,15 @@ export function resolveNamaBendahara(
       ) {
         return String(matchedUser.namaKepsek).trim();
       }
+      if (matchedUser.username && Array.isArray(sekolahs)) {
+        const schById = sekolahs.find((s: any) => s.idSekolah && String(s.idSekolah).trim().toLowerCase() === String(matchedUser.username).trim().toLowerCase());
+        if (schById && schById.namaKepsek && String(schById.namaKepsek).trim()) {
+          return String(schById.namaKepsek).trim();
+        }
+      }
       if (matchedUser.sekolah && Array.isArray(sekolahs)) {
         const sch = sekolahs.find(
-          (s: any) => s.namaSekolah && (
-            String(s.namaSekolah).toLowerCase().trim() === String(matchedUser.sekolah).toLowerCase().trim() ||
-            String(s.namaSekolah).toLowerCase().includes(String(matchedUser.sekolah).toLowerCase().trim())
-          )
+          (s: any) => s.namaSekolah && String(s.namaSekolah).toLowerCase().trim() === String(matchedUser.sekolah).toLowerCase().trim()
         );
         if (sch && sch.namaKepsek && String(sch.namaKepsek).trim()) {
           return String(sch.namaKepsek).trim();
@@ -143,8 +146,7 @@ export function resolveNamaBendahara(
       (s: any) =>
         (s.idSekolah && String(s.idSekolah).toLowerCase().trim() === rawLower) ||
         (s.namaSekolah && String(s.namaSekolah).toLowerCase().trim() === rawLower) ||
-        (s.namaKepsek && String(s.namaKepsek).toLowerCase().trim() === rawLower) ||
-        (s.namaKepsek && String(s.namaKepsek).toLowerCase().includes(rawLower))
+        (s.namaKepsek && String(s.namaKepsek).toLowerCase().trim() === rawLower)
     );
     if (matchedSek && matchedSek.namaKepsek && String(matchedSek.namaKepsek).trim()) {
       return String(matchedSek.namaKepsek).trim();
