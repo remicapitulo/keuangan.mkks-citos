@@ -390,8 +390,8 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
                 </span>
                 <input
                   type="number"
-                  min="1000"
-                  step="1000"
+                  min="0"
+                  step="any"
                   placeholder="0"
                   value={nominal}
                   onChange={(e) => setNominal(e.target.value)}
