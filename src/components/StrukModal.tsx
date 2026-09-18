@@ -486,6 +486,23 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       }
       curY += (pemLines.length - 1) * 15;
 
+      if (!isPemasukanLain && data.keterangan) {
+        curY += 16;
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('Tempat / Catatan', 40, curY);
+
+        ctx.fillStyle = '#334155';
+        ctx.font = '500 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'right';
+        const ketLines = wrapTextLines(ctx, data.keterangan, 320);
+        for (let i = 0; i < ketLines.length; i++) {
+          ctx.fillText(ketLines[i], 520, curY + (i * 14));
+        }
+        curY += (ketLines.length - 1) * 14;
+      }
+
       ctx.strokeStyle = '#f1f5f9';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -736,6 +753,15 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                   }
                 </span>
               </div>
+
+              {!isPemasukanLain && data.keterangan && (
+                <div className="flex items-start justify-between border-b border-slate-200/80 pb-2 gap-2">
+                  <span className="text-slate-500 font-medium shrink-0">Tempat / Catatan</span>
+                  <span className="font-semibold text-slate-700 text-right max-w-xs text-xs leading-snug">
+                    {data.keterangan}
+                  </span>
+                </div>
+              )}
 
               {/* Total Highlight Box - Styled with vibrant colors for print & screen */}
               <div 

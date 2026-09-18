@@ -63,6 +63,7 @@ export function exportToExcel(
     'Tanggal Pembayaran': i.tanggalInput,
     'Nama Instansi': i.namaSekolah,
     'Jumlah Nominal (Rp)': i.nominal,
+    'Keterangan / Tempat Terima': i.keterangan || '-',
     'Diinput Oleh': resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
     'No. Kuitansi': i.noKuitansi || '-'
   }));
@@ -75,6 +76,7 @@ export function exportToExcel(
     'Tanggal Pembayaran': '',
     'Nama Instansi': 'TOTAL IURAN MASUK',
     'Jumlah Nominal (Rp)': totalIuranMasuk,
+    'Keterangan / Tempat Terima': '',
     'Diinput Oleh': '',
     'No. Kuitansi': ''
   } as any);
@@ -427,7 +429,7 @@ export function exportToPDF(
   doc.text('2. Rincian Kas Masuk (Iuran Terbayar)', 14, currentY);
   currentY += 3.5;
 
-  const kasMasukHead = [['No', 'Tahun', 'Bulan', 'Tgl Bayar', 'Nama Instansi', 'Nominal', 'Petugas']];
+  const kasMasukHead = [['No', 'Tahun', 'Bulan', 'Tgl Bayar', 'Nama Instansi', 'Nominal', 'Keterangan / Tempat', 'Petugas']];
   const kasMasukRows = iuranTahunThis.map((i, idx) => [
     idx + 1,
     i.tahun,
@@ -435,10 +437,11 @@ export function exportToPDF(
     formatDateIndonesian(i.tanggalInput),
     i.namaSekolah,
     formatRupiah(i.nominal),
+    i.keterangan || '-',
     resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
   ]);
 
-  kasMasukRows.push(['', '', '', '', 'TOTAL IURAN MASUK', formatRupiah(totalIuranMasuk), '']);
+  kasMasukRows.push(['', '', '', '', 'TOTAL IURAN MASUK', formatRupiah(totalIuranMasuk), '', '']);
 
   autoTable(doc, {
     startY: currentY,
@@ -449,12 +452,13 @@ export function exportToPDF(
     headStyles: { fillColor: [5, 150, 105], textColor: 255, fontStyle: 'bold' },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 15, halign: 'center' },
-      2: { cellWidth: 22, halign: 'center' },
-      3: { cellWidth: 28, halign: 'center' },
-      4: { cellWidth: 84 },
-      5: { cellWidth: 45, halign: 'right' },
-      6: { cellWidth: 65 }
+      1: { cellWidth: 14, halign: 'center' },
+      2: { cellWidth: 20, halign: 'center' },
+      3: { cellWidth: 25, halign: 'center' },
+      4: { cellWidth: 55 },
+      5: { cellWidth: 40, halign: 'right' },
+      6: { cellWidth: 55 },
+      7: { cellWidth: 50 }
     },
     theme: 'striped'
   });

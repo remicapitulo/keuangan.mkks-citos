@@ -145,14 +145,19 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
           )}
 
           {/* Apps Script Guide Instructions */}
-          <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/50 space-y-2 text-xs">
-            <div className="font-bold text-slate-800">Petunjuk Cara Menghubungkan Google Sheet:</div>
-            <ol className="list-decimal list-inside space-y-1 text-slate-600 text-[11px]">
-              <li>Buka file Google Spreadsheet Anda.</li>
-              <li>Klik menu <strong>Ekstensi</strong> &rarr; <strong>Apps Script</strong>.</li>
-              <li>Hapus semua kode lama, lalu tempel kode yang sudah disalin (tombol di atas).</li>
-              <li>Klik tombol <strong>Deploy</strong> &rarr; <strong>New deployment</strong> &rarr; Pilih type <strong>Web app</strong>.</li>
-              <li>Atur <i>Who has access</i> menjadi <strong>Anyone</strong>, lalu klik Deploy dan salin Web App URL-nya ke form di atas.</li>
+          <div className="border border-teal-200 rounded-xl p-3.5 bg-teal-50/50 space-y-2.5 text-xs">
+            <div className="font-bold text-teal-900 flex items-center space-x-1.5">
+              <span>Langkah Update Kode Google Apps Script (Urutan Kolom Baru: Nominal &rarr; Keterangan &rarr; Tanggal Input):</span>
+            </div>
+            <ol className="list-decimal list-inside space-y-1.5 text-slate-700 text-[11px] leading-relaxed">
+              <li>Klik tombol <strong>Salin Kode Apps Script</strong> di bagian atas.</li>
+              <li>Buka spreadsheet Anda di Google Sheets &rarr; Klik menu <strong>Ekstensi (Extensions)</strong> &rarr; <strong>Apps Script</strong>.</li>
+              <li>Hapus (select all & delete) semua kode lama di file <code className="bg-white px-1 py-0.5 rounded border border-teal-300 font-mono text-[10px]">Code.gs</code>, lalu <strong>Paste</strong> kode baru yang disalin tadi.</li>
+              <li>
+                <strong>PENTING (Deploy Versi Baru):</strong><br />
+                Klik menu <strong>Deploy</strong> (kanan atas) &rarr; pilih <strong>Manage deployments (Kelola deployment)</strong> &rarr; klik ikon <strong>Pensil (Edit)</strong> &rarr; pada bagian <i>Version</i>, pilih <strong>New version (Versi baru)</strong> &rarr; klik <strong>Deploy</strong>.
+              </li>
+              <li>Setelah selesai di Apps Script, kembali ke sini lalu klik tombol <strong>Simpan & Tes Koneksi</strong> di bawah. Sheet Iuran akan langsung diperbarui dengan urutan: <strong>Nominal &rarr; Keterangan &rarr; Tanggal Input</strong>.</li>
             </ol>
           </div>
 

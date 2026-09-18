@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sekolah, Iuran, BULAN_LIST, IURAN_PER_BULAN, PaketDurasi, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
-import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter } from 'lucide-react';
+import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter, MapPin, FileText, Sparkles } from 'lucide-react';
 
 interface InputIuranProps {
   sekolahList: Sekolah[];
@@ -29,9 +29,12 @@ export const InputIuran: React.FC<InputIuranProps> = ({
   currentUser
 }) => {
   const currentYear = new Date().getFullYear();
+  const todayDateStr = new Date().toISOString().split('T')[0];
 
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
   const [tahunBuku, setTahunBuku] = useState<number>(currentYear);
+  const [tanggalPembayaran, setTanggalPembayaran] = useState<string>(todayDateStr);
+  const [keterangan, setKeterangan] = useState<string>('');
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [selectedPaketIndex, setSelectedPaketIndex] = useState<number>(0);
   const [searchSchoolQuery, setSearchSchoolQuery] = useState<string>('');
@@ -39,6 +42,14 @@ export const InputIuran: React.FC<InputIuranProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [historyTab, setHistoryTab] = useState<'selected' | 'all'>('selected');
   const [allHistorySearch, setAllHistorySearch] = useState<string>('');
+
+  const quickNotesSuggestions = [
+    'Rapat Rutin MKKS',
+    'Diterima Tunai di Sekolah',
+    'Transfer Bank BJB',
+    'Pertemuan Kelompok Kerja Kepala Sekolah',
+    'Diserahkan saat Kegiatan Workshop'
+  ];
 
   // Set initial selected school if passed from dashboard
   useEffect(() => {
@@ -122,7 +133,8 @@ export const InputIuran: React.FC<InputIuranProps> = ({
     // Generate Kuitansi No
     const timestamp = Date.now();
     const noKuitansi = `KWT/MKKS-CITOS/${tahunBuku}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${timestamp.toString().slice(-4)}`;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveTanggal = tanggalPembayaran || todayDateStr;
+    const trimmedKeterangan = keterangan.trim() || undefined;
 
     const currentBendaharaName = resolveNamaBendahara(
       currentUser?.namaKepsek || currentUser?.username,
@@ -137,9 +149,10 @@ export const InputIuran: React.FC<InputIuranProps> = ({
       idSekolah: activeSchool.idSekolah,
       namaSekolah: activeSchool.namaSekolah,
       nominal: IURAN_PER_BULAN,
-      tanggalInput: todayStr,
+      tanggalInput: effectiveTanggal,
       diinputOleh: currentBendaharaName,
-      noKuitansi
+      noKuitansi,
+      keterangan: trimmedKeterangan
     }));
 
     // Save to store
@@ -149,21 +162,23 @@ export const InputIuran: React.FC<InputIuranProps> = ({
     const totalNominal = selectedMonths.length * IURAN_PER_BULAN;
     const kuitansiData = {
       noKuitansi,
-      tanggal: todayStr,
+      tanggal: effectiveTanggal,
       namaSekolah: activeSchool.namaSekolah,
       namaKepsek: activeSchool.namaKepsek,
       alamatSekolah: `${activeSchool.alamat}, Kel. ${activeSchool.kelurahan}, Kec. ${activeSchool.kecamatan}`,
       tahunBuku,
       bulanList: selectedMonths,
       totalNominal,
-      diinputOleh: currentBendaharaName
+      diinputOleh: currentBendaharaName,
+      keterangan: trimmedKeterangan
     };
 
     // Open Struk Receipt Popup
     onOpenStrukModal(kuitansiData);
 
-    // Reset form selection
+    // Reset form selection and notes
     setSelectedMonths([]);
+    setKeterangan('');
   };
 
   // Payment history for active school
@@ -376,6 +391,107 @@ export const InputIuran: React.FC<InputIuranProps> = ({
               </div>
             </div>
 
+            {/* 5. Tanggal & Keterangan Penerimaan (Tempat & Waktu Terima Iuran) */}
+            <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-3.5 sm:p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+                  <MapPin className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span>5. Tempat & Waktu Terima Iuran (Keterangan)</span>
+                </label>
+                <span className="text-[10px] text-teal-800 font-semibold bg-teal-100/70 px-2 py-0.5 rounded-full w-fit">
+                  Pengingat Bendahara
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Tanggal Terima */}
+                <div className="sm:col-span-1">
+                  <label htmlFor="tanggal-pembayaran-input" className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Tanggal Penerimaan
+                  </label>
+                  <div className="relative">
+                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      id="tanggal-pembayaran-input"
+                      type="date"
+                      value={tanggalPembayaran}
+                      onChange={(e) => setTanggalPembayaran(e.target.value)}
+                      className="w-full pl-9 pr-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Keterangan Tempat & Catatan */}
+                <div className="sm:col-span-2">
+                  <label htmlFor="keterangan-iuran-input" className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Keterangan Tempat & Kondisi Serah Terima
+                  </label>
+                  <div className="relative">
+                    <FileText className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      id="keterangan-iuran-input"
+                      type="text"
+                      placeholder="Contoh: Diterima tunai saat rapat MKKS di SDN Cisalak 1"
+                      value={keterangan}
+                      onChange={(e) => setKeterangan(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Suggestion Chips */}
+              <div className="pt-1 border-t border-slate-200/60">
+                <div className="text-[10px] font-bold text-slate-500 mb-1.5 flex items-center space-x-1">
+                  <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
+                  <span>Pilihan Cepat Catatan Tempat:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {quickNotesSuggestions.map((item, qIdx) => (
+                    <button
+                      key={`quick-note-${qIdx}`}
+                      type="button"
+                      onClick={() => {
+                        if (!keterangan) {
+                          setKeterangan(item);
+                        } else if (!keterangan.includes(item)) {
+                          setKeterangan(prev => `${prev} (${item})`);
+                        }
+                      }}
+                      className="text-[10px] font-semibold bg-white hover:bg-teal-50 text-slate-600 hover:text-teal-700 px-2.5 py-1 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors shadow-xs cursor-pointer"
+                    >
+                      + {item}
+                    </button>
+                  ))}
+                  {activeSchool && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const noteSchool = `Diterima di ${activeSchool.namaSekolah}`;
+                        if (!keterangan) {
+                          setKeterangan(noteSchool);
+                        } else if (!keterangan.includes(activeSchool.namaSekolah)) {
+                          setKeterangan(prev => `${prev} (${noteSchool})`);
+                        }
+                      }}
+                      className="text-[10px] font-semibold bg-teal-50 hover:bg-teal-100 text-teal-800 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors shadow-xs cursor-pointer"
+                    >
+                      + Di {activeSchool.namaSekolah}
+                    </button>
+                  )}
+                  {keterangan && (
+                    <button
+                      type="button"
+                      onClick={() => setKeterangan('')}
+                      className="text-[10px] font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer ml-auto"
+                    >
+                      Hapus Catatan
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Error / Validation Warning */}
             {errorMsg && (
               <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3.5 rounded-xl flex items-start space-x-2.5">
@@ -474,6 +590,7 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                       return (
                         (i.namaSekolah || '').toLowerCase().includes(q) ||
                         (i.bulan || '').toLowerCase().includes(q) ||
+                        (i.keterangan || '').toLowerCase().includes(q) ||
                         (i.noKuitansi || '').toLowerCase().includes(q) ||
                         (i.diinputOleh || '').toLowerCase().includes(q)
                       );
@@ -526,6 +643,13 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                           )}
                         </div>
 
+                        {item.keterangan && (
+                          <div className="text-[11px] text-teal-800 bg-teal-50/90 px-2 py-1 rounded-md border border-teal-200/70 flex items-start space-x-1.5 mt-1">
+                            <MapPin className="w-3 h-3 text-teal-600 mt-0.5 shrink-0" />
+                            <span className="leading-tight break-words font-medium">{item.keterangan}</span>
+                          </div>
+                        )}
+
                         <div className="pt-2 border-t border-slate-200/50 flex items-center justify-between">
                           <span className="text-[10px] text-slate-400 truncate max-w-[110px]" title={item.diinputOleh}>
                             Oleh: {resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)}
@@ -544,10 +668,11 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                                   tahunBuku: item.tahun,
                                   bulanList: [item.bulan],
                                   totalNominal: item.nominal,
-                                  diinputOleh: resolveNamaBendahara(item.diinputOleh, undefined, sekolahList)
+                                  diinputOleh: resolveNamaBendahara(item.diinputOleh, undefined, sekolahList),
+                                  keterangan: item.keterangan
                                 });
                               }}
-                              className="text-teal-600 hover:text-teal-800 font-bold text-[10px] flex items-center space-x-1 hover:underline"
+                              className="text-teal-600 hover:text-teal-800 font-bold text-[10px] flex items-center space-x-1 hover:underline cursor-pointer"
                             >
                               <Printer className="w-3 h-3" />
                               <span>Cetak Kuitansi</span>

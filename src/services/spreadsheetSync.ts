@@ -224,6 +224,8 @@ export function normalizeIuranList(rawList: any[], sekolahList: Sekolah[] = INIT
     const tanggalInput = String(i.tanggalInput || i['Tanggal Input'] || i.tanggal || i.Tanggal || new Date().toISOString().split('T')[0]).trim();
     const diinputOleh = String(i.diinputOleh || i['Diinput Oleh'] || i.operator || 'Bendahara MKKS Citos').trim();
     const noKuitansi = String(i.noKuitansi || i['No Kuitansi'] || i.kuitansi || `KWT/MKKS/${tahun}/${idSekolah}`).trim();
+    const keteranganRaw = i.keterangan || i.Keterangan || i['Keterangan'] || i['Keterangan / Tempat Terima'] || i['Tempat Terima'] || i.catatan || i.Catatan || '';
+    const keterangan = String(keteranganRaw || '').trim();
     const id = String(i.id || i.ID || `IUR-${tahun}-${idx + 1}`).trim();
 
     if (!bulan || (!idSekolah && !namaSekolah)) return null;
@@ -237,7 +239,8 @@ export function normalizeIuranList(rawList: any[], sekolahList: Sekolah[] = INIT
       nominal,
       tanggalInput,
       diinputOleh,
-      noKuitansi
+      noKuitansi,
+      keterangan: keterangan || undefined
     } as Iuran;
   }).filter((item): item is Iuran => item !== null);
 }
@@ -648,6 +651,7 @@ export class StorageService {
       'ID Sekolah': item.idSekolah,
       'Nama Sekolah': item.namaSekolah,
       'Nominal': item.nominal,
+      'Keterangan / Tempat Terima': item.keterangan || '',
       'Tanggal Input': item.tanggalInput,
       'Diinput Oleh': item.diinputOleh,
       'No Kuitansi': item.noKuitansi,
@@ -656,6 +660,7 @@ export class StorageService {
       idSekolah: item.idSekolah,
       namaSekolah: item.namaSekolah,
       nominal: item.nominal,
+      keterangan: item.keterangan || '',
       tanggalInput: item.tanggalInput,
       diinputOleh: item.diinputOleh,
       noKuitansi: item.noKuitansi,
@@ -979,7 +984,7 @@ function writeSheetData(ss, sheetName, rows) {
 
   // Header Rapi Standar MKKS Citos
   var headerMap = {
-    'Iuran': ['Tahun', 'Bulan', 'ID Sekolah', 'Nama Sekolah', 'Nominal', 'Tanggal Input', 'Diinput Oleh', 'No Kuitansi'],
+    'Iuran': ['Tahun', 'Bulan', 'ID Sekolah', 'Nama Sekolah', 'Nominal', 'Keterangan / Tempat Terima', 'Tanggal Input', 'Diinput Oleh', 'No Kuitansi'],
     'Pengeluaran': ['No', 'Tanggal Transaksi', 'Alokasi Project / Kegiatan', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh'],
     'Pemasukan_Lain': ['No', 'Tanggal Transaksi', 'Kategori', 'Sumber Dana / Pihak Terkait', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh', 'No Kuitansi'],
     'PemasukanLain': ['No', 'Tanggal Transaksi', 'Kategori', 'Sumber Dana / Pihak Terkait', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh', 'No Kuitansi'],
@@ -995,6 +1000,8 @@ function writeSheetData(ss, sheetName, rows) {
     'Bulan': ['Bulan', 'bulan'],
     'ID Sekolah': ['ID Sekolah', 'idSekolah', 'id_sekolah'],
     'Nama Sekolah': ['Nama Sekolah', 'namaSekolah', 'nama_sekolah', 'sekolah'],
+    'Keterangan / Tempat Terima': ['Keterangan / Tempat Terima', 'Keterangan', 'keterangan', 'Tempat Terima', 'tempatTerima', 'Catatan', 'catatan'],
+    'Keterangan': ['Keterangan', 'keterangan', 'Keterangan / Tempat Terima', 'Tempat Terima', 'Catatan', 'catatan'],
     'Nominal': ['Nominal', 'nominal', 'jumlah'],
     'Tanggal Input': ['Tanggal Input', 'tanggalInput', 'tanggal'],
     'Diinput Oleh': ['Diinput Oleh', 'diinputOleh', 'operator'],

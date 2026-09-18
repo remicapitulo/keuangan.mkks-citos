@@ -28,6 +28,7 @@ export interface Iuran {
   tanggalInput: string; // YYYY-MM-DD
   diinputOleh: string;
   noKuitansi?: string;
+  keterangan?: string;
 }
 
 export interface Pengeluaran {

@@ -109,7 +109,8 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const filteredKasMasuk = iuranYear
     .filter(i =>
       (i.namaSekolah || '').toLowerCase().includes(query) ||
-      (i.bulan || '').toLowerCase().includes(query)
+      (i.bulan || '').toLowerCase().includes(query) ||
+      (i.keterangan || '').toLowerCase().includes(query)
     )
     .sort((a, b) => {
       const dateA = new Date(a.tanggalInput).getTime() || 0;
@@ -738,6 +739,12 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <span>Bulan: <strong className="text-emerald-800">{i.bulan}</strong> ({i.tahun})</span>
                     <span>{formatDateIndonesian(i.tanggalInput)}</span>
                   </div>
+                  {i.keterangan && (
+                    <div className="text-[11px] text-teal-900 bg-teal-50 px-2 py-1 rounded-md border border-teal-200/60 flex items-start space-x-1">
+                      <span className="font-bold text-teal-800 shrink-0">Tempat / Ket:</span>
+                      <span className="break-words">{i.keterangan}</span>
+                    </div>
+                  )}
                   <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1.5 border-t border-emerald-100">
                     <span>Diinput: {resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</span>
                     <div className="flex items-center space-x-1.5">
@@ -756,7 +763,8 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                               tahunBuku: i.tahun,
                               bulanList: [i.bulan],
                               totalNominal: i.nominal,
-                              diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
+                              diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
+                              keterangan: i.keterangan
                             });
                           }}
                           className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-emerald-200"
@@ -794,6 +802,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   <th className="py-3 px-3">Tanggal Pembayaran</th>
                   <th className="py-3 px-4">Nama Instansi / Sekolah</th>
                   <th className="py-3 px-3 text-right">Jumlah Nominal</th>
+                  <th className="py-3 px-3 min-w-[140px]">Keterangan / Tempat Terima</th>
                   <th className={`py-3 px-3 text-center ${!isBendahara ? 'rounded-tr-xl' : ''}`}>Diinput Oleh</th>
                   {isBendahara && (
                     <th className="py-3 px-3 text-center rounded-tr-xl">Aksi</th>
@@ -809,6 +818,15 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                     <td className="py-3 px-3 text-slate-600">{formatDateIndonesian(i.tanggalInput)}</td>
                     <td className="py-3 px-4 font-bold text-slate-900">{i.namaSekolah}</td>
                     <td className="py-3 px-3 text-right font-black text-emerald-600">{formatRupiah(i.nominal)}</td>
+                    <td className="py-3 px-3 text-slate-600 text-[11px]">
+                      {i.keterangan ? (
+                        <span className="text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-100 font-medium inline-block max-w-[200px] truncate" title={i.keterangan}>
+                          {i.keterangan}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic">-</span>
+                      )}
+                    </td>
                     <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</td>
                     {isBendahara && (
                       <td className="py-3 px-3 text-center">
@@ -828,7 +846,8 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                                   tahunBuku: i.tahun,
                                   bulanList: [i.bulan],
                                   totalNominal: i.nominal,
-                                  diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)
+                                  diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
+                                  keterangan: i.keterangan
                                 });
                               }}
                               className="inline-flex items-center space-x-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold text-[11px] transition-colors cursor-pointer"
@@ -859,7 +878,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                 <tr className="bg-slate-800 text-white font-bold text-xs">
                   <td colSpan={5} className="py-3 px-4 text-right rounded-bl-xl">TOTAL IURAN MASUK ({selectedYear}):</td>
                   <td className="py-3 px-3 text-right text-emerald-400 font-black text-sm">{formatRupiah(totalIuranMasuk)}</td>
-                  <td colSpan={isBendahara ? 2 : 1} className="rounded-br-xl"></td>
+                  <td colSpan={isBendahara ? 3 : 2} className="rounded-br-xl"></td>
                 </tr>
               </tfoot>
             </table>

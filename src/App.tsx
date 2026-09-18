@@ -162,7 +162,7 @@ export default function App() {
       id: item.id,
       jenis: 'Iuran',
       title: `Iuran ${item.namaSekolah} (${item.bulan} ${item.tahun})`,
-      subtitle: `Tahun Buku ${item.tahun}`,
+      subtitle: item.keterangan ? `${item.keterangan} (Tahun ${item.tahun})` : `Tahun Buku ${item.tahun}`,
       nominal: item.nominal,
       tanggal: item.tanggalInput,
       noKuitansi: item.noKuitansi,
