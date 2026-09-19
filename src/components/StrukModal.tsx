@@ -489,14 +489,14 @@ export const StrukModal: React.FC<StrukModalProps> = ({
       if (!isPemasukanLain && data.keterangan) {
         curY += 16;
         ctx.fillStyle = '#64748b';
-        ctx.font = '500 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('Catatan / Keterangan', 40, curY);
+        ctx.fillText('Catatan Inputan Bendahara', 40, curY);
 
         ctx.fillStyle = '#0f766e';
         ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'right';
-        const ketLines = wrapTextLines(ctx, data.keterangan, 320);
+        const ketLines = wrapTextLines(ctx, data.keterangan, 300);
         for (let i = 0; i < ketLines.length; i++) {
           ctx.fillText(ketLines[i], 520, curY + (i * 14));
         }
@@ -755,12 +755,13 @@ export const StrukModal: React.FC<StrukModalProps> = ({
               </div>
 
               {!isPemasukanLain && data.keterangan && (
-                <div className="flex items-start justify-between border-b border-slate-200/80 pb-2 gap-2 bg-teal-50/70 p-2 rounded-lg border border-teal-200/60">
-                  <span className="text-teal-900 font-bold shrink-0 text-xs">
-                    Catatan / Keterangan
+                <div className="flex items-start justify-between border-b border-slate-200/80 pb-2.5 gap-2 bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200/80">
+                  <span className="text-emerald-950 font-black shrink-0 text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                    <span>Catatan Inputan Bendahara:</span>
                   </span>
-                  <span className="font-bold text-teal-800 text-right max-w-xs text-xs leading-snug break-words">
-                    {data.keterangan}
+                  <span className="font-bold text-emerald-800 text-right max-w-xs text-xs leading-snug break-words italic">
+                    "{data.keterangan}"
                   </span>
                 </div>
               )}

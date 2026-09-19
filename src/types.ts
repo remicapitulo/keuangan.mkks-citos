@@ -1,4 +1,4 @@
-export type UserRole = 'Admin' | 'Bendahara' | 'Sekolah';
+export type UserRole = 'Admin' | 'Bendahara' | 'Sekolah' | 'Ketua';
 
 export interface User {
   username: string;
@@ -104,4 +104,44 @@ export interface RiwayatHapus {
   tanggalTransaksi?: string;
   keteranganAsli?: string;
   namaSekolah?: string;
+}
+
+export interface PecahanUangCash {
+  pecahan100k: number; // lembar Rp 100.000
+  pecahan50k: number;  // lembar Rp 50.000
+  pecahan20k: number;  // lembar Rp 20.000
+  pecahan10k: number;  // lembar Rp 10.000
+  pecahan5k: number;   // lembar Rp 5.000
+  pecahan2k: number;   // lembar Rp 2.000
+  pecahan1k: number;   // lembar Rp 1.000
+  koin: number;        // total rupiah koin
+}
+
+export interface RekonsiliasiKas {
+  id: string;
+  tahun: number;
+  tanggalAudit: string; // YYYY-MM-DD HH:mm:ss
+  saldoCash: number;    // Uang Cash Fisik (Brankas Bendahara)
+  saldoBank: number;    // Uang di Rekening Bank
+  namaBank: string;     // Contoh: "Bank DKI", "Bank BJB", "Bank Mandiri"
+  nomorRekening: string;
+  atasNamaRekening: string;
+  catatanAudit: string;
+  diauditOleh: string;
+  namaKetuaMkks?: string;
+  nipKetuaMkks?: string;
+  jabatanKetuaMkks?: string;
+  namaBendahara?: string;
+  nipBendahara?: string;
+  jabatanBendahara?: string;
+  pecahanCash?: PecahanUangCash;
+}
+
+export interface PejabatPenandatangan {
+  namaKetuaMkks: string;
+  nipKetuaMkks: string;
+  jabatanKetuaMkks: string;
+  namaBendahara: string;
+  nipBendahara: string;
+  jabatanBendahara: string;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus } from './types';
+import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, RekonsiliasiKas } from './types';
 import { StorageService } from './services/spreadsheetSync';
 import { Navbar } from './components/Navbar';
 import { Navigation, ActiveTab } from './components/Sidebar';
@@ -26,6 +26,7 @@ export default function App() {
   const [pengeluaranList, setPengeluaranList] = useState<Pengeluaran[]>(() => StorageService.getPengeluaran());
   const [pemasukanLainList, setPemasukanLainList] = useState<PemasukanLain[]>(() => StorageService.getPemasukanLain());
   const [riwayatHapusList, setRiwayatHapusList] = useState<RiwayatHapus[]>(() => StorageService.getRiwayatHapus());
+  const [rekonsiliasiKasList, setRekonsiliasiKasList] = useState<RekonsiliasiKas[]>(() => StorageService.getRekonsiliasiKas());
   const [spreadsheetId, setSpreadsheetId] = useState<string>(() => StorageService.getSpreadsheetId());
 
   // Modals state
@@ -54,6 +55,7 @@ export default function App() {
     setPengeluaranList(StorageService.getPengeluaran());
     setPemasukanLainList(StorageService.getPemasukanLain());
     setRiwayatHapusList(StorageService.getRiwayatHapus());
+    setRekonsiliasiKasList(StorageService.getRekonsiliasiKas());
 
     StorageService.fetchFromAppsScript().then((success) => {
       if (success) {
@@ -63,6 +65,7 @@ export default function App() {
         setPengeluaranList(StorageService.getPengeluaran());
         setPemasukanLainList(StorageService.getPemasukanLain());
         setRiwayatHapusList(StorageService.getRiwayatHapus());
+        setRekonsiliasiKasList(StorageService.getRekonsiliasiKas());
       }
     });
 
@@ -294,8 +297,22 @@ export default function App() {
     setPengeluaranList(StorageService.getPengeluaran());
     setPemasukanLainList(StorageService.getPemasukanLain());
     setRiwayatHapusList(StorageService.getRiwayatHapus());
+    setRekonsiliasiKasList(StorageService.getRekonsiliasiKas());
     setCurrentUser(StorageService.getCurrentUser());
     showToast('Data aplikasi di-reset ke data default awal.');
+  };
+
+  // Save Audit Rekonsiliasi Kas
+  const handleSaveRekonsiliasiKas = async (record: RekonsiliasiKas) => {
+    const updated = StorageService.saveSingleRekonsiliasi(record);
+    setRekonsiliasiKasList(updated);
+    
+    const syncRes = await StorageService.syncToAppsScript();
+    if (syncRes.status === 'connected') {
+      showToast(`Hasil audit fisik & rekonsiliasi kas tahun ${record.tahun} berhasil disimpan & disinkronkan ke Google Sheet (Sheet: Rekonsiliasi_Kas)!`);
+    } else {
+      showToast(`Hasil audit fisik & rekonsiliasi kas tahun ${record.tahun} berhasil disimpan lokal.`);
+    }
   };
 
   const isAdmin = currentUser ? (
@@ -409,12 +426,15 @@ export default function App() {
                   pengeluaranList={pengeluaranList}
                   pemasukanLainList={pemasukanLainList}
                   riwayatHapusList={riwayatHapusList}
+                  rekonsiliasiKasList={rekonsiliasiKasList}
+                  onSaveRekonsiliasiKas={handleSaveRekonsiliasiKas}
                   userSchoolName={currentUser?.sekolah}
                   currentUser={currentUser}
                   onOpenStrukModal={handleOpenStrukModal}
                   onDeleteIuran={handleRequestDeleteIuran}
                   onDeletePemasukanLain={handleRequestDeletePemasukanLain}
                   onDeletePengeluaran={handleRequestDeletePengeluaran}
+                  onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
                 />
               )}
 

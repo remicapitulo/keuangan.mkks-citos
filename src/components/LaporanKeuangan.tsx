@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
+import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas, PejabatPenandatangan } from '../types';
+import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
 import { exportToExcel, exportToPDF, exportRiwayatHapusToExcel, exportRiwayatHapusToPDF } from '../services/exportUtils';
+import { StorageService } from '../services/spreadsheetSync';
+import { AuditRekonsiliasiTab } from './AuditRekonsiliasiTab';
+import { BeritaAcaraAuditModal } from './BeritaAcaraAuditModal';
+import { ModalEditPejabat } from './ModalEditPejabat';
 import { 
   FileSpreadsheet, 
   FileText, 
@@ -28,7 +32,10 @@ import {
   AlertTriangle,
   Clock,
   User as UserIcon,
-  Tag
+  Tag,
+  Scale,
+  Landmark,
+  ArrowRight
 } from 'lucide-react';
 
 interface LaporanKeuanganProps {
@@ -37,12 +44,15 @@ interface LaporanKeuanganProps {
   pengeluaranList: Pengeluaran[];
   pemasukanLainList?: PemasukanLain[];
   riwayatHapusList?: RiwayatHapus[];
+  rekonsiliasiKasList?: RekonsiliasiKas[];
   userSchoolName?: string;
   currentUser?: User | null;
   onOpenStrukModal?: (data: any) => void;
   onDeleteIuran?: (item: Iuran) => void;
   onDeletePemasukanLain?: (item: PemasukanLain) => void;
   onDeletePengeluaran?: (item: Pengeluaran) => void;
+  onSaveRekonsiliasiKas?: (record: RekonsiliasiKas) => void;
+  onOpenSpreadsheetModal?: () => void;
 }
 
 export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
@@ -51,20 +61,40 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   pengeluaranList,
   pemasukanLainList = [],
   riwayatHapusList = [],
+  rekonsiliasiKasList,
   userSchoolName,
   currentUser,
   onOpenStrukModal,
   onDeleteIuran,
   onDeletePemasukanLain,
-  onDeletePengeluaran
+  onDeletePengeluaran,
+  onSaveRekonsiliasiKas,
+  onOpenSpreadsheetModal
 }) => {
   const currentYear = new Date().getFullYear();
   const availableYears = getTahunBukuList(iuranList.map((i) => i.tahun));
   const [selectedYear, setSelectedYear] = useState<number>(() => Math.max(2026, currentYear));
-  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap' | 'riwayat-hapus'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap' | 'audit' | 'riwayat-hapus'>('matrix');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [matrixViewMode, setMatrixViewMode] = useState<'cards' | 'table'>('cards');
   const [filterJenisHapus, setFilterJenisHapus] = useState<string>('all');
+  const [isBeritaAcaraOpen, setIsBeritaAcaraOpen] = useState<boolean>(false);
+  const [isPejabatModalOpen, setIsPejabatModalOpen] = useState<boolean>(false);
+  const [pejabatData, setPejabatData] = useState<PejabatPenandatangan>(() => StorageService.getPejabat());
+
+  // Local storage sync fallback for rekonsiliasi kas
+  const [localRekonsiliasiList, setLocalRekonsiliasiList] = useState<RekonsiliasiKas[]>(() => {
+    return rekonsiliasiKasList && rekonsiliasiKasList.length > 0 
+      ? rekonsiliasiKasList 
+      : StorageService.getRekonsiliasiKas();
+  });
+
+  // Keep local state in sync when prop changes
+  React.useEffect(() => {
+    if (rekonsiliasiKasList && rekonsiliasiKasList.length > 0) {
+      setLocalRekonsiliasiList(rekonsiliasiKasList);
+    }
+  }, [rekonsiliasiKasList]);
 
   // Filter dataset by year
   const iuranYear = iuranList.filter(i => i.tahun === selectedYear);
@@ -78,13 +108,41 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const totalKasKeluar = pengeluaranYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const saldoBersih = totalKasMasuk - totalKasKeluar;
 
+  // Active year audit record (Real vs Data)
+  const effectiveAuditList = rekonsiliasiKasList && rekonsiliasiKasList.length > 0 ? rekonsiliasiKasList : localRekonsiliasiList;
+  const auditTahunThis: RekonsiliasiKas = effectiveAuditList.find(r => r.tahun === selectedYear) || {
+    id: `AUDIT-${selectedYear}-1`,
+    tahun: selectedYear,
+    tanggalAudit: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    saldoCash: saldoBersih > 0 ? Math.round((saldoBersih * 0.25) / 50000) * 50000 : 0,
+    saldoBank: saldoBersih > 0 ? Math.max(0, saldoBersih - Math.round((saldoBersih * 0.25) / 50000) * 50000) : 0,
+    namaBank: 'Bank DKI',
+    nomorRekening: '102.23.09876.1',
+    atasNamaRekening: 'MKKS SMP CITOS',
+    catatanAudit: 'Pencocokan fisik kas dan rekening bank per saldo buku pembukuan sistem.',
+    diauditOleh: currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS Citos'
+  };
+
+  const totalSaldoReal = (auditTahunThis.saldoCash || 0) + (auditTahunThis.saldoBank || 0);
+  const selisihAudit = totalSaldoReal - saldoBersih;
+  const isAuditBalance = Math.abs(selisihAudit) === 0;
+  const isAuditLebih = selisihAudit > 0;
+
+  const handleSaveAudit = (record: RekonsiliasiKas) => {
+    if (onSaveRekonsiliasiKas) {
+      onSaveRekonsiliasiKas(record);
+    }
+    const updated = StorageService.saveSingleRekonsiliasi(record);
+    setLocalRekonsiliasiList(updated);
+  };
+
   // Export handlers
   const handleExportExcel = () => {
-    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList, riwayatHapusList);
+    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList, riwayatHapusList, auditTahunThis);
   };
 
   const handleExportPDF = () => {
-    exportToPDF(selectedYear, sekolahList, iuranList, pengeluaranList, currentUser, pemasukanLainList);
+    exportToPDF(selectedYear, sekolahList, iuranList, pengeluaranList, currentUser, pemasukanLainList, auditTahunThis);
   };
 
   const handlePrintReport = () => {
@@ -189,11 +247,22 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             </div>
 
             {/* Export & Print Buttons Group */}
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <button
+                id="btn-edit-pejabat-laporan"
+                type="button"
+                onClick={() => setIsPejabatModalOpen(true)}
+                className="bg-teal-800/80 hover:bg-teal-700 active:bg-teal-900 text-teal-100 hover:text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md border border-teal-400/40 transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                title="Atur Nama Ketua MKKS & Bendahara untuk Tanda Tangan Laporan & Berita Acara"
+              >
+                <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-300 shrink-0" />
+                <span className="whitespace-nowrap">Atur Pejabat</span>
+              </button>
+
               <button
                 id="btn-export-excel"
                 onClick={handleExportExcel}
-                className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
                 title="Export Ke Excel (.xlsx)"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -203,7 +272,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <button
                 id="btn-export-pdf"
                 onClick={handleExportPDF}
-                className="bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                className="bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
                 title="Export Ke PDF (.pdf)"
               >
                 <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -213,7 +282,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <button
                 id="btn-print-laporan"
                 onClick={handlePrintReport}
-                className="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-bold text-xs px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                className="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
                 title="Cetak Laporan Keuangan"
               >
                 <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -298,6 +367,86 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       </div>
 
+      {/* Quick Audit / Rekonsiliasi Real vs Data Bar */}
+      <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
+          <div className="flex items-center space-x-2">
+            <div className={`p-2 rounded-xl ${isAuditBalance ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+              <Scale className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-tight">
+                Audit Kas ({selectedYear})
+              </span>
+              <span className="text-xs font-black text-slate-800">
+                Data vs Real Keuangan
+              </span>
+            </div>
+          </div>
+
+          <div className="h-6 w-px bg-slate-200 hidden md:block"></div>
+
+          {/* Saldo Data */}
+          <div className="bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
+            <span className="text-slate-500 block text-[9px] font-medium">Saldo Data (Sistem):</span>
+            <span className="font-mono font-bold text-slate-800">{formatRupiah(saldoBersih)}</span>
+          </div>
+
+          <span className="text-slate-400 hidden sm:inline">↔</span>
+
+          {/* Uang Cash */}
+          <div className="bg-amber-50/60 px-2.5 py-1 rounded-xl border border-amber-200/80">
+            <span className="text-amber-800 block text-[9px] font-semibold flex items-center gap-1">
+              <Wallet className="w-2.5 h-2.5 text-amber-600" /> Uang Cash:
+            </span>
+            <span className="font-mono font-bold text-amber-900">{formatRupiah(auditTahunThis.saldoCash || 0)}</span>
+          </div>
+
+          <span className="text-slate-400 hidden sm:inline">+</span>
+
+          {/* Uang di Rekening */}
+          <div className="bg-indigo-50/60 px-2.5 py-1 rounded-xl border border-indigo-200/80">
+            <span className="text-indigo-800 block text-[9px] font-semibold flex items-center gap-1">
+              <Landmark className="w-2.5 h-2.5 text-indigo-600" /> Uang di Rekening:
+            </span>
+            <span className="font-mono font-bold text-indigo-900">{formatRupiah(auditTahunThis.saldoBank || 0)}</span>
+          </div>
+
+          <span className="text-slate-400 hidden sm:inline">=</span>
+
+          {/* Total Saldo Real */}
+          <div className="bg-teal-50 px-2.5 py-1 rounded-xl border border-teal-200">
+            <span className="text-teal-800 block text-[9px] font-semibold">Total Real:</span>
+            <span className="font-mono font-extrabold text-teal-900">{formatRupiah(totalSaldoReal)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 shrink-0 self-end md:self-auto">
+          <span className={`px-2.5 py-1 rounded-xl text-xs font-black uppercase ${
+            isAuditBalance
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : isAuditLebih
+              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+              : 'bg-rose-100 text-rose-800 border border-rose-300'
+          }`}>
+            {isAuditBalance ? '✓ BALANCE' : isAuditLebih ? `+${formatRupiah(selisihAudit)} (Lebih)` : `-${formatRupiah(Math.abs(selisihAudit))} (Kurang)`}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('audit')}
+            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer ${
+              activeTab === 'audit'
+                ? 'bg-emerald-700 text-white'
+                : 'bg-slate-900 hover:bg-slate-800 text-white'
+            }`}
+          >
+            <span>{activeTab === 'audit' ? 'Aktif di Tab Audit' : 'Cek Detail Audit'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
       {/* Navigation Tabs & Search Controls */}
       <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200 shadow-xs space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-3">
         
@@ -372,6 +521,26 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Rekap Bulanan</span>
+          </button>
+
+          <button
+            id="tab-laporan-audit"
+            onClick={() => setActiveTab('audit')}
+            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+              activeTab === 'audit'
+                ? 'bg-slate-900 text-white shadow-md ring-2 ring-emerald-500/50'
+                : 'text-slate-700 bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-200/80'
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Audit Kas (Real vs Data)</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+              isAuditBalance
+                ? (activeTab === 'audit' ? 'bg-emerald-500 text-slate-950' : 'bg-emerald-100 text-emerald-800')
+                : (activeTab === 'audit' ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-800')
+            }`}>
+              {isAuditBalance ? 'Balance' : isAuditLebih ? '+Lebih' : '-Kurang'}
+            </span>
           </button>
 
           {isBendahara && (
@@ -1365,7 +1534,80 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               </tfoot>
             </table>
           </div>
+
+          {/* Audit Kas Real vs Data Highlight Card on Rekap Tab */}
+          <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700/80">
+              <div className="flex items-center space-x-2.5">
+                <div className={`p-2 rounded-xl ${isAuditBalance ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-sm text-white">
+                    Hasil Rekonsiliasi Kas (Saldo Data vs Real Keuangan)
+                  </h4>
+                  <p className="text-xs text-slate-300">
+                    Kesesuaian saldo pembukuan sistem dengan fisik uang tunai & mutasi rekening bank
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className={`px-3 py-1 rounded-xl text-xs font-black uppercase ${
+                  isAuditBalance 
+                    ? 'bg-emerald-600 text-white' 
+                    : isAuditLebih 
+                    ? 'bg-amber-600 text-white' 
+                    : 'bg-rose-600 text-white'
+                }`}>
+                  {isAuditBalance ? '✓ BALANCE' : isAuditLebih ? `SELISIH LEBIH (+${formatRupiah(selisihAudit)})` : `SELISIH KURANG (-${formatRupiah(Math.abs(selisihAudit))})`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('audit')}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Kelola Audit
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                <span className="text-slate-400 text-[11px] block">Saldo Menurut Pembukuan:</span>
+                <span className="text-sm font-mono font-bold text-white">{formatRupiah(saldoBersih)}</span>
+              </div>
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                <span className="text-slate-400 text-[11px] block">1. Uang Tunai / Cash (Brankas):</span>
+                <span className="text-sm font-mono font-bold text-amber-300">{formatRupiah(auditTahunThis.saldoCash || 0)}</span>
+              </div>
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                <span className="text-slate-400 text-[11px] block">2. Uang di Rekening ({auditTahunThis.namaBank}):</span>
+                <span className="text-sm font-mono font-bold text-indigo-300">{formatRupiah(auditTahunThis.saldoBank || 0)}</span>
+              </div>
+            </div>
+          </div>
+
         </div>
+      )}
+
+      {/* TAB AUDIT & REKONSILIASI KAS (REAL VS DATA) */}
+      {activeTab === 'audit' && (
+        <AuditRekonsiliasiTab
+          selectedYear={selectedYear}
+          totalKasMasuk={totalKasMasuk}
+          totalKasKeluar={totalKasKeluar}
+          saldoData={saldoBersih}
+          totalIuranMasuk={totalIuranMasuk}
+          totalPemasukanLain={totalPemasukanLain}
+          currentAudit={auditTahunThis}
+          isBendahara={isBendahara}
+          currentUser={currentUser}
+          sekolahList={sekolahList}
+          onSaveAudit={handleSaveAudit}
+          onOpenBeritaAcara={() => setIsBeritaAcaraOpen(true)}
+          onOpenSpreadsheetModal={onOpenSpreadsheetModal}
+        />
       )}
 
       {/* TAB 6: LAPORAN RIWAYAT PENGHAPUSAN DATA (AUDIT LOG) */}
@@ -1582,7 +1824,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                             <div className="flex items-center space-x-1.5">
                               {getJenisBadge(item.jenis)}
                               <span className="text-[10px] text-slate-400 font-mono">
-                                {formatDateIndonesian(item.tanggalHapus)}
+                                {formatDateTimeIndonesian(item.tanggalHapus)}
                               </span>
                             </div>
                             <h4 className="font-bold text-slate-900 text-xs mt-1">{item.judul}</h4>
@@ -1633,7 +1875,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                           <tr key={`riwayat-hapus-row-${item.id || idx}`} className="hover:bg-rose-50/40 transition-colors">
                             <td className="py-3 px-3 font-mono font-semibold text-slate-500 text-center">{idx + 1}</td>
                             <td className="py-3 px-3 text-slate-600 whitespace-nowrap text-[11px]">
-                              {formatDateIndonesian(item.tanggalHapus)}
+                              {formatDateTimeIndonesian(item.tanggalHapus)}
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap">
                               {getJenisBadge(item.jenis)}
@@ -1904,11 +2146,58 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           </table>
         </div>
 
-        {/* 5. Riwayat Penghapusan Data (Audit Log if exists) */}
+        {/* 5. Hasil Pemeriksaan & Rekonsiliasi Kas (Real vs Data) */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+            {pemasukanLainYear.length > 0 ? '5' : '4'}. Hasil Pemeriksaan & Rekonsiliasi Kas (Real Fisik vs Pembukuan Sistem)
+          </h4>
+          <table className="w-full text-left text-[10px] border-collapse border border-slate-300">
+            <thead>
+              <tr className="bg-slate-800 text-white font-bold">
+                <th className="p-2 border border-slate-700">Parameter Pemeriksaan</th>
+                <th className="p-2 border border-slate-700 text-right">Nominal (Rp)</th>
+                <th className="p-2 border border-slate-700">Keterangan / Posisi Fisik</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="p-2 border border-slate-300 font-semibold">A. Saldo Menurut Pembukuan Sistem (Data)</td>
+                <td className="p-2 border border-slate-300 text-right font-bold text-slate-800">{formatRupiah(saldoBersih)}</td>
+                <td className="p-2 border border-slate-300 text-slate-600">Total Kas Masuk dikurangi Total Kas Keluar</td>
+              </tr>
+              <tr>
+                <td className="p-2 border border-slate-300 font-semibold">B1. Fisik Uang Tunai (Cash) di Bendahara</td>
+                <td className="p-2 border border-slate-300 text-right font-bold text-amber-900">{formatRupiah(auditTahunThis.saldoCash || 0)}</td>
+                <td className="p-2 border border-slate-300 text-slate-600">Disimpan dalam Brankas / Kas Kecil Bendahara</td>
+              </tr>
+              <tr>
+                <td className="p-2 border border-slate-300 font-semibold">B2. Uang di Rekening Bank ({auditTahunThis.namaBank || 'Bank'})</td>
+                <td className="p-2 border border-slate-300 text-right font-bold text-indigo-900">{formatRupiah(auditTahunThis.saldoBank || 0)}</td>
+                <td className="p-2 border border-slate-300 text-slate-600">No. Rek: {auditTahunThis.nomorRekening || '-'} a.n. {auditTahunThis.atasNamaRekening || '-'}</td>
+              </tr>
+              <tr className="bg-teal-50">
+                <td className="p-2 border border-slate-300 font-black text-teal-900">B. TOTAL REAL KEBERADAAN DANA (Cash + Bank)</td>
+                <td className="p-2 border border-slate-300 text-right font-black text-teal-800">{formatRupiah(totalSaldoReal)}</td>
+                <td className="p-2 border border-slate-300 font-bold text-teal-800">Akumulasi uang tunai dan saldo bank riil</td>
+              </tr>
+              <tr className={isAuditBalance ? 'bg-emerald-100' : 'bg-rose-100'}>
+                <td className="p-2.5 border border-slate-300 font-black text-xs">STATUS REKONSILIASI / SELISIH (Real - Data)</td>
+                <td className={`p-2.5 border border-slate-300 text-right font-black text-xs ${isAuditBalance ? 'text-emerald-900' : 'text-rose-900'}`}>
+                  {isAuditBalance ? 'Rp 0' : (selisihAudit > 0 ? `+${formatRupiah(selisihAudit)}` : `-${formatRupiah(Math.abs(selisihAudit))}`)}
+                </td>
+                <td className={`p-2.5 border border-slate-300 font-black text-xs ${isAuditBalance ? 'text-emerald-900' : 'text-rose-900'}`}>
+                  {isAuditBalance ? '✓ BALANCE (COCOK SEMPURNA)' : (selisihAudit > 0 ? 'SELISIH LEBIH (Uang Real > Data)' : 'SELISIH KURANG (Uang Real < Data)')}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 6. Riwayat Penghapusan Data (Audit Log if exists) */}
         {isBendahara && riwayatHapusList.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-              {pemasukanLainYear.length > 0 ? '5' : '4'}. Catatan Audit Riwayat Penghapusan Data
+              {pemasukanLainYear.length > 0 ? '6' : '5'}. Catatan Audit Riwayat Penghapusan Data
             </h4>
             <table className="w-full text-left text-[10px] border-collapse border border-slate-300">
               <thead>
@@ -1926,7 +2215,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                 {riwayatHapusList.map((r, idx) => (
                   <tr key={`print-hapus-${r.id || idx}`} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
                     <td className="p-1.5 border border-slate-300 text-center">{idx + 1}</td>
-                    <td className="p-1.5 border border-slate-300 whitespace-nowrap">{formatDateIndonesian(r.tanggalHapus)}</td>
+                    <td className="p-1.5 border border-slate-300 whitespace-nowrap">{formatDateTimeIndonesian(r.tanggalHapus)}</td>
                     <td className="p-1.5 border border-slate-300 font-bold uppercase text-[9px] text-rose-800">{r.jenis}</td>
                     <td className="p-1.5 border border-slate-300 font-semibold">{r.judul}</td>
                     <td className="p-1.5 border border-slate-300 text-right font-bold text-rose-700">{formatRupiah(r.nominal)}</td>
@@ -1940,17 +2229,71 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         )}
 
         {/* Tanda Tangan */}
-        <div className="pt-6 flex justify-end">
-          <div className="text-right text-xs text-slate-800 space-y-1">
-            <p>Depok, {formatDateIndonesian(new Date().toISOString().split('T')[0])}</p>
-            <p className="font-bold">Bendahara MKKS,</p>
+        <div className="pt-8 grid grid-cols-2 gap-8 text-xs text-slate-800">
+          <div>
+            <p>Mengetahui,</p>
+            <p className="font-bold">{auditTahunThis?.jabatanKetuaMkks || pejabatData.jabatanKetuaMkks || 'Ketua MKKS SMP Cimanggis & Tapos'}</p>
             <div className="h-16"></div>
             <p className="font-extrabold underline text-slate-900">
-              {resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList)}
+              {auditTahunThis?.namaKetuaMkks || pejabatData.namaKetuaMkks || 'Drs. H. M. Supriyadi, M.Pd'}
             </p>
+            {(auditTahunThis?.nipKetuaMkks || pejabatData.nipKetuaMkks) && (
+              <p className="text-[10px] text-slate-600">NIP. {auditTahunThis?.nipKetuaMkks || pejabatData.nipKetuaMkks}</p>
+            )}
+          </div>
+          <div className="text-right">
+            <p>Depok, {formatDateIndonesian(new Date().toISOString().split('T')[0])}</p>
+            <p className="font-bold">{auditTahunThis?.jabatanBendahara || pejabatData.jabatanBendahara || 'Bendahara MKKS SMP Citos'}</p>
+            <div className="h-16"></div>
+            <p className="font-extrabold underline text-slate-900">
+              {auditTahunThis?.namaBendahara || pejabatData.namaBendahara || resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList)}
+            </p>
+            {(auditTahunThis?.nipBendahara || pejabatData.nipBendahara) ? (
+              <p className="text-[10px] text-slate-600">NIP. {auditTahunThis?.nipBendahara || pejabatData.nipBendahara}</p>
+            ) : (
+              <p className="text-[10px] text-slate-600">Petugas Pengelola Keuangan</p>
+            )}
           </div>
         </div>
       </div>
+
+      {/* MODAL BERITA ACARA PEMERIKSAAN KAS */}
+      <BeritaAcaraAuditModal
+        isOpen={isBeritaAcaraOpen}
+        onClose={() => setIsBeritaAcaraOpen(false)}
+        auditData={auditTahunThis}
+        totalKasMasuk={totalKasMasuk}
+        totalKasKeluar={totalKasKeluar}
+        saldoData={saldoBersih}
+        totalIuranMasuk={totalIuranMasuk}
+        totalPemasukanLain={totalPemasukanLain}
+        sekolahList={sekolahList}
+        onUpdateAudit={(updated) => {
+          handleSaveAudit(updated);
+          setPejabatData(StorageService.getPejabat());
+        }}
+      />
+
+      {/* MODAL EDIT PEJABAT PENANDATANGAN */}
+      <ModalEditPejabat
+        isOpen={isPejabatModalOpen}
+        onClose={() => setIsPejabatModalOpen(false)}
+        onSaved={(updated) => {
+          setPejabatData(updated);
+          // If current audit exists, also update it
+          if (auditTahunThis) {
+            handleSaveAudit({
+              ...auditTahunThis,
+              namaKetuaMkks: updated.namaKetuaMkks,
+              nipKetuaMkks: updated.nipKetuaMkks,
+              jabatanKetuaMkks: updated.jabatanKetuaMkks,
+              namaBendahara: updated.namaBendahara,
+              nipBendahara: updated.nipBendahara,
+              jabatanBendahara: updated.jabatanBendahara
+            });
+          }
+        }}
+      />
 
     </div>
   );

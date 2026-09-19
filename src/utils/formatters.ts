@@ -14,16 +14,102 @@ export function formatNumber(amount: number): string {
   return new Intl.NumberFormat('id-ID').format(amount);
 }
 
-export function formatDateIndonesian(dateString: string): string {
+export const INDO_MONTHS = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+export function formatDateIndonesian(dateString?: string | null): string {
   if (!dateString) return '-';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString;
+  const raw = String(dateString).trim();
+  if (!raw || raw === '-') return '-';
+
+  // Already formatted Indonesian check
+  if (/^[0-9]{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+[0-9]{4}/i.test(raw)) {
+    return raw;
+  }
+
+  // Regex parse YYYY-MM-DD safely to prevent UTC timezone day shift
+  const match = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (match) {
+    const year = match[1];
+    const monthIdx = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${day} ${INDO_MONTHS[monthIdx]} ${year}`;
+    }
+  }
+
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) {
+    // If all parse fails, strip ISO artifacts
+    return raw.replace(/T.*$/, '').replace(/Z$/, '');
+  }
   
-  return new Intl.DateTimeFormat('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  }).format(date);
+  try {
+    return new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }).format(date);
+  } catch {
+    return `${date.getDate()} ${INDO_MONTHS[date.getMonth()] || ''} ${date.getFullYear()}`;
+  }
+}
+
+/**
+ * Format date & time to clean Indonesian with hours and minutes:
+ * e.g., "19 September 2026, 13:30 WIB"
+ */
+export function formatDateTimeIndonesian(dateString?: string | null, withWIB = true): string {
+  if (!dateString) return '-';
+  const raw = String(dateString).trim();
+  if (!raw || raw === '-') return '-';
+
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) {
+    const day = d.getDate();
+    const month = INDO_MONTHS[d.getMonth()] || '';
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+
+    // If time is 00:00 and string didn't have explicit time component
+    if (hours === '00' && minutes === '00' && !raw.includes(':')) {
+      return `${day} ${month} ${year}`;
+    }
+
+    return `${day} ${month} ${year}, ${hours}:${minutes}${withWIB ? ' WIB' : ''}`;
+  }
+
+  // Fallback: try to extract YYYY-MM-DD HH:mm from raw string
+  const m = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2}))?/);
+  if (m) {
+    const year = m[1];
+    const monthIdx = parseInt(m[2], 10) - 1;
+    const day = parseInt(m[3], 10);
+    const month = INDO_MONTHS[monthIdx] || m[2];
+    if (m[4] !== undefined && m[5] !== undefined) {
+      return `${day} ${month} ${year}, ${m[4]}:${m[5]}${withWIB ? ' WIB' : ''}`;
+    }
+    return `${day} ${month} ${year}`;
+  }
+
+  return formatDateIndonesian(raw);
+}
+
+/**
+ * Clean up raw ISO string for input fields (e.g. "2026-09-19T13:30:00.000Z" -> "2026-09-19 13:30")
+ */
+export function cleanDateInputString(val?: string | null): string {
+  if (!val) return '';
+  const raw = String(val).trim();
+  return raw
+    .replace('T', ' ')
+    .replace(/:\d{2}\.\d{3}Z$/, '')
+    .replace(/\.\d{3}Z$/, '')
+    .replace(/Z$/, '')
+    .substring(0, 16);
 }
 
 /**

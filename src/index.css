@@ -36,6 +36,23 @@
     color: #0f172a !important;
   }
 
+  /* Printable Berita Acara Audit */
+  #berita-acara-printable, #berita-acara-printable * {
+    visibility: visible;
+  }
+  #berita-acara-printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 24px;
+    background: white !important;
+    color: #0f172a !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
   .no-print {
     display: none !important;
   }

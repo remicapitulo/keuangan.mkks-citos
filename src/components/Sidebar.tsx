@@ -192,6 +192,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 id="btn-sheet-sync-nav"
                 onClick={onOpenSpreadsheetModal}
                 className="flex items-center space-x-2 text-xs sm:text-sm font-semibold text-slate-700 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 px-3.5 py-2 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+                title="Buka Pengaturan Database Spreadsheet (Khusus Admin)"
               >
                 <Database className="w-4 h-4 text-teal-600" />
                 <span>Database Google Sheets</span>

@@ -1,8 +1,9 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas } from '../types';
+import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { StorageService } from './spreadsheetSync';
 
 export function exportToExcel(
   tahun: number,
@@ -10,7 +11,8 @@ export function exportToExcel(
   iuranList: Iuran[],
   pengeluaranList: Pengeluaran[],
   pemasukanLainList: PemasukanLain[] = [],
-  riwayatHapusList: RiwayatHapus[] = []
+  riwayatHapusList: RiwayatHapus[] = [],
+  rekonsiliasiKas?: RekonsiliasiKas
 ) {
   const wb = XLSX.utils.book_new();
 
@@ -60,7 +62,7 @@ export function exportToExcel(
     'No': idx + 1,
     'Tahun Buku': i.tahun,
     'Bulan Pembayaran': i.bulan,
-    'Tanggal Pembayaran': i.tanggalInput,
+    'Tanggal Pembayaran': formatDateIndonesian(i.tanggalInput),
     'Nama Instansi': i.namaSekolah,
     'Jumlah Nominal (Rp)': i.nominal,
     'Keterangan / Tempat Terima': i.keterangan || '-',
@@ -95,7 +97,7 @@ export function exportToExcel(
     });
   const pemasukanLainData = pemasukanLainTahunThis.map((p, idx) => ({
     'No': idx + 1,
-    'Tanggal Transaksi': p.tanggal,
+    'Tanggal Transaksi': formatDateIndonesian(p.tanggal),
     'Kategori': p.kategori,
     'Sumber Dana / Pihak Terkait': p.sumberDana,
     'Keterangan Tambahan': p.keterangan,
@@ -130,7 +132,7 @@ export function exportToExcel(
     });
   const kasKeluarData = pengeluaranTahunThis.map((p, idx) => ({
     'No': idx + 1,
-    'Tanggal Transaksi': p.tanggal,
+    'Tanggal Transaksi': formatDateIndonesian(p.tanggal),
     'Alokasi Project / Kegiatan': p.project,
     'Keterangan Tambahan': p.keterangan,
     'Jumlah Nominal (Rp)': p.nominal,
@@ -190,7 +192,7 @@ export function exportToExcel(
   if (riwayatHapusList && riwayatHapusList.length > 0) {
     const logData = riwayatHapusList.map((r, idx) => ({
       'No': idx + 1,
-      'Waktu Penghapusan': r.timestamp || r.tanggalHapus,
+      'Waktu Penghapusan': formatDateTimeIndonesian(r.timestamp || r.tanggalHapus),
       'Jenis Transaksi': (r.jenisTransaksi || r.jenis || '').toUpperCase(),
       'Identitas Transaksi': r.judulItem || r.judul || r.rincianData || '-',
       'Nominal Transaksi (Rp)': r.nominal || 0,
@@ -204,6 +206,27 @@ export function exportToExcel(
     XLSX.utils.book_append_sheet(wb, wsLog, `Log Hapus Data`);
   }
 
+  // 7. Sheet Audit & Rekonsiliasi Kas (Real vs Data)
+  if (rekonsiliasiKas) {
+    const totalSaldoReal = (rekonsiliasiKas.saldoCash || 0) + (rekonsiliasiKas.saldoBank || 0);
+    const selisih = totalSaldoReal - saldoAkhir;
+    const isBal = Math.abs(selisih) === 0;
+
+    const auditExcelData = [
+      { 'Komponen Pemeriksaan Kas': 'Saldo Menurut Data Sistem Pembukuan (A)', 'Jumlah Nominal (Rp)': saldoAkhir, 'Status & Keterangan Fisik': 'Hasil kalkulasi Kas Masuk dikurangi Pengeluaran' },
+      { 'Komponen Pemeriksaan Kas': '1. Uang Tunai / Cash (Brankas Bendahara)', 'Jumlah Nominal (Rp)': rekonsiliasiKas.saldoCash || 0, 'Status & Keterangan Fisik': 'Hasil hitung fisik uang cash di bendahara' },
+      { 'Komponen Pemeriksaan Kas': '2. Uang di Rekening Bank', 'Jumlah Nominal (Rp)': rekonsiliasiKas.saldoBank || 0, 'Status & Keterangan Fisik': `${rekonsiliasiKas.namaBank} - No. ${rekonsiliasiKas.nomorRekening} (a.n. ${rekonsiliasiKas.atasNamaRekening})` },
+      { 'Komponen Pemeriksaan Kas': 'TOTAL SALDO REAL FISIK (B = Cash + Bank)', 'Jumlah Nominal (Rp)': totalSaldoReal, 'Status & Keterangan Fisik': 'Akumulasi total uang nyata yang dimiliki' },
+      { 'Komponen Pemeriksaan Kas': 'SELISIH KEUANGAN (B - A)', 'Jumlah Nominal (Rp)': selisih, 'Status & Keterangan Fisik': isBal ? 'BALANCE / COCOK 100% (Rp 0)' : (selisih > 0 ? `SELISIH LEBIH (+${selisih})` : `SELISIH KURANG (-${Math.abs(selisih)})`) },
+      { 'Komponen Pemeriksaan Kas': 'Waktu Pelaksanaan Audit', 'Jumlah Nominal (Rp)': '', 'Status & Keterangan Fisik': formatDateTimeIndonesian(rekonsiliasiKas.tanggalAudit) },
+      { 'Komponen Pemeriksaan Kas': 'Petugas Pemeriksa', 'Jumlah Nominal (Rp)': '', 'Status & Keterangan Fisik': resolveNamaBendahara(rekonsiliasiKas.diauditOleh, undefined, sekolahList) },
+      { 'Komponen Pemeriksaan Kas': 'Catatan Temuan Audit', 'Jumlah Nominal (Rp)': '', 'Status & Keterangan Fisik': rekonsiliasiKas.catatanAudit || '-' }
+    ];
+
+    const wsAudit = XLSX.utils.json_to_sheet(auditExcelData);
+    XLSX.utils.book_append_sheet(wb, wsAudit, `Audit Kas Real ${tahun}`);
+  }
+
   // Trigger browser download
   XLSX.writeFile(wb, `Laporan_Keuangan_MKKS_Citos_${tahun}.xlsx`);
 }
@@ -214,7 +237,8 @@ export function exportToPDF(
   iuranList: Iuran[],
   pengeluaranList: Pengeluaran[],
   currentUser?: User | null,
-  pemasukanLainList: PemasukanLain[] = []
+  pemasukanLainList: PemasukanLain[] = [],
+  rekonsiliasiKas?: RekonsiliasiKas
 ) {
   const doc = new jsPDF('landscape', 'mm', 'a4');
 
@@ -610,24 +634,117 @@ export function exportToPDF(
     theme: 'grid'
   });
 
-  // Footer Signature
+  // 6. Table Hasil Audit & Rekonsiliasi Kas (Real vs Data)
+  if (rekonsiliasiKas) {
+    const totalSaldoReal = (rekonsiliasiKas.saldoCash || 0) + (rekonsiliasiKas.saldoBank || 0);
+    const selisih = totalSaldoReal - saldoBersih;
+    const isBal = Math.abs(selisih) === 0;
+
+    currentY = (doc as any).lastAutoTable.finalY + 8;
+    if (currentY > 140) {
+      doc.addPage('a4', 'landscape');
+      currentY = 15;
+    }
+
+    doc.setFontSize(10.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    const auditSecNum = pemasukanLainTahunThis.length > 0 ? '6' : '5';
+    doc.text(`${auditSecNum}. Hasil Audit & Rekonsiliasi Kas (Saldo Data vs Real Kas Tunai & Bank)`, 14, currentY);
+    currentY += 3.5;
+
+    const auditHead = [['Komponen Audit Keuangan', 'Jumlah Nominal (Rp)', 'Status & Keterangan Fisik / Rekening']];
+    const auditRows = [
+      ['Saldo Kas Menurut Pembukuan (Data Sistem)', formatRupiah(saldoBersih), 'Kalkulasi Total Kas Masuk dikurangi Total Pengeluaran'],
+      ['1. Uang Kas Tunai / Cash (Brankas Bendahara)', formatRupiah(rekonsiliasiKas.saldoCash), 'Hasil hitung fisik uang tunai di kas bendahara'],
+      ['2. Uang di Rekening Bank', formatRupiah(rekonsiliasiKas.saldoBank), `${rekonsiliasiKas.namaBank} - No. Rek: ${rekonsiliasiKas.nomorRekening} (a.n. ${rekonsiliasiKas.atasNamaRekening})`],
+      ['TOTAL SALDO REAL FISIK (Cash + Bank)', formatRupiah(totalSaldoReal), 'Akumulasi seluruh uang nyata yang dimiliki organisasi'],
+      ['SELISIH KAS (Real Fisik - Data Sistem)', isBal ? 'Rp 0' : (selisih > 0 ? `+${formatRupiah(selisih)}` : `-${formatRupiah(Math.abs(selisih))}`), isBal ? 'STATUS: BALANCE (SINKRON 100%)' : (selisih > 0 ? 'STATUS: SELISIH LEBIH' : 'STATUS: SELISIH KURANG')]
+    ];
+
+    autoTable(doc, {
+      startY: currentY,
+      head: auditHead,
+      body: auditRows,
+      margin: { left: 14, right: 14 },
+      styles: { fontSize: 8, cellPadding: 2.2 },
+      headStyles: { fillColor: [13, 148, 136], textColor: 255, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 100, fontStyle: 'bold' },
+        1: { cellWidth: 60, halign: 'right', fontStyle: 'bold' },
+        2: { cellWidth: 109 }
+      },
+      didParseCell: (data) => {
+        if (data.row.index === 3) {
+          data.cell.styles.fillColor = [204, 251, 241]; // teal-100
+          data.cell.styles.textColor = [15, 118, 110];
+        } else if (data.row.index === 4) {
+          if (isBal) {
+            data.cell.styles.fillColor = [236, 253, 245];
+            data.cell.styles.textColor = [6, 95, 70];
+          } else {
+            data.cell.styles.fillColor = [255, 241, 242];
+            data.cell.styles.textColor = [190, 18, 60];
+          }
+        }
+      },
+      theme: 'grid'
+    });
+  }
+
+  // Footer Signatures (Ketua MKKS & Bendahara MKKS)
   currentY = (doc as any).lastAutoTable.finalY + 10;
   let signatureY = currentY;
-  if (signatureY > 165) {
+  if (signatureY > 160) {
     doc.addPage('a4', 'landscape');
     signatureY = 25;
   }
 
-  const bendaharaName = resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList);
+  const savedPejabat = StorageService.getPejabat();
+  const namaKetua = rekonsiliasiKas?.namaKetuaMkks || savedPejabat.namaKetuaMkks || 'Drs. H. M. Supriyadi, M.Pd';
+  const nipKetua = rekonsiliasiKas?.nipKetuaMkks || savedPejabat.nipKetuaMkks || '196805121994121001';
+  const jabatanKetua = rekonsiliasiKas?.jabatanKetuaMkks || savedPejabat.jabatanKetuaMkks || 'Ketua MKKS SMP Cimanggis & Tapos';
+
+  const defaultBendahara = resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList);
+  const namaBend = rekonsiliasiKas?.namaBendahara || savedPejabat.namaBendahara || defaultBendahara;
+  const nipBend = rekonsiliasiKas?.nipBendahara || savedPejabat.nipBendahara || '';
+  const jabatanBend = rekonsiliasiKas?.jabatanBendahara || savedPejabat.jabatanBendahara || 'Bendahara MKKS SMP Citos';
+
   const printDate = formatDateIndonesian(new Date().toISOString().split('T')[0]);
 
+  // Sisi Kiri: Mengetahui Ketua MKKS
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(`Depok, ${printDate}`, 220, signatureY);
-  doc.text('Bendahara MKKS,', 220, signatureY + 6);
+  doc.text('Mengetahui,', 20, signatureY);
   doc.setFont('helvetica', 'bold');
-  doc.text(bendaharaName, 220, signatureY + 25);
+  doc.text(jabatanKetua, 20, signatureY + 5.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(namaKetua, 20, signatureY + 25);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  if (nipKetua && nipKetua !== '-') {
+    doc.text(`NIP. ${nipKetua}`, 20, signatureY + 29.5);
+  }
+
+  // Sisi Kanan: Bendahara MKKS
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Depok, ${printDate}`, 210, signatureY);
+  doc.setFont('helvetica', 'bold');
+  doc.text(jabatanBend, 210, signatureY + 5.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(namaBend, 210, signatureY + 25);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  if (nipBend && nipBend !== '-') {
+    doc.text(`NIP. ${nipBend}`, 210, signatureY + 29.5);
+  } else {
+    doc.text('Petugas Pengelola Keuangan', 210, signatureY + 29.5);
+  }
 
   doc.save(`Laporan_Keuangan_MKKS_${tahun}.pdf`);
 }
@@ -646,7 +763,7 @@ export function exportRiwayatHapusToExcel(
 
   const logData = sortedList.map((r, idx) => ({
     'No': idx + 1,
-    'Waktu Penghapusan': r.timestamp || r.tanggalHapus,
+    'Waktu Penghapusan': formatDateTimeIndonesian(r.timestamp || r.tanggalHapus),
     'Jenis Transaksi': (r.jenisTransaksi || r.jenis || '').toUpperCase(),
     'Identitas Transaksi': r.judulItem || r.judul || r.rincianData || '-',
     'Nominal Transaksi (Rp)': r.nominal || 0,
@@ -693,7 +810,7 @@ export function exportRiwayatHapusToPDF(
 
   const tableBody = sortedList.map((r, idx) => [
     idx + 1,
-    r.timestamp || r.tanggalHapus,
+    formatDateTimeIndonesian(r.timestamp || r.tanggalHapus),
     (r.jenisTransaksi || r.jenis || '').toUpperCase(),
     r.judulItem || r.judul || r.rincianData || '-',
     formatRupiah(r.nominal || 0),

@@ -1,5 +1,15 @@
-import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole, RiwayatHapus } from '../types';
-import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, INITIAL_RIWAYAT_HAPUS, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
+import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole, RiwayatHapus, RekonsiliasiKas, PejabatPenandatangan } from '../types';
+import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, INITIAL_RIWAYAT_HAPUS, INITIAL_REKONSILIASI_KAS, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
+import { cleanDateInputString } from '../utils/formatters';
+
+export const DEFAULT_PEJABAT: PejabatPenandatangan = {
+  namaKetuaMkks: 'H. Gustian Maskat, S.Ag., M.M.',
+  nipKetuaMkks: '',
+  jabatanKetuaMkks: 'Ketua MKKS SMP Cimanggis & Tapos',
+  namaBendahara: 'Abu Haripin, M.Pd.',
+  nipBendahara: '',
+  jabatanBendahara: 'Bendahara MKKS SMP Citos'
+};
 
 const STORAGE_KEYS = {
   SEKOLAH: 'mkks_citos_sekolah',
@@ -8,6 +18,8 @@ const STORAGE_KEYS = {
   PENGELUARAN: 'mkks_citos_pengeluaran',
   PEMASUKAN_LAIN: 'mkks_citos_pemasukan_lain',
   RIWAYAT_HAPUS: 'mkks_citos_riwayat_hapus',
+  REKONSILIASI_KAS: 'mkks_citos_rekonsiliasi_kas',
+  PEJABAT: 'mkks_citos_pejabat',
   SPREADSHEET_ID: 'mkks_citos_sheet_id',
   APPS_SCRIPT_URL: 'mkks_citos_apps_script_url',
   CURRENT_USER: 'mkks_citos_current_user'
@@ -134,6 +146,8 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
       role = 'Admin';
     } else if (rawRole === 'bendahara') {
       role = 'Bendahara';
+    } else if (rawRole === 'ketua') {
+      role = 'Ketua';
     }
     let sekolah = String(u.sekolah || u.Sekolah || u['Nama Sekolah'] || u.namaSekolah || '').trim();
     const aktif = u.aktif !== undefined ? u.aktif : (u.Aktif !== undefined ? u.Aktif : 'Ya');
@@ -143,8 +157,16 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
     ).trim();
 
     if (!namaKepsek || namaKepsek.toLowerCase() === username.toLowerCase()) {
-      if (username.toLowerCase() === 'neng') {
-        namaKepsek = 'Hj. Neng Nurhasanah, M.Pd';
+      if (username.toLowerCase() === 'gustian') {
+        namaKepsek = 'H. Gustian Maskat, S.Ag., M.M.';
+      } else if (username.toLowerCase() === 'abu') {
+        namaKepsek = 'Abu Haripin, M.Pd.';
+      } else if (username.toLowerCase() === 'neng') {
+        namaKepsek = 'Siti Rogaya, S.Pd.';
+      } else if (username.toLowerCase() === 'marlina') {
+        namaKepsek = 'Marlina, S.Pd.';
+      } else if (username.toLowerCase() === 'lisna') {
+        namaKepsek = 'Lisnawati Suparta, M.Pd';
       } else if (username.toLowerCase() === 'bendahara') {
         namaKepsek = 'H. Nurhasan, M.Pd';
       } else if (username.toLowerCase() === 'admin') {
@@ -221,7 +243,8 @@ export function normalizeIuranList(rawList: any[], sekolahList: Sekolah[] = INIT
     const bulan = String(i.bulan || i.Bulan || '').trim();
     const nominalRaw = i.nominal !== undefined ? i.nominal : (i.Nominal !== undefined ? i.Nominal : (i.jumlah || i.Jumlah));
     const nominal = Number(nominalRaw) || 100000;
-    const tanggalInput = String(i.tanggalInput || i['Tanggal Input'] || i.tanggal || i.Tanggal || new Date().toISOString().split('T')[0]).trim();
+    const rawTgl = String(i.tanggalInput || i['Tanggal Input'] || i.tanggal || i.Tanggal || '').trim();
+    const tanggalInput = rawTgl ? cleanDateInputString(rawTgl).split(' ')[0] : new Date().toISOString().split('T')[0];
     const diinputOleh = String(i.diinputOleh || i['Diinput Oleh'] || i.operator || 'Bendahara MKKS Citos').trim();
     const noKuitansi = String(i.noKuitansi || i['No Kuitansi'] || i.kuitansi || `KWT/MKKS/${tahun}/${idSekolah}`).trim();
     const keteranganRaw = i.keterangan || i.Keterangan || i['Keterangan'] || i['Keterangan / Tempat Terima'] || i['Tempat Terima'] || i.catatan || i.Catatan || '';
@@ -254,8 +277,8 @@ export function normalizePengeluaranList(rawList: any[]): Pengeluaran[] {
     const id = String(p.id || p.ID || p.No || `OUT-${idx + 1}`).trim();
     
     // Find tanggal flexibly
-    const tanggalRaw = p.tanggal || p.Tanggal || p['Tanggal Transaksi'] || p['Tanggal Input'] || p['Tgl'] || p['TGL'] || new Date().toISOString().split('T')[0];
-    const tanggal = String(tanggalRaw).trim();
+    const tanggalRaw = p.tanggal || p.Tanggal || p['Tanggal Transaksi'] || p['Tanggal Input'] || p['Tgl'] || p['TGL'] || '';
+    const tanggal = tanggalRaw ? cleanDateInputString(String(tanggalRaw)).split(' ')[0] : new Date().toISOString().split('T')[0];
 
     // Find project flexibly
     const project = String(
@@ -305,8 +328,8 @@ export function normalizePemasukanLainList(rawList: any[]): PemasukanLain[] {
     const id = String(p.id || p.ID || p.No || `IN-LAIN-${idx + 1}`).trim();
     
     // Find tanggal flexibly
-    const tanggalRaw = p.tanggal || p.Tanggal || p['Tanggal Transaksi'] || p['Tanggal Input'] || p['Tgl'] || p['TGL'] || new Date().toISOString().split('T')[0];
-    const tanggal = String(tanggalRaw).trim();
+    const tanggalRaw = p.tanggal || p.Tanggal || p['Tanggal Transaksi'] || p['Tanggal Input'] || p['Tgl'] || p['TGL'] || '';
+    const tanggal = tanggalRaw ? cleanDateInputString(String(tanggalRaw)).split(' ')[0] : new Date().toISOString().split('T')[0];
 
     // Find kategori flexibly
     const kategori = String(
@@ -377,12 +400,14 @@ export function normalizeRiwayatHapusList(rawList: any[]): RiwayatHapus[] {
     }
     const nominal = Number(nominalRaw) || 0;
 
-    const tanggalHapus = String(r.tanggalHapus || r['Tanggal Hapus'] || r['Waktu Penghapusan'] || new Date().toISOString()).trim();
+    const rawTglHapus = r.tanggalHapus || r['Tanggal Hapus'] || r['Waktu Penghapusan'] || '';
+    const tanggalHapus = rawTglHapus ? cleanDateInputString(String(rawTglHapus)) : cleanDateInputString(new Date().toISOString());
     const dihapusOleh = String(r.dihapusOleh || r['Dihapus Oleh'] || r.petugas || 'Bendahara MKKS').trim();
     const roleUser = String(r.roleUser || r['Role User'] || r.role || 'Bendahara').trim();
     const alasanHapus = String(r.alasanHapus || r['Alasan Hapus'] || r['Keterangan Hapus'] || r.alasan || 'Koreksi Data').trim();
     const noKuitansi = String(r.noKuitansi || r['No Kuitansi'] || '').trim() || undefined;
-    const tanggalTransaksiAsli = String(r.tanggalTransaksiAsli || r['Tanggal Transaksi Asli'] || '').trim() || undefined;
+    const rawTglAsli = r.tanggalTransaksiAsli || r['Tanggal Transaksi Asli'] || '';
+    const tanggalTransaksiAsli = rawTglAsli ? cleanDateInputString(String(rawTglAsli)).split(' ')[0] : undefined;
 
     return {
       id,
@@ -410,6 +435,81 @@ export function normalizeRiwayatHapusList(rawList: any[]): RiwayatHapus[] {
         : 'pemasukan-lain'
     } as RiwayatHapus;
   }).filter((item): item is RiwayatHapus => item !== null);
+}
+
+export function normalizeRekonsiliasiKasList(rawList: any[]): RekonsiliasiKas[] {
+  if (!Array.isArray(rawList)) return [];
+
+  return rawList.map((r, idx) => {
+    if (!r || typeof r !== 'object') return null;
+
+    const id = String(r.id || r['ID Audit'] || r.idAudit || r.ID || `AUDIT-${r.tahun || r.Tahun || 2026}-${idx + 1}`).trim();
+    const tahun = Number(r.tahun || r.Tahun || 2026);
+    const rawTglAudit = r.tanggalAudit || r['Tanggal Audit'] || r.tanggal || '';
+    const tanggalAudit = rawTglAudit ? cleanDateInputString(String(rawTglAudit)) : cleanDateInputString(new Date().toISOString());
+    
+    let cashRaw = r.saldoCash ?? r['Saldo Cash Fisik (Rp)'] ?? r.cash ?? r['Saldo Cash'] ?? r['Uang Cash'] ?? 0;
+    if (typeof cashRaw === 'string') cashRaw = cashRaw.replace(/[^0-9]/g, '');
+    const saldoCash = Number(cashRaw) || 0;
+
+    let bankRaw = r.saldoBank ?? r['Saldo Rekening Bank (Rp)'] ?? r.bank ?? r['Saldo Bank'] ?? r['Uang di Rekening'] ?? 0;
+    if (typeof bankRaw === 'string') bankRaw = bankRaw.replace(/[^0-9]/g, '');
+    const saldoBank = Number(bankRaw) || 0;
+
+    const namaBank = String(r.namaBank || r['Nama Bank'] || r.bankName || 'Bank DKI').trim();
+    const nomorRekening = String(r.nomorRekening || r['Nomor Rekening'] || r.noRekening || '102.23.09876.1').trim();
+    const atasNamaRekening = String(r.atasNamaRekening || r['Atas Nama Rekening'] || r['Atas Nama'] || 'MKKS SMP CITOS').trim();
+    const catatanAudit = String(r.catatanAudit || r['Catatan Temuan Audit'] || r['Catatan Audit'] || r.catatan || r.keterangan || '').trim();
+    const diauditOleh = String(r.diauditOleh || r['Diaudit Oleh'] || r.auditor || 'Bendahara MKKS Citos').trim();
+
+    const rawNamaKetua = r.namaKetuaMkks || r['Nama Ketua MKKS'] || r.ketuaMkks || r.ketua || '';
+    const namaKetuaMkks = rawNamaKetua ? String(rawNamaKetua).trim() : DEFAULT_PEJABAT.namaKetuaMkks;
+    const rawNipKetua = r.nipKetuaMkks || r['NIP Ketua MKKS'] || r.nipKetua || '';
+    const nipKetuaMkks = rawNipKetua ? String(rawNipKetua).trim() : DEFAULT_PEJABAT.nipKetuaMkks;
+    const rawJabatanKetua = r.jabatanKetuaMkks || r['Jabatan Ketua MKKS'] || r.jabatanKetua || '';
+    const jabatanKetuaMkks = rawJabatanKetua ? String(rawJabatanKetua).trim() : DEFAULT_PEJABAT.jabatanKetuaMkks;
+
+    const rawNamaBendahara = r.namaBendahara || r['Nama Bendahara'] || '';
+    const namaBendahara = rawNamaBendahara ? String(rawNamaBendahara).trim() : undefined;
+    const rawNipBendahara = r.nipBendahara || r['NIP Bendahara'] || '';
+    const nipBendahara = rawNipBendahara ? String(rawNipBendahara).trim() : undefined;
+    const rawJabatanBendahara = r.jabatanBendahara || r['Jabatan Bendahara'] || '';
+    const jabatanBendahara = rawJabatanBendahara ? String(rawJabatanBendahara).trim() : DEFAULT_PEJABAT.jabatanBendahara;
+
+    let pecahanCash = r.pecahanCash;
+    const rawPecahanStr = r['Rincian Pecahan Cash (JSON)'] || r.pecahan;
+    if (!pecahanCash && rawPecahanStr) {
+      if (typeof rawPecahanStr === 'object') {
+        pecahanCash = rawPecahanStr;
+      } else if (typeof rawPecahanStr === 'string' && rawPecahanStr.trim().startsWith('{')) {
+        try {
+          pecahanCash = JSON.parse(rawPecahanStr);
+        } catch {
+          // ignore parsing error
+        }
+      }
+    }
+
+    return {
+      id,
+      tahun,
+      tanggalAudit,
+      saldoCash,
+      saldoBank,
+      namaBank,
+      nomorRekening,
+      atasNamaRekening,
+      catatanAudit,
+      diauditOleh,
+      namaKetuaMkks,
+      nipKetuaMkks,
+      jabatanKetuaMkks,
+      namaBendahara,
+      nipBendahara,
+      jabatanBendahara,
+      pecahanCash: pecahanCash || undefined
+    } as RekonsiliasiKas;
+  }).filter((item): item is RekonsiliasiKas => item !== null);
 }
 
 export class StorageService {
@@ -595,6 +695,105 @@ export class StorageService {
     return updated;
   }
 
+  // Rekonsiliasi & Audit Kas (Real vs Data)
+  public static getRekonsiliasiKas(): RekonsiliasiKas[] {
+    const data = localStorage.getItem(STORAGE_KEYS.REKONSILIASI_KAS);
+    if (!data) {
+      const normalized = normalizeRekonsiliasiKasList(INITIAL_REKONSILIASI_KAS);
+      this.saveRekonsiliasiKas(normalized, false);
+      return normalized;
+    }
+    try {
+      const parsed = JSON.parse(data);
+      return normalizeRekonsiliasiKasList(parsed);
+    } catch {
+      return INITIAL_REKONSILIASI_KAS;
+    }
+  }
+
+  public static saveRekonsiliasiKas(list: RekonsiliasiKas[], syncToRemote = true): void {
+    const normalized = normalizeRekonsiliasiKasList(list);
+    localStorage.setItem(STORAGE_KEYS.REKONSILIASI_KAS, JSON.stringify(normalized));
+    if (syncToRemote) {
+      this.syncToAppsScript();
+    }
+  }
+
+  public static saveSingleRekonsiliasi(record: RekonsiliasiKas): RekonsiliasiKas[] {
+    const current = this.getRekonsiliasiKas();
+    const filtered = current.filter(r => r.tahun !== record.tahun);
+    const updated = [record, ...filtered];
+    this.saveRekonsiliasiKas(updated, true);
+    return updated;
+  }
+
+  // Get user with role Ketua from sheet User
+  public static getKetuaUser(): User | undefined {
+    const users = this.getUsers();
+    return users.find(u => {
+      const r = (u.role || '').toLowerCase();
+      const a = String(u.aktif || '').toLowerCase();
+      return r === 'ketua' && (a === 'ya' || a === 'true' || a === '1' || a === '');
+    }) || users.find(u => (u.role || '').toLowerCase() === 'ketua');
+  }
+
+  // Pejabat Penandatangan Organisasi (Ketua MKKS & Bendahara)
+  public static getPejabat(): PejabatPenandatangan {
+    const ketuaUser = this.getKetuaUser();
+    const currentUser = this.getCurrentUser();
+
+    const dynamicDefault: PejabatPenandatangan = {
+      namaKetuaMkks: ketuaUser?.namaKepsek || DEFAULT_PEJABAT.namaKetuaMkks,
+      nipKetuaMkks: DEFAULT_PEJABAT.nipKetuaMkks,
+      jabatanKetuaMkks: DEFAULT_PEJABAT.jabatanKetuaMkks,
+      namaBendahara: (currentUser && (currentUser.role === 'Bendahara' || currentUser.role === 'Admin') && currentUser.namaKepsek)
+        ? currentUser.namaKepsek
+        : DEFAULT_PEJABAT.namaBendahara,
+      nipBendahara: DEFAULT_PEJABAT.nipBendahara,
+      jabatanBendahara: DEFAULT_PEJABAT.jabatanBendahara
+    };
+
+    const data = localStorage.getItem(STORAGE_KEYS.PEJABAT);
+    if (data) {
+      try {
+        const parsed = JSON.parse(data);
+        // If saved namaKetuaMkks is empty or old placeholder "Drs. H. M. Supriyadi, M.Pd" and we have a real Ketua from sheet User, use real Ketua
+        if (ketuaUser?.namaKepsek && (!parsed.namaKetuaMkks || parsed.namaKetuaMkks === 'Drs. H. M. Supriyadi, M.Pd')) {
+          parsed.namaKetuaMkks = ketuaUser.namaKepsek;
+        }
+        // If saved namaBendahara is empty or old placeholder "H. Nurhasan...", automatically take active login account
+        const isOldBendaharaPlaceholder = 
+          !parsed.namaBendahara ||
+          parsed.namaBendahara === 'H. Nurhasan, M.Pd' ||
+          parsed.namaBendahara === 'H. Nurhasan, M.Pd (Bendahara)' ||
+          parsed.namaBendahara === 'Bendahara MKKS Citos' ||
+          parsed.namaBendahara === 'Bendahara MKKS';
+
+        if (isOldBendaharaPlaceholder && dynamicDefault.namaBendahara) {
+          parsed.namaBendahara = dynamicDefault.namaBendahara;
+        }
+        return { ...dynamicDefault, ...parsed };
+      } catch {
+        return dynamicDefault;
+      }
+    }
+    return dynamicDefault;
+  }
+
+  public static savePejabat(pejabat: Partial<PejabatPenandatangan>): PejabatPenandatangan {
+    const current = this.getPejabat();
+    const updated: PejabatPenandatangan = {
+      namaKetuaMkks: (pejabat.namaKetuaMkks !== undefined ? pejabat.namaKetuaMkks : current.namaKetuaMkks).trim(),
+      nipKetuaMkks: (pejabat.nipKetuaMkks !== undefined ? pejabat.nipKetuaMkks : current.nipKetuaMkks).trim(),
+      jabatanKetuaMkks: (pejabat.jabatanKetuaMkks !== undefined ? pejabat.jabatanKetuaMkks : current.jabatanKetuaMkks).trim(),
+      namaBendahara: (pejabat.namaBendahara !== undefined ? pejabat.namaBendahara : current.namaBendahara).trim(),
+      nipBendahara: (pejabat.nipBendahara !== undefined ? pejabat.nipBendahara : current.nipBendahara).trim(),
+      jabatanBendahara: (pejabat.jabatanBendahara !== undefined ? pejabat.jabatanBendahara : current.jabatanBendahara).trim(),
+    };
+    localStorage.setItem(STORAGE_KEYS.PEJABAT, JSON.stringify(updated));
+    return updated;
+  }
+
   // Current logged in user
   public static getCurrentUser(): User | null {
     const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -624,6 +823,7 @@ export class StorageService {
     this.savePengeluaran(INITIAL_PENGELUARAN, false);
     this.savePemasukanLain(INITIAL_PEMASUKAN_LAIN, false);
     this.saveRiwayatHapus(INITIAL_RIWAYAT_HAPUS, false);
+    this.saveRekonsiliasiKas(INITIAL_REKONSILIASI_KAS, false);
     this.setSpreadsheetId(DEFAULT_SPREADSHEET_ID);
     this.setAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
     this.setCurrentUser(INITIAL_USER[0]);
@@ -727,6 +927,44 @@ export class StorageService {
       tanggalTransaksiAsli: item.tanggalTransaksiAsli
     }));
 
+    const rawRekonsiliasiKas = this.getRekonsiliasiKas();
+    const formattedRekonsiliasiKas = rawRekonsiliasiKas.map(item => ({
+      'ID Audit': item.id,
+      'Tahun': item.tahun,
+      'Tanggal Audit': item.tanggalAudit,
+      'Saldo Cash Fisik (Rp)': item.saldoCash,
+      'Saldo Rekening Bank (Rp)': item.saldoBank,
+      'Nama Bank': item.namaBank || 'Bank DKI',
+      'Nomor Rekening': item.nomorRekening || '',
+      'Atas Nama Rekening': item.atasNamaRekening || '',
+      'Catatan Temuan Audit': item.catatanAudit || '',
+      'Diaudit Oleh': item.diauditOleh || 'Bendahara MKKS',
+      'Nama Ketua MKKS': item.namaKetuaMkks || '',
+      'NIP Ketua MKKS': item.nipKetuaMkks || '',
+      'Jabatan Ketua MKKS': item.jabatanKetuaMkks || '',
+      'Nama Bendahara': item.namaBendahara || '',
+      'NIP Bendahara': item.nipBendahara || '',
+      'Jabatan Bendahara': item.jabatanBendahara || '',
+      'Rincian Pecahan Cash (JSON)': item.pecahanCash ? JSON.stringify(item.pecahanCash) : '',
+      id: item.id,
+      tahun: item.tahun,
+      tanggalAudit: item.tanggalAudit,
+      saldoCash: item.saldoCash,
+      saldoBank: item.saldoBank,
+      namaBank: item.namaBank,
+      nomorRekening: item.nomorRekening,
+      atasNamaRekening: item.atasNamaRekening,
+      catatanAudit: item.catatanAudit,
+      diauditOleh: item.diauditOleh,
+      namaKetuaMkks: item.namaKetuaMkks,
+      nipKetuaMkks: item.nipKetuaMkks,
+      jabatanKetuaMkks: item.jabatanKetuaMkks,
+      namaBendahara: item.namaBendahara,
+      nipBendahara: item.nipBendahara,
+      jabatanBendahara: item.jabatanBendahara,
+      pecahanCash: item.pecahanCash
+    }));
+
     const payload = {
       action: 'syncAll',
       spreadsheetId: this.getSpreadsheetId(),
@@ -735,7 +973,8 @@ export class StorageService {
       iuran: formattedIuran,
       pengeluaran: formattedPengeluaran,
       pemasukanLain: formattedPemasukanLain,
-      riwayatHapus: formattedRiwayatHapus
+      riwayatHapus: formattedRiwayatHapus,
+      rekonsiliasiKas: formattedRekonsiliasiKas
     };
 
     let data: any = null;
@@ -873,6 +1112,11 @@ export class StorageService {
       if (Array.isArray(data.pengeluaran)) this.savePengeluaran(data.pengeluaran, false);
       if (Array.isArray(data.pemasukanLain)) this.savePemasukanLain(data.pemasukanLain, false);
       if (Array.isArray(data.riwayatHapus)) this.saveRiwayatHapus(data.riwayatHapus, false);
+      
+      const rekonsiliasiData = data.rekonsiliasiKas || data.rekonsiliasi || data.auditKas || data.Audit_Kas;
+      if (Array.isArray(rekonsiliasiData) && rekonsiliasiData.length > 0) {
+        this.saveRekonsiliasiKas(rekonsiliasiData, false);
+      }
       return true;
     }
 
@@ -885,16 +1129,23 @@ export class StorageService {
  */
 export const GOOGLE_APPS_SCRIPT_CODE = `
 /**
- * Apps Script Web App backend untuk Aplikasi MKKS Citos (Versi 6 Sheet Lengkap dengan Riwayat Hapus)
- * Salin kode ini ke Google Spreadsheet -> Ekstensi -> Apps Script
- * Lalu klik "Deploy" -> "Manage deployments" -> Klik ikon pensil (Edit) -> Version: "New version" -> "Deploy"
+ * Apps Script Web App backend untuk Aplikasi MKKS Citos (Versi 7 Sheet Lengkap)
+ * Mendukung: Sekolah, User, Iuran, Pengeluaran, Pemasukan_Lain, Riwayat_Hapus, dan Rekonsiliasi_Kas
+ * Urutan Kolom Iuran: Tahun -> Bulan -> ID Sekolah -> Nama Sekolah -> Nominal -> Keterangan / Tempat Terima -> Tanggal Input -> Diinput Oleh -> No Kuitansi
+ * 
+ * Cara Update di Google Sheets:
+ * 1. Buka Google Spreadsheet -> Ekstensi -> Apps Script
+ * 2. Hapus seluruh isi kode lama di Code.gs, lalu tempelkan (paste) seluruh kode di bawah ini
+ * 3. Klik tombol "Simpan" (ikon disket / Ctrl + S)
+ * 4. Klik menu "Deploy" (kanan atas) -> "Manage deployments" (Kelola deployment)
+ * 5. Klik ikon Pensil (Edit) -> Pada pilihan Version, pilih "New version" (Versi baru) -> Klik "Deploy"
  */
 
 function doGet(e) {
   var action = e && e.parameter ? e.parameter.action : '';
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // 1. Ambil Data dari Google Sheet (6 Sheet Lengkap)
+  // 1. Ambil Data dari Google Sheet (7 Sheet Lengkap)
   if (action === 'getData') {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'success',
@@ -903,7 +1154,8 @@ function doGet(e) {
       iuran: getSheetData(ss, 'Iuran'),
       pengeluaran: getSheetData(ss, 'Pengeluaran'),
       pemasukanLain: getSheetData(ss, 'Pemasukan_Lain') || getSheetData(ss, 'PemasukanLain'),
-      riwayatHapus: getSheetData(ss, 'Riwayat_Hapus') || getSheetData(ss, 'RiwayatHapus')
+      riwayatHapus: getSheetData(ss, 'Riwayat_Hapus') || getSheetData(ss, 'RiwayatHapus'),
+      rekonsiliasiKas: getSheetData(ss, 'Rekonsiliasi_Kas') || getSheetData(ss, 'RekonsiliasiKas') || getSheetData(ss, 'Audit_Kas')
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -917,6 +1169,7 @@ function doGet(e) {
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
       if (data.riwayatHapus) writeSheetData(ss, 'Riwayat_Hapus', data.riwayatHapus);
+      if (data.rekonsiliasiKas) writeSheetData(ss, 'Rekonsiliasi_Kas', data.rekonsiliasiKas);
       
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed via GET' }))
         .setMimeType(ContentService.MimeType.JSON);
@@ -926,7 +1179,7 @@ function doGet(e) {
     }
   }
   
-  return ContentService.createTextOutput(JSON.stringify({ status: 'active', message: 'API MKKS Citos Ready (6 Sheets)' }))
+  return ContentService.createTextOutput(JSON.stringify({ status: 'active', message: 'API MKKS Citos Ready (7 Sheets)' }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -948,6 +1201,7 @@ function doPost(e) {
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
       if (data.riwayatHapus) writeSheetData(ss, 'Riwayat_Hapus', data.riwayatHapus);
+      if (data.rekonsiliasiKas) writeSheetData(ss, 'Rekonsiliasi_Kas', data.rekonsiliasiKas);
       
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed' }))
         .setMimeType(ContentService.MimeType.JSON);
@@ -982,7 +1236,7 @@ function writeSheetData(ss, sheetName, rows) {
   var sheet = findSheetByName(ss, sheetName) || ss.insertSheet(sheetName);
   if (!rows || rows.length === 0) return;
 
-  // Header Rapi Standar MKKS Citos
+  // Header Rapi Standar MKKS Citos (Nominal sebelum Keterangan / Tempat Terima)
   var headerMap = {
     'Iuran': ['Tahun', 'Bulan', 'ID Sekolah', 'Nama Sekolah', 'Nominal', 'Keterangan / Tempat Terima', 'Tanggal Input', 'Diinput Oleh', 'No Kuitansi'],
     'Pengeluaran': ['No', 'Tanggal Transaksi', 'Alokasi Project / Kegiatan', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh'],
@@ -990,6 +1244,9 @@ function writeSheetData(ss, sheetName, rows) {
     'PemasukanLain': ['No', 'Tanggal Transaksi', 'Kategori', 'Sumber Dana / Pihak Terkait', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh', 'No Kuitansi'],
     'Riwayat_Hapus': ['ID Log', 'ID Transaksi Asli', 'Jenis Transaksi', 'Rincian Data', 'Jumlah Nominal (Rp)', 'Waktu Penghapusan', 'Dihapus Oleh', 'Role User', 'Alasan Penghapusan', 'No Kuitansi', 'Tanggal Transaksi Asli'],
     'RiwayatHapus': ['ID Log', 'ID Transaksi Asli', 'Jenis Transaksi', 'Rincian Data', 'Jumlah Nominal (Rp)', 'Waktu Penghapusan', 'Dihapus Oleh', 'Role User', 'Alasan Penghapusan', 'No Kuitansi', 'Tanggal Transaksi Asli'],
+    'Rekonsiliasi_Kas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
+    'RekonsiliasiKas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
+    'Audit_Kas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
     'Sekolah': ['ID Sekolah', 'Nama Sekolah', 'Nama Kepsek', 'Alamat', 'Kelurahan', 'Kecamatan'],
     'User': ['Username', 'Password', 'Role', 'Sekolah', 'Aktif', 'Nama Kepsek']
   };
@@ -1000,9 +1257,9 @@ function writeSheetData(ss, sheetName, rows) {
     'Bulan': ['Bulan', 'bulan'],
     'ID Sekolah': ['ID Sekolah', 'idSekolah', 'id_sekolah'],
     'Nama Sekolah': ['Nama Sekolah', 'namaSekolah', 'nama_sekolah', 'sekolah'],
+    'Nominal': ['Nominal', 'nominal', 'jumlah'],
     'Keterangan / Tempat Terima': ['Keterangan / Tempat Terima', 'Keterangan', 'keterangan', 'Tempat Terima', 'tempatTerima', 'Catatan', 'catatan'],
     'Keterangan': ['Keterangan', 'keterangan', 'Keterangan / Tempat Terima', 'Tempat Terima', 'Catatan', 'catatan'],
-    'Nominal': ['Nominal', 'nominal', 'jumlah'],
     'Tanggal Input': ['Tanggal Input', 'tanggalInput', 'tanggal'],
     'Diinput Oleh': ['Diinput Oleh', 'diinputOleh', 'operator'],
     'No Kuitansi': ['No Kuitansi', 'noKuitansi', 'kuitansi'],
@@ -1022,6 +1279,16 @@ function writeSheetData(ss, sheetName, rows) {
     'Role User': ['Role User', 'roleUser', 'role'],
     'Alasan Penghapusan': ['Alasan Penghapusan', 'alasanHapus', 'alasan'],
     'Tanggal Transaksi Asli': ['Tanggal Transaksi Asli', 'tanggalTransaksiAsli'],
+    'ID Audit': ['ID Audit', 'idAudit', 'id', 'ID'],
+    'Tanggal Audit': ['Tanggal Audit', 'tanggalAudit', 'tanggal', 'Waktu Audit'],
+    'Saldo Cash Fisik (Rp)': ['Saldo Cash Fisik (Rp)', 'saldoCash', 'Saldo Cash', 'Uang Cash', 'cash', 'Cash', 'saldo_cash'],
+    'Saldo Rekening Bank (Rp)': ['Saldo Rekening Bank (Rp)', 'saldoBank', 'Saldo Bank', 'Uang di Rekening', 'bank', 'Bank', 'saldo_bank'],
+    'Nama Bank': ['Nama Bank', 'namaBank', 'bankName', 'Bank'],
+    'Nomor Rekening': ['Nomor Rekening', 'nomorRekening', 'noRekening', 'No Rekening'],
+    'Atas Nama Rekening': ['Atas Nama Rekening', 'atasNamaRekening', 'atasNama', 'Atas Nama'],
+    'Catatan Temuan Audit': ['Catatan Temuan Audit', 'catatanAudit', 'catatan', 'Catatan', 'keterangan', 'Keterangan'],
+    'Diaudit Oleh': ['Diaudit Oleh', 'diauditOleh', 'auditor', 'Auditor', 'petugas'],
+    'Rincian Pecahan Cash (JSON)': ['Rincian Pecahan Cash (JSON)', 'pecahanCash', 'pecahan', 'rincianPecahan'],
     'Nama Kepsek': ['Nama Kepsek', 'namaKepsek', 'Kepala Sekolah'],
     'Alamat': ['Alamat', 'alamat'],
     'Kelurahan': ['Kelurahan', 'kelurahan'],

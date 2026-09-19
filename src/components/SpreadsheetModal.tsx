@@ -103,13 +103,13 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
               className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
               required
             />
-            <p className="text-[11px] text-slate-500 mt-1">ID Spreadsheet yang berisi Sheet User, Sekolah, Iuran, dan Pengeluaran.</p>
+            <p className="text-[11px] text-slate-500 mt-1">ID Spreadsheet yang berisi 7 Sheet: Sekolah, User, Iuran, Pengeluaran, Pemasukan_Lain, Riwayat_Hapus, dan Rekonsiliasi_Kas.</p>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
               <label htmlFor="apps-script-url-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Google Apps Script Web App URL (Opsional untuk 2-way live sync)
+                Google Apps Script Web App URL (7 Sheet Live Sync)
               </label>
               <button
                 type="button"
@@ -117,7 +117,7 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
                 className="text-[11px] text-teal-600 hover:text-teal-800 font-bold flex items-center space-x-1"
               >
                 {copiedCode ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                <span>{copiedCode ? 'Kode Tersalin!' : 'Salin Kode Apps Script'}</span>
+                <span>{copiedCode ? 'Kode 7 Sheet Tersalin!' : 'Salin Kode Apps Script (7 Sheet)'}</span>
               </button>
             </div>
 
@@ -130,7 +130,7 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
               className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
             <p className="text-[11px] text-slate-500 mt-1">
-              Jika diisi, aplikasi akan melakukan 2-way sync otomatis dengan Google Sheet Anda saat ada perubahan data.
+              Jika diisi, aplikasi akan melakukan 2-way sync otomatis untuk data Kas & Audit Rekonsiliasi Kas dengan Google Sheet Anda.
             </p>
           </div>
 
@@ -147,17 +147,17 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
           {/* Apps Script Guide Instructions */}
           <div className="border border-teal-200 rounded-xl p-3.5 bg-teal-50/50 space-y-2.5 text-xs">
             <div className="font-bold text-teal-900 flex items-center space-x-1.5">
-              <span>Langkah Update Kode Google Apps Script (Urutan Kolom Baru: Nominal &rarr; Keterangan &rarr; Tanggal Input):</span>
+              <span>Langkah Update Kode Google Apps Script (Versi 7 Sheet Lengkap + Rekonsiliasi Kas):</span>
             </div>
             <ol className="list-decimal list-inside space-y-1.5 text-slate-700 text-[11px] leading-relaxed">
-              <li>Klik tombol <strong>Salin Kode Apps Script</strong> di bagian atas.</li>
+              <li>Klik tombol <strong>Salin Kode Apps Script (7 Sheet)</strong> di atas.</li>
               <li>Buka spreadsheet Anda di Google Sheets &rarr; Klik menu <strong>Ekstensi (Extensions)</strong> &rarr; <strong>Apps Script</strong>.</li>
               <li>Hapus (select all & delete) semua kode lama di file <code className="bg-white px-1 py-0.5 rounded border border-teal-300 font-mono text-[10px]">Code.gs</code>, lalu <strong>Paste</strong> kode baru yang disalin tadi.</li>
               <li>
                 <strong>PENTING (Deploy Versi Baru):</strong><br />
                 Klik menu <strong>Deploy</strong> (kanan atas) &rarr; pilih <strong>Manage deployments (Kelola deployment)</strong> &rarr; klik ikon <strong>Pensil (Edit)</strong> &rarr; pada bagian <i>Version</i>, pilih <strong>New version (Versi baru)</strong> &rarr; klik <strong>Deploy</strong>.
               </li>
-              <li>Setelah selesai di Apps Script, kembali ke sini lalu klik tombol <strong>Simpan & Tes Koneksi</strong> di bawah. Sheet Iuran akan langsung diperbarui dengan urutan: <strong>Nominal &rarr; Keterangan &rarr; Tanggal Input</strong>.</li>
+              <li>Setelah selesai di Apps Script, kembali ke sini lalu klik tombol <strong>Simpan & Tes Koneksi</strong> di bawah. Sheet <strong>Rekonsiliasi_Kas</strong> akan otomatis dibuat/diperbarui secara real-time.</li>
             </ol>
           </div>
 

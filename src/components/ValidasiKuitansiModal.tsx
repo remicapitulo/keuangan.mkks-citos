@@ -140,10 +140,10 @@ export const ValidasiKuitansiModal: React.FC<ValidasiKuitansiModalProps> = ({
 
             {/* Catatan / Keterangan if available */}
             {!isPemasukanLain && data.keterangan && (
-              <div className="flex items-start justify-between pb-2.5 border-b border-emerald-200/60 gap-2 bg-teal-50/70 p-2 rounded-lg border border-teal-200/60">
-                <span className="text-teal-900 font-bold shrink-0">Catatan / Keterangan</span>
-                <span className="font-semibold text-teal-900 text-right leading-snug break-words">
-                  {data.keterangan}
+              <div className="flex items-start justify-between pb-2.5 border-b border-emerald-200/60 gap-2 bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200/80">
+                <span className="text-emerald-950 font-bold shrink-0">Catatan Inputan Bendahara</span>
+                <span className="font-semibold text-emerald-900 text-right leading-snug break-words italic">
+                  "{data.keterangan}"
                 </span>
               </div>
             )}
