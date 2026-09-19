@@ -1,4 +1,5 @@
 import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, RekonsiliasiKas } from '../types';
+import { getCurrentWIBDateTimeString } from '../utils/formatters';
 
 // Default initial schools fallback (empty - loaded dynamically from Google Spreadsheet)
 export const INITIAL_SEKOLAH: Sekolah[] = [];
@@ -90,7 +91,7 @@ export const INITIAL_REKONSILIASI_KAS: RekonsiliasiKas[] = [
   {
     id: 'AUDIT-2026-01',
     tahun: 2026,
-    tanggalAudit: '2026-09-19 09:30',
+    tanggalAudit: getCurrentWIBDateTimeString(),
     saldoCash: 1200000,
     saldoBank: 4800000,
     namaBank: 'Bank DKI',

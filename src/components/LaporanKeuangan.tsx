@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas, PejabatPenandatangan } from '../types';
-import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList, getCurrentWIBDateTimeString } from '../utils/formatters';
 import { exportToExcel, exportToPDF, exportRiwayatHapusToExcel, exportRiwayatHapusToPDF } from '../services/exportUtils';
 import { StorageService } from '../services/spreadsheetSync';
 import { AuditRekonsiliasiTab } from './AuditRekonsiliasiTab';
@@ -121,7 +121,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const auditTahunThis: RekonsiliasiKas = effectiveAuditList.find(r => r.tahun === selectedYear) || {
     id: `AUDIT-${selectedYear}-1`,
     tahun: selectedYear,
-    tanggalAudit: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    tanggalAudit: getCurrentWIBDateTimeString(),
     saldoCash: saldoBersih > 0 ? Math.round((saldoBersih * 0.25) / 50000) * 50000 : 0,
     saldoBank: saldoBersih > 0 ? Math.max(0, saldoBersih - Math.round((saldoBersih * 0.25) / 50000) * 50000) : 0,
     namaBank: 'Bank DKI',

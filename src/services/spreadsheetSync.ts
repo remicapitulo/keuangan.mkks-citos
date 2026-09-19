@@ -1,6 +1,6 @@
 import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole, RiwayatHapus, RekonsiliasiKas, PejabatPenandatangan } from '../types';
 import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, INITIAL_RIWAYAT_HAPUS, INITIAL_REKONSILIASI_KAS, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
-import { cleanDateInputString } from '../utils/formatters';
+import { cleanDateInputString, getCurrentWIBDateTimeString, getCurrentWIBDateString, isPlaceholderAuditTime } from '../utils/formatters';
 
 export const DEFAULT_PEJABAT: PejabatPenandatangan = {
   namaKetuaMkks: '',
@@ -276,7 +276,7 @@ export function normalizeIuranList(rawList: any[], sekolahList: Sekolah[] = INIT
     const nominalRaw = i.nominal !== undefined ? i.nominal : (i.Nominal !== undefined ? i.Nominal : (i.jumlah || i.Jumlah));
     const nominal = Number(nominalRaw) || 100000;
     const rawTgl = String(i.tanggalInput || i['Tanggal Input'] || i.tanggal || i.Tanggal || '').trim();
-    const tanggalInput = rawTgl ? cleanDateInputString(rawTgl).split(' ')[0] : new Date().toISOString().split('T')[0];
+    const tanggalInput = rawTgl ? cleanDateInputString(rawTgl).split(' ')[0] : getCurrentWIBDateString();
     const diinputOleh = String(i.diinputOleh || i['Diinput Oleh'] || i.operator || 'Bendahara MKKS Citos').trim();
     const noKuitansi = String(i.noKuitansi || i['No Kuitansi'] || i.kuitansi || `KWT/MKKS/${tahun}/${idSekolah}`).trim();
     const keteranganRaw = i.keterangan || i.Keterangan || i['Keterangan'] || i['Keterangan / Tempat Terima'] || i['Tempat Terima'] || i.catatan || i.Catatan || '';
@@ -310,7 +310,7 @@ export function normalizePengeluaranList(rawList: any[]): Pengeluaran[] {
     
     // Find tanggal flexibly
     const tanggalRaw = p.tanggal || p.Tanggal || p['Tanggal Transaksi'] || p['Tanggal Input'] || p['Tgl'] || p['TGL'] || '';
-    const tanggal = tanggalRaw ? cleanDateInputString(String(tanggalRaw)).split(' ')[0] : new Date().toISOString().split('T')[0];
+    const tanggal = tanggalRaw ? cleanDateInputString(String(tanggalRaw)).split(' ')[0] : getCurrentWIBDateString();
 
     // Find project flexibly
     const project = String(
@@ -361,7 +361,7 @@ export function normalizePemasukanLainList(rawList: any[]): PemasukanLain[] {
     
     // Find tanggal flexibly
     const tanggalRaw = p.tanggal || p.Tanggal || p['Tanggal Transaksi'] || p['Tanggal Input'] || p['Tgl'] || p['TGL'] || '';
-    const tanggal = tanggalRaw ? cleanDateInputString(String(tanggalRaw)).split(' ')[0] : new Date().toISOString().split('T')[0];
+    const tanggal = tanggalRaw ? cleanDateInputString(String(tanggalRaw)).split(' ')[0] : getCurrentWIBDateString();
 
     // Find kategori flexibly
     const kategori = String(
@@ -433,7 +433,7 @@ export function normalizeRiwayatHapusList(rawList: any[]): RiwayatHapus[] {
     const nominal = Number(nominalRaw) || 0;
 
     const rawTglHapus = r.tanggalHapus || r['Tanggal Hapus'] || r['Waktu Penghapusan'] || '';
-    const tanggalHapus = rawTglHapus ? cleanDateInputString(String(rawTglHapus)) : cleanDateInputString(new Date().toISOString());
+    const tanggalHapus = rawTglHapus ? cleanDateInputString(String(rawTglHapus)) : cleanDateInputString(getCurrentWIBDateTimeString());
     const dihapusOleh = String(r.dihapusOleh || r['Dihapus Oleh'] || r.petugas || 'Bendahara MKKS').trim();
     const roleUser = String(r.roleUser || r['Role User'] || r.role || 'Bendahara').trim();
     const alasanHapus = String(r.alasanHapus || r['Alasan Hapus'] || r['Keterangan Hapus'] || r.alasan || 'Koreksi Data').trim();
@@ -478,7 +478,10 @@ export function normalizeRekonsiliasiKasList(rawList: any[]): RekonsiliasiKas[] 
     const id = String(r.id || r['ID Audit'] || r.idAudit || r.ID || `AUDIT-${r.tahun || r.Tahun || 2026}-${idx + 1}`).trim();
     const tahun = Number(r.tahun || r.Tahun || 2026);
     const rawTglAudit = r.tanggalAudit || r['Tanggal Audit'] || r.tanggal || '';
-    const tanggalAudit = rawTglAudit ? cleanDateInputString(String(rawTglAudit)) : cleanDateInputString(new Date().toISOString());
+    let tanggalAudit = rawTglAudit ? cleanDateInputString(String(rawTglAudit)) : cleanDateInputString(getCurrentWIBDateTimeString());
+    if (!tanggalAudit || isPlaceholderAuditTime(tanggalAudit)) {
+      tanggalAudit = getCurrentWIBDateTimeString();
+    }
     
     let cashRaw = r.saldoCash ?? r['Saldo Cash Fisik (Rp)'] ?? r.cash ?? r['Saldo Cash'] ?? r['Uang Cash'] ?? 0;
     if (typeof cashRaw === 'string') cashRaw = cashRaw.replace(/[^0-9]/g, '');
@@ -1181,6 +1184,9 @@ export const GOOGLE_APPS_SCRIPT_CODE = `
 function doGet(e) {
   var action = e && e.parameter ? e.parameter.action : '';
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  try {
+    ss.setSpreadsheetTimeZone('Asia/Jakarta');
+  } catch(tzErr) {}
   
   // 1. Ambil Data dari Google Sheet (7 Sheet Lengkap)
   if (action === 'getData') {
@@ -1238,6 +1244,9 @@ function doPost(e) {
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    try {
+      ss.setSpreadsheetTimeZone('Asia/Jakarta');
+    } catch(tzErr) {}
     
     if (data && data.action === 'syncAll') {
       if (data.sekolah) writeSheetData(ss, 'Sekolah', data.sekolah);
@@ -1263,7 +1272,9 @@ function doPost(e) {
 function getSheetData(ss, sheetName) {
   var sheet = findSheetByName(ss, sheetName);
   if (!sheet) return [];
-  var data = sheet.getDataRange().getValues();
+  var range = sheet.getDataRange();
+  var data = range.getValues();
+  var displayValues = range.getDisplayValues();
   if (data.length <= 1) return [];
   var headers = data[0];
   var result = [];
@@ -1272,10 +1283,25 @@ function getSheetData(ss, sheetName) {
     for (var j = 0; j < headers.length; j++) {
       var headerKey = String(headers[j] || '').trim();
       if (headerKey) {
-        row[headerKey] = data[i][j];
+        var val = data[i][j];
+        if (val instanceof Date) {
+          // Format waktu sel ke zona waktu Asia/Jakarta (WIB) secara presisi
+          try {
+            var hours = val.getHours();
+            var minutes = val.getMinutes();
+            if (hours !== 0 || minutes !== 0) {
+              row[headerKey] = Utilities.formatDate(val, "Asia/Jakarta", "yyyy-MM-dd HH:mm");
+            } else {
+              row[headerKey] = Utilities.formatDate(val, "Asia/Jakarta", "yyyy-MM-dd");
+            }
+          } catch(e) {
+            row[headerKey] = displayValues[i][j] || String(val);
+          }
+        } else {
+          row[headerKey] = val;
+        }
       }
     }
-    row['_rawRow'] = data[i];
     result.push(row);
   }
   return result;

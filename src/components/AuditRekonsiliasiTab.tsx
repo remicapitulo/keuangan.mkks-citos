@@ -24,7 +24,16 @@ import {
   Lock
 } from 'lucide-react';
 import { RekonsiliasiKas, PecahanUangCash, User, Sekolah } from '../types';
-import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, cleanDateInputString, getCurrentLocalDateTimeString, resolveNamaBendahara } from '../utils/formatters';
+import { 
+  formatRupiah, 
+  formatDateIndonesian, 
+  formatDateTimeIndonesian, 
+  cleanDateInputString, 
+  getCurrentLocalDateTimeString, 
+  getCurrentWIBDateTimeString,
+  isPlaceholderAuditTime,
+  resolveNamaBendahara 
+} from '../utils/formatters';
 import { StorageService, DEFAULT_PEJABAT } from '../services/spreadsheetSync';
 
 interface AuditRekonsiliasiTabProps {
@@ -72,11 +81,22 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   const [nomorRekening, setNomorRekening] = useState<string>(currentAudit.nomorRekening || '102.23.09876.1');
   const [atasNamaRekening, setAtasNamaRekening] = useState<string>(currentAudit.atasNamaRekening || 'MKKS SMP CITOS');
   const [catatanAudit, setCatatanAudit] = useState<string>(currentAudit.catatanAudit || '');
-  const [tanggalAudit, setTanggalAudit] = useState<string>(() => {
-    if (!currentAudit.tanggalAudit || currentAudit.tanggalAudit.startsWith('2026-09-19 09:30')) {
-      return getCurrentLocalDateTimeString();
+  // Helper to detect placeholder/sample audit records or dummy/shifted dates
+  const isPlaceholderAudit = (audit?: RekonsiliasiKas | null) => {
+    if (!audit || !audit.tanggalAudit) return true;
+    if (isPlaceholderAuditTime(audit.tanggalAudit)) return true;
+    if (audit.id === 'AUDIT-2026-01' && (audit.diauditOleh === 'Abu Haripin, M.Pd.' || audit.atasNamaRekening === 'MKKS SMP Cilandak')) {
+      return true;
     }
-    return cleanDateInputString(currentAudit.tanggalAudit) || getCurrentLocalDateTimeString();
+    return false;
+  };
+
+  const [tanggalAudit, setTanggalAudit] = useState<string>(() => {
+    // If no tanggalAudit saved yet or it matches old default static seed/timezone shift, always use live WIB now
+    if (isPlaceholderAudit(currentAudit)) {
+      return getCurrentWIBDateTimeString();
+    }
+    return cleanDateInputString(currentAudit.tanggalAudit) || getCurrentWIBDateTimeString();
   });
 
   // Helper to detect old initial placeholders
@@ -181,8 +201,8 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     setNomorRekening(currentAudit.nomorRekening || '102.23.09876.1');
     setAtasNamaRekening(currentAudit.atasNamaRekening || 'MKKS SMP CITOS');
     setCatatanAudit(currentAudit.catatanAudit || '');
-    const isOldPlaceholderTime = !currentAudit.tanggalAudit || currentAudit.tanggalAudit.startsWith('2026-09-19 09:30');
-    setTanggalAudit(isOldPlaceholderTime ? getCurrentLocalDateTimeString() : (cleanDateInputString(currentAudit.tanggalAudit) || getCurrentLocalDateTimeString()));
+    const isOldPlaceholderTime = isPlaceholderAudit(currentAudit);
+    setTanggalAudit(isOldPlaceholderTime ? getCurrentWIBDateTimeString() : (cleanDateInputString(currentAudit.tanggalAudit) || getCurrentWIBDateTimeString()));
     if (currentAudit.pecahanCash) {
       setPecahan(currentAudit.pecahanCash);
     }
@@ -264,7 +284,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     const recordToSave: RekonsiliasiKas = {
       id: currentAudit.id || `AUDIT-${selectedYear}-${Date.now().toString().slice(-4)}`,
       tahun: selectedYear,
-      tanggalAudit: cleanDateInputString(tanggalAudit) || cleanDateInputString(new Date().toISOString()),
+      tanggalAudit: cleanDateInputString(tanggalAudit) || getCurrentWIBDateTimeString(),
       saldoCash: Number(saldoCash) || 0,
       saldoBank: Number(saldoBank) || 0,
       namaBank: namaBank || 'Bank DKI',
@@ -287,7 +307,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   };
 
   const handleOpenBeritaAcaraWithSync = () => {
-    const effectiveTanggal = cleanDateInputString(tanggalAudit) || getCurrentLocalDateTimeString();
+    const effectiveTanggal = cleanDateInputString(tanggalAudit) || getCurrentWIBDateTimeString();
     const penandatanganBendahara = (namaBendahara && !isOldBendaharaPlaceholder(namaBendahara))
       ? namaBendahara
       : (namaPemeriksaLogin || StorageService.getPejabat(usersList).namaBendahara || DEFAULT_PEJABAT.namaBendahara);
@@ -807,17 +827,22 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Waktu & Tanggal Audit / Kas Opname
-                  </label>
+                  <div className="flex items-center space-x-1.5">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Waktu & Tanggal Audit / Kas Opname
+                    </label>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      WIB (UTC+7)
+                    </span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setTanggalAudit(getCurrentLocalDateTimeString())}
+                    onClick={() => setTanggalAudit(getCurrentWIBDateTimeString())}
                     className="inline-flex items-center space-x-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-200 transition-all cursor-pointer"
-                    title="Klik untuk memperbarui ke waktu aktif saat ini"
+                    title="Klik untuk memperbarui ke waktu aktif saat ini (Waktu Indonesia Barat / UTC+7)"
                   >
                     <Clock className="w-3 h-3 text-teal-600" />
-                    <span>Waktu Sekarang</span>
+                    <span>Waktu Sekarang (WIB)</span>
                   </button>
                 </div>
                 <input

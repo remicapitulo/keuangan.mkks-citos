@@ -66,23 +66,7 @@ export function formatDateTimeIndonesian(dateString?: string | null, withWIB = t
   const raw = String(dateString).trim();
   if (!raw || raw === '-') return '-';
 
-  const d = new Date(raw);
-  if (!isNaN(d.getTime())) {
-    const day = d.getDate();
-    const month = INDO_MONTHS[d.getMonth()] || '';
-    const year = d.getFullYear();
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-
-    // If time is 00:00 and string didn't have explicit time component
-    if (hours === '00' && minutes === '00' && !raw.includes(':')) {
-      return `${day} ${month} ${year}`;
-    }
-
-    return `${day} ${month} ${year}, ${hours}:${minutes}${withWIB ? ' WIB' : ''}`;
-  }
-
-  // Fallback: try to extract YYYY-MM-DD HH:mm from raw string
+  // 1. Match YYYY-MM-DD HH:mm or YYYY-MM-DDTHH:mm safely without timezone offset shifts
   const m = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s](\d{1,2}):(\d{1,2}))?/);
   if (m) {
     const year = m[1];
@@ -90,9 +74,46 @@ export function formatDateTimeIndonesian(dateString?: string | null, withWIB = t
     const day = parseInt(m[3], 10);
     const month = INDO_MONTHS[monthIdx] || m[2];
     if (m[4] !== undefined && m[5] !== undefined) {
-      return `${day} ${month} ${year}, ${m[4]}:${m[5]}${withWIB ? ' WIB' : ''}`;
+      return `${day} ${month} ${year}, ${m[4].padStart(2, '0')}:${m[5].padStart(2, '0')}${withWIB ? ' WIB' : ''}`;
     }
     return `${day} ${month} ${year}`;
+  }
+
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23'
+      }).formatToParts(d);
+
+      const get = (type: string) => parts.find(p => p.type === type)?.value || '00';
+      const year = get('year');
+      const monthIdx = parseInt(get('month'), 10) - 1;
+      const day = parseInt(get('day'), 10);
+      const month = INDO_MONTHS[monthIdx] || '';
+      const rawHour = parseInt(get('hour'), 10) % 24;
+      const hours = String(rawHour).padStart(2, '0');
+      const minutes = get('minute').padStart(2, '0');
+
+      if (hours === '00' && minutes === '00' && !raw.includes(':')) {
+        return `${day} ${month} ${year}`;
+      }
+
+      return `${day} ${month} ${year}, ${hours}:${minutes}${withWIB ? ' WIB' : ''}`;
+    } catch {
+      const day = d.getDate();
+      const month = INDO_MONTHS[d.getMonth()] || '';
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${day} ${month} ${year}, ${hours}:${minutes}${withWIB ? ' WIB' : ''}`;
+    }
   }
 
   return formatDateIndonesian(raw);
@@ -100,10 +121,38 @@ export function formatDateTimeIndonesian(dateString?: string | null, withWIB = t
 
 /**
  * Clean up raw ISO string for input fields (e.g. "2026-09-19T13:30:00.000Z" -> "2026-09-19 13:30")
+ * Ensures timezone strings (UTC 'Z' or offsets) are properly converted to Asia/Jakarta (WIB UTC+7).
  */
 export function cleanDateInputString(val?: string | null): string {
   if (!val) return '';
   const raw = String(val).trim();
+  if (!raw || raw === '-') return '';
+
+  // Already standard format YYYY-MM-DD HH:mm
+  if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/.test(raw)) {
+    return raw;
+  }
+  // Standard format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  // If it's an ISO UTC string (ending with Z or containing timezone offset)
+  // e.g. "2026-09-19T15:30:00.000Z" or "2026-09-19T15:30:00+00:00"
+  if (raw.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(raw)) {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      // Calculate WIB (UTC+7) safely via UTC millisecond math
+      const wib = new Date(d.getTime() + (7 * 3600 * 1000));
+      const year = wib.getUTCFullYear();
+      const month = String(wib.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(wib.getUTCDate()).padStart(2, '0');
+      const hours = String(wib.getUTCHours()).padStart(2, '0');
+      const minutes = String(wib.getUTCMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    }
+  }
+
   return raw
     .replace('T', ' ')
     .replace(/:\d{2}\.\d{3}Z$/, '')
@@ -113,16 +162,101 @@ export function cleanDateInputString(val?: string | null): string {
 }
 
 /**
- * Return current local date and time in format YYYY-MM-DD HH:mm
+ * Checks if a given date string is an old placeholder/seed or timezone-shifted timestamp
+ */
+export function isPlaceholderAuditTime(val?: string | null): boolean {
+  if (!val) return true;
+  const s = String(val).trim();
+  return (
+    s.startsWith('2026-09-19 09:30') ||
+    s.startsWith('2026-09-20 03:14') ||
+    s.startsWith('2026-09-20 02:35') ||
+    s.startsWith('2026-09-20 02:36') ||
+    s.includes('2026-09-20T03:14') ||
+    s.includes('2026-09-20T02:35') ||
+    s.includes('2026-09-20T02:36') ||
+    s === '-'
+  );
+}
+
+/**
+ * Return current date and time in Indonesian Server Timezone: UTC+7 (WIB / Asia/Jakarta)
+ * Format: YYYY-MM-DD HH:mm
+ */
+export function getCurrentWIBDateTimeString(): string {
+  try {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(now);
+
+    const get = (type: string) => parts.find(p => p.type === type)?.value || '00';
+    const year = get('year');
+    const month = get('month').padStart(2, '0');
+    const day = get('day').padStart(2, '0');
+    let rawHour = parseInt(get('hour'), 10);
+    if (isNaN(rawHour)) rawHour = 0;
+    if (rawHour === 24) rawHour = 0;
+    const hours = String(rawHour).padStart(2, '0');
+    const minutes = get('minute').padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  } catch {
+    // Mathematical UTC+7 calculation:
+    // now.getTime() is UTC epoch milliseconds. Adding 7 * 3600 * 1000 gives exact UTC+7 timestamp.
+    // getUTC* getters guarantee 100% immunity from host/client machine timezone.
+    const now = new Date();
+    const wib = new Date(now.getTime() + (7 * 3600 * 1000));
+    const year = wib.getUTCFullYear();
+    const month = String(wib.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(wib.getUTCDate()).padStart(2, '0');
+    const hours = String(wib.getUTCHours()).padStart(2, '0');
+    const minutes = String(wib.getUTCMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  }
+}
+
+/**
+ * Return current date in Indonesian Server Timezone: UTC+7 (WIB / Asia/Jakarta)
+ * Format: YYYY-MM-DD
+ */
+export function getCurrentWIBDateString(): string {
+  try {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour12: false
+    }).formatToParts(now);
+
+    const get = (type: string) => parts.find(p => p.type === type)?.value || '00';
+    const year = get('year');
+    const month = get('month').padStart(2, '0');
+    const day = get('day').padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch {
+    const now = new Date();
+    const wib = new Date(now.getTime() + (7 * 3600 * 1000));
+    const year = wib.getUTCFullYear();
+    const month = String(wib.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(wib.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+}
+
+/**
+ * Return current local date and time in format YYYY-MM-DD HH:mm (Synchronized to WIB UTC+7)
  */
 export function getCurrentLocalDateTimeString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
+  return getCurrentWIBDateTimeString();
 }
 
 /**

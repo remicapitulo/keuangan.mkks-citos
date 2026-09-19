@@ -25,6 +25,8 @@ import {
   formatDateTimeIndonesian, 
   cleanDateInputString, 
   getCurrentLocalDateTimeString, 
+  getCurrentWIBDateTimeString,
+  isPlaceholderAuditTime,
   resolveNamaBendahara 
 } from '../utils/formatters';
 import { StorageService, DEFAULT_PEJABAT } from '../services/spreadsheetSync';
@@ -124,11 +126,21 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
   const [kotaAudit, setKotaAudit] = useState<string>('Depok');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
-  const [tanggalAuditLocal, setTanggalAuditLocal] = useState<string>(() => {
-    if (!auditData?.tanggalAudit || auditData.tanggalAudit.startsWith('2026-09-19 09:30')) {
-      return getCurrentLocalDateTimeString();
+
+  const isPlaceholderAudit = (audit?: RekonsiliasiKas | null) => {
+    if (!audit || !audit.tanggalAudit) return true;
+    if (isPlaceholderAuditTime(audit.tanggalAudit)) return true;
+    if (audit.id === 'AUDIT-2026-01' && (audit.diauditOleh === 'Abu Haripin, M.Pd.' || audit.atasNamaRekening === 'MKKS SMP Cilandak')) {
+      return true;
     }
-    return cleanDateInputString(auditData.tanggalAudit) || getCurrentLocalDateTimeString();
+    return false;
+  };
+
+  const [tanggalAuditLocal, setTanggalAuditLocal] = useState<string>(() => {
+    if (isPlaceholderAudit(auditData)) {
+      return getCurrentWIBDateTimeString();
+    }
+    return cleanDateInputString(auditData?.tanggalAudit) || getCurrentWIBDateTimeString();
   });
 
   // Sync state when auditData changes
@@ -154,8 +166,8 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
       setNipBendahara(auditData.nipBendahara || pej.nipBendahara || '');
       setJabatanBendahara(auditData.jabatanBendahara || pej.jabatanBendahara || DEFAULT_PEJABAT.jabatanBendahara);
 
-      const isOldDefault = !auditData.tanggalAudit || auditData.tanggalAudit.startsWith('2026-09-19 09:30');
-      setTanggalAuditLocal(isOldDefault ? getCurrentLocalDateTimeString() : (cleanDateInputString(auditData.tanggalAudit) || getCurrentLocalDateTimeString()));
+      const isOldDefault = isPlaceholderAudit(auditData);
+      setTanggalAuditLocal(isOldDefault ? getCurrentWIBDateTimeString() : (cleanDateInputString(auditData.tanggalAudit) || getCurrentWIBDateTimeString()));
     }
   }, [auditData, usersList]);
 
@@ -276,7 +288,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
         namaBendahara,
         nipBendahara,
         jabatanBendahara,
-        tanggalAudit: cleanDateInputString(tanggalAuditLocal) || cleanDateInputString(auditData.tanggalAudit) || getCurrentLocalDateTimeString()
+        tanggalAudit: cleanDateInputString(tanggalAuditLocal) || cleanDateInputString(auditData.tanggalAudit) || getCurrentWIBDateTimeString()
       });
 
       setToastMessage(`Dokumen PDF berhasil diunduh: ${filename}`);
@@ -314,7 +326,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
       nipBendahara,
       jabatanBendahara,
       diauditOleh: auditData.diauditOleh || namaBendahara,
-      tanggalAudit: cleanDateInputString(tanggalAuditLocal) || getCurrentLocalDateTimeString()
+      tanggalAudit: cleanDateInputString(tanggalAuditLocal) || getCurrentWIBDateTimeString()
     };
 
     StorageService.saveSingleRekonsiliasi(updatedRecord);
@@ -741,7 +753,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                   </div>
 
                   <div className="flex items-center space-x-1.5">
-                    <label className="font-semibold text-slate-700 shrink-0">Waktu & Tanggal:</label>
+                    <label className="font-semibold text-slate-700 shrink-0">Waktu & Tanggal (WIB):</label>
                     <input
                       type="text"
                       value={tanggalAuditLocal}
@@ -751,12 +763,12 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                     />
                     <button
                       type="button"
-                      onClick={() => setTanggalAuditLocal(getCurrentLocalDateTimeString())}
+                      onClick={() => setTanggalAuditLocal(getCurrentWIBDateTimeString())}
                       className="inline-flex items-center space-x-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-200 transition-all cursor-pointer"
-                      title="Set ke waktu aktif saat ini"
+                      title="Set ke waktu aktif saat ini (WIB / UTC+7)"
                     >
                       <Clock className="w-3 h-3 text-teal-600" />
-                      <span>Sekarang</span>
+                      <span>Sekarang (WIB)</span>
                     </button>
                   </div>
                 </div>
