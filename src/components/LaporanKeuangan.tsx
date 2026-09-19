@@ -35,7 +35,8 @@ import {
   Tag,
   Scale,
   Landmark,
-  ArrowRight
+  ArrowRight,
+  ShieldAlert
 } from 'lucide-react';
 
 interface LaporanKeuanganProps {
@@ -145,14 +146,17 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
   // Export handlers
   const handleExportExcel = () => {
+    if (isRoleSekolah) return;
     exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList, riwayatHapusList, auditTahunThis);
   };
 
   const handleExportPDF = () => {
+    if (isRoleSekolah) return;
     exportToPDF(selectedYear, sekolahList, iuranList, pengeluaranList, currentUser, pemasukanLainList, auditTahunThis);
   };
 
   const handlePrintReport = () => {
+    if (isRoleSekolah) return;
     window.print();
   };
 
@@ -164,6 +168,19 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   ) : false;
 
   const isBendahara = currentUser?.role === 'Bendahara' || isAdmin;
+
+  // Deteksi akun Sekolah dari currentUser maupun dari baris usersList (Sheet User Kolom C: Role "Sekolah")
+  const userInList = usersList.find(u => u.username?.toLowerCase() === currentUser?.username?.toLowerCase());
+  const detectedRole = String(userInList?.role || currentUser?.role || '').trim().toLowerCase();
+  const isRoleSekolah = detectedRole === 'sekolah';
+  const canAccessAudit = !isRoleSekolah;
+
+  // Jika akun adalah Role Sekolah dan sedang berada di tab audit atau rekap bulanan, otomatis arahkan ke tab matriks iuran
+  React.useEffect(() => {
+    if (isRoleSekolah && (activeTab === 'audit' || activeTab === 'rekap')) {
+      setActiveTab('matrix');
+    }
+  }, [isRoleSekolah, activeTab]);
 
   // Filtered lists for search
   const query = (searchFilter || '').toLowerCase();
@@ -253,49 +270,51 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               </select>
             </div>
 
-            {/* Export & Print Buttons Group */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <button
-                id="btn-edit-pejabat-laporan"
-                type="button"
-                onClick={() => setIsPejabatModalOpen(true)}
-                className="bg-teal-800/80 hover:bg-teal-700 active:bg-teal-900 text-teal-100 hover:text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md border border-teal-400/40 transition-all flex items-center justify-center space-x-1 cursor-pointer"
-                title="Atur Nama Ketua MKKS & Bendahara untuk Tanda Tangan Laporan & Berita Acara"
-              >
-                <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-300 shrink-0" />
-                <span className="whitespace-nowrap">Atur Pejabat</span>
-              </button>
+            {/* Export, Print & Pejabat Buttons Group (Khusus Ditutup untuk Seluruh Akun Sekolah) */}
+            {!isRoleSekolah && (
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <button
+                  id="btn-edit-pejabat-laporan"
+                  type="button"
+                  onClick={() => setIsPejabatModalOpen(true)}
+                  className="bg-teal-800/80 hover:bg-teal-700 active:bg-teal-900 text-teal-100 hover:text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md border border-teal-400/40 transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                  title="Atur Nama Ketua MKKS & Bendahara untuk Tanda Tangan Laporan & Berita Acara"
+                >
+                  <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-300 shrink-0" />
+                  <span className="whitespace-nowrap">Atur Pejabat</span>
+                </button>
 
-              <button
-                id="btn-export-excel"
-                onClick={handleExportExcel}
-                className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
-                title="Export Ke Excel (.xlsx)"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                <span>Excel</span>
-              </button>
+                <button
+                  id="btn-export-excel"
+                  onClick={handleExportExcel}
+                  className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                  title="Export Ke Excel (.xlsx)"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                  <span>Excel</span>
+                </button>
 
-              <button
-                id="btn-export-pdf"
-                onClick={handleExportPDF}
-                className="bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
-                title="Export Ke PDF (.pdf)"
-              >
-                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                <span>PDF</span>
-              </button>
+                <button
+                  id="btn-export-pdf"
+                  onClick={handleExportPDF}
+                  className="bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                  title="Export Ke PDF (.pdf)"
+                >
+                  <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                  <span>PDF</span>
+                </button>
 
-              <button
-                id="btn-print-laporan"
-                onClick={handlePrintReport}
-                className="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
-                title="Cetak Laporan Keuangan"
-              >
-                <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                <span>Cetak</span>
-              </button>
-            </div>
+                <button
+                  id="btn-print-laporan"
+                  onClick={handlePrintReport}
+                  className="bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white font-bold text-xs px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                  title="Cetak Laporan Keuangan"
+                >
+                  <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                  <span>Cetak</span>
+                </button>
+              </div>
+            )}
 
           </div>
         </div>
@@ -374,85 +393,87 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       </div>
 
-      {/* Quick Audit / Rekonsiliasi Real vs Data Bar */}
-      <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
-          <div className="flex items-center space-x-2">
-            <div className={`p-2 rounded-xl ${isAuditBalance ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-              <Scale className="w-4 h-4" />
+      {/* Quick Audit / Rekonsiliasi Real vs Data Bar (Khusus Ditutup untuk Akun Role Sekolah) */}
+      {!isRoleSekolah && (
+        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
+            <div className="flex items-center space-x-2">
+              <div className={`p-2 rounded-xl ${isAuditBalance ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                <Scale className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-tight">
+                  Audit Kas ({selectedYear})
+                </span>
+                <span className="text-xs font-black text-slate-800">
+                  Data vs Real Keuangan
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block leading-tight">
-                Audit Kas ({selectedYear})
+
+            <div className="h-6 w-px bg-slate-200 hidden md:block"></div>
+
+            {/* Saldo Data */}
+            <div className="bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
+              <span className="text-slate-500 block text-[9px] font-medium">Saldo Data (Sistem):</span>
+              <span className="font-mono font-bold text-slate-800">{formatRupiah(saldoBersih)}</span>
+            </div>
+
+            <span className="text-slate-400 hidden sm:inline">↔</span>
+
+            {/* Uang Cash */}
+            <div className="bg-amber-50/60 px-2.5 py-1 rounded-xl border border-amber-200/80">
+              <span className="text-amber-800 block text-[9px] font-semibold flex items-center gap-1">
+                <Wallet className="w-2.5 h-2.5 text-amber-600" /> Uang Cash:
               </span>
-              <span className="text-xs font-black text-slate-800">
-                Data vs Real Keuangan
+              <span className="font-mono font-bold text-amber-900">{formatRupiah(auditTahunThis.saldoCash || 0)}</span>
+            </div>
+
+            <span className="text-slate-400 hidden sm:inline">+</span>
+
+            {/* Uang di Rekening */}
+            <div className="bg-indigo-50/60 px-2.5 py-1 rounded-xl border border-indigo-200/80">
+              <span className="text-indigo-800 block text-[9px] font-semibold flex items-center gap-1">
+                <Landmark className="w-2.5 h-2.5 text-indigo-600" /> Uang di Rekening:
               </span>
+              <span className="font-mono font-bold text-indigo-900">{formatRupiah(auditTahunThis.saldoBank || 0)}</span>
+            </div>
+
+            <span className="text-slate-400 hidden sm:inline">=</span>
+
+            {/* Total Saldo Real */}
+            <div className="bg-teal-50 px-2.5 py-1 rounded-xl border border-teal-200">
+              <span className="text-teal-800 block text-[9px] font-semibold">Total Real:</span>
+              <span className="font-mono font-extrabold text-teal-900">{formatRupiah(totalSaldoReal)}</span>
             </div>
           </div>
 
-          <div className="h-6 w-px bg-slate-200 hidden md:block"></div>
-
-          {/* Saldo Data */}
-          <div className="bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
-            <span className="text-slate-500 block text-[9px] font-medium">Saldo Data (Sistem):</span>
-            <span className="font-mono font-bold text-slate-800">{formatRupiah(saldoBersih)}</span>
-          </div>
-
-          <span className="text-slate-400 hidden sm:inline">↔</span>
-
-          {/* Uang Cash */}
-          <div className="bg-amber-50/60 px-2.5 py-1 rounded-xl border border-amber-200/80">
-            <span className="text-amber-800 block text-[9px] font-semibold flex items-center gap-1">
-              <Wallet className="w-2.5 h-2.5 text-amber-600" /> Uang Cash:
+          <div className="flex items-center space-x-2 shrink-0 self-end md:self-auto">
+            <span className={`px-2.5 py-1 rounded-xl text-xs font-black uppercase ${
+              isAuditBalance
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                : isAuditLebih
+                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                : 'bg-rose-100 text-rose-800 border border-rose-300'
+            }`}>
+              {isAuditBalance ? '✓ BALANCE' : isAuditLebih ? `+${formatRupiah(selisihAudit)} (Lebih)` : `-${formatRupiah(Math.abs(selisihAudit))} (Kurang)`}
             </span>
-            <span className="font-mono font-bold text-amber-900">{formatRupiah(auditTahunThis.saldoCash || 0)}</span>
-          </div>
 
-          <span className="text-slate-400 hidden sm:inline">+</span>
-
-          {/* Uang di Rekening */}
-          <div className="bg-indigo-50/60 px-2.5 py-1 rounded-xl border border-indigo-200/80">
-            <span className="text-indigo-800 block text-[9px] font-semibold flex items-center gap-1">
-              <Landmark className="w-2.5 h-2.5 text-indigo-600" /> Uang di Rekening:
-            </span>
-            <span className="font-mono font-bold text-indigo-900">{formatRupiah(auditTahunThis.saldoBank || 0)}</span>
-          </div>
-
-          <span className="text-slate-400 hidden sm:inline">=</span>
-
-          {/* Total Saldo Real */}
-          <div className="bg-teal-50 px-2.5 py-1 rounded-xl border border-teal-200">
-            <span className="text-teal-800 block text-[9px] font-semibold">Total Real:</span>
-            <span className="font-mono font-extrabold text-teal-900">{formatRupiah(totalSaldoReal)}</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab('audit')}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer ${
+                activeTab === 'audit'
+                  ? 'bg-emerald-700 text-white'
+                  : 'bg-slate-900 hover:bg-slate-800 text-white'
+              }`}
+            >
+              <span>{activeTab === 'audit' ? 'Aktif di Tab Audit' : 'Cek Detail Audit'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
-
-        <div className="flex items-center space-x-2 shrink-0 self-end md:self-auto">
-          <span className={`px-2.5 py-1 rounded-xl text-xs font-black uppercase ${
-            isAuditBalance
-              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-              : isAuditLebih
-              ? 'bg-amber-100 text-amber-800 border border-amber-300'
-              : 'bg-rose-100 text-rose-800 border border-rose-300'
-          }`}>
-            {isAuditBalance ? '✓ BALANCE' : isAuditLebih ? `+${formatRupiah(selisihAudit)} (Lebih)` : `-${formatRupiah(Math.abs(selisihAudit))} (Kurang)`}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('audit')}
-            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer ${
-              activeTab === 'audit'
-                ? 'bg-emerald-700 text-white'
-                : 'bg-slate-900 hover:bg-slate-800 text-white'
-            }`}
-          >
-            <span>{activeTab === 'audit' ? 'Aktif di Tab Audit' : 'Cek Detail Audit'}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Navigation Tabs & Search Controls */}
       <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-slate-200 shadow-xs space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-3">
@@ -517,38 +538,42 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             <span>Kas Keluar</span>
           </button>
 
-          <button
-            id="tab-laporan-rekap"
-            onClick={() => setActiveTab('rekap')}
-            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
-              activeTab === 'rekap'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Rekap Bulanan</span>
-          </button>
+          {!isRoleSekolah && (
+            <button
+              id="tab-laporan-rekap"
+              onClick={() => setActiveTab('rekap')}
+              className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+                activeTab === 'rekap'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Rekap Bulanan</span>
+            </button>
+          )}
 
-          <button
-            id="tab-laporan-audit"
-            onClick={() => setActiveTab('audit')}
-            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
-              activeTab === 'audit'
-                ? 'bg-slate-900 text-white shadow-md ring-2 ring-emerald-500/50'
-                : 'text-slate-700 bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-200/80'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Audit Kas (Real vs Data)</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-              isAuditBalance
-                ? (activeTab === 'audit' ? 'bg-emerald-500 text-slate-950' : 'bg-emerald-100 text-emerald-800')
-                : (activeTab === 'audit' ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-800')
-            }`}>
-              {isAuditBalance ? 'Balance' : isAuditLebih ? '+Lebih' : '-Kurang'}
-            </span>
-          </button>
+          {!isRoleSekolah && (
+            <button
+              id="tab-laporan-audit"
+              onClick={() => setActiveTab('audit')}
+              className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+                activeTab === 'audit'
+                  ? 'bg-slate-900 text-white shadow-md ring-2 ring-emerald-500/50'
+                  : 'text-slate-700 bg-emerald-50/60 hover:bg-emerald-100/80 border border-emerald-200/80'
+              }`}
+            >
+              <Scale className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Audit Kas (Real vs Data)</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                isAuditBalance
+                  ? (activeTab === 'audit' ? 'bg-emerald-500 text-slate-950' : 'bg-emerald-100 text-emerald-800')
+                  : (activeTab === 'audit' ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-800')
+              }`}>
+                {isAuditBalance ? 'Balance' : isAuditLebih ? '+Lebih' : '-Kurang'}
+              </span>
+            </button>
+          )}
 
           {isBendahara && (
             <button
@@ -1396,8 +1421,8 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       )}
 
-      {/* TAB 5: REKAP BULANAN & SALDO BERSIH */}
-      {activeTab === 'rekap' && (
+      {/* TAB 5: REKAP BULANAN & SALDO BERSIH (DITUTUP UNTUK ROLE SEKOLAH) */}
+      {activeTab === 'rekap' && !isRoleSekolah && (
         <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm sm:text-base">
@@ -1569,13 +1594,15 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                 }`}>
                   {isAuditBalance ? '✓ BALANCE' : isAuditLebih ? `SELISIH LEBIH (+${formatRupiah(selisihAudit)})` : `SELISIH KURANG (-${formatRupiah(Math.abs(selisihAudit))})`}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('audit')}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-                >
-                  Kelola Audit
-                </button>
+                {!isRoleSekolah && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('audit')}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Kelola Audit
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1598,8 +1625,24 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       )}
 
-      {/* TAB AUDIT & REKONSILIASI KAS (REAL VS DATA) */}
-      {activeTab === 'audit' && (
+      {activeTab === 'rekap' && isRoleSekolah && (
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12 space-y-3">
+          <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto" />
+          <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Pengurus)</h3>
+          <p className="text-xs text-slate-500">
+            Menu Rekap Bulanan ditutup untuk akun Sekolah. Silakan pilih tab Matriks Iuran.
+          </p>
+          <button
+            onClick={() => setActiveTab('matrix')}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            Kembali ke Matriks Iuran
+          </button>
+        </div>
+      )}
+
+      {/* TAB AUDIT & REKONSILIASI KAS (REAL VS DATA) - DITUTUP UNTUK ROLE SEKOLAH */}
+      {activeTab === 'audit' && !isRoleSekolah && (
         <AuditRekonsiliasiTab
           selectedYear={selectedYear}
           totalKasMasuk={totalKasMasuk}
@@ -1616,6 +1659,22 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           onOpenBeritaAcara={() => setIsBeritaAcaraOpen(true)}
           onOpenSpreadsheetModal={onOpenSpreadsheetModal}
         />
+      )}
+
+      {activeTab === 'audit' && isRoleSekolah && (
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12 space-y-3">
+          <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto" />
+          <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Pengurus)</h3>
+          <p className="text-xs text-slate-500">
+            Menu Audit Kas & Rekonsiliasi ditutup untuk akun Sekolah. Silakan pilih tab Matriks Iuran.
+          </p>
+          <button
+            onClick={() => setActiveTab('matrix')}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            Kembali ke Matriks Iuran
+          </button>
+        </div>
       )}
 
       {/* TAB 6: LAPORAN RIWAYAT PENGHAPUSAN DATA (AUDIT LOG) */}
@@ -2267,7 +2326,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
       {/* MODAL BERITA ACARA PEMERIKSAAN KAS */}
       <BeritaAcaraAuditModal
-        isOpen={isBeritaAcaraOpen}
+        isOpen={isBeritaAcaraOpen && !isRoleSekolah}
         onClose={() => setIsBeritaAcaraOpen(false)}
         auditData={auditTahunThis}
         totalKasMasuk={totalKasMasuk}
@@ -2285,7 +2344,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
       {/* MODAL EDIT PEJABAT PENANDATANGAN */}
       <ModalEditPejabat
-        isOpen={isPejabatModalOpen}
+        isOpen={isPejabatModalOpen && !isRoleSekolah}
         onClose={() => setIsPejabatModalOpen(false)}
         onSaved={(updated) => {
           setPejabatData(updated);

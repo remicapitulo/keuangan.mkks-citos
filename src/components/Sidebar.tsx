@@ -63,7 +63,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       id: 'laporan-keuangan',
       label: 'Laporan Keuangan',
       icon: <FileText className="w-5 h-5" />,
-      desc: 'Rekap Kas & Matriks'
+      desc: 'Matriks Iuran Sekolah'
     }
   ];
 
