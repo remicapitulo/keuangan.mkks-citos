@@ -330,24 +330,23 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
       {/* Financial Health Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Kas Masuk */}
+        {/* Card 1: Penerimaan Iuran Sekolah */}
         <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-emerald-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
           <div className="flex items-center space-x-3 sm:space-x-0 sm:justify-between sm:mb-2">
             <div className="bg-emerald-100 p-2 sm:p-2.5 rounded-xl text-emerald-700 shrink-0">
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Total Masuk</span>
-              <p className="text-[10px] text-slate-400 font-medium sm:hidden">Iuran & Non-Iuran ({selectedYear})</p>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Iuran Sekolah</span>
             </div>
           </div>
           <div className="text-right sm:text-left">
-            <div className="text-base sm:text-xl font-extrabold text-emerald-700">{formatRupiah(totalKasMasuk)}</div>
-            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Iuran & Non-Iuran ({selectedYear})</p>
+            <div className="text-base sm:text-xl font-extrabold text-emerald-700">{formatRupiah(totalIuranMasuk)}</div>
+            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">Iuran Bulanan ({selectedYear})</p>
           </div>
         </div>
 
-        {/* Pemasukan Non-Iuran */}
+        {/* Card 2: Pemasukan Non-Iuran */}
         <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-teal-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
           <div className="flex items-center space-x-3 sm:space-x-0 sm:justify-between sm:mb-2">
             <div className="bg-teal-100 p-2 sm:p-2.5 rounded-xl text-teal-700 shrink-0">
@@ -355,7 +354,6 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             </div>
             <div>
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Non-Iuran</span>
-              <p className="text-[10px] text-slate-400 font-medium sm:hidden">Sponsor / Sisa ({selectedYear})</p>
             </div>
           </div>
           <div className="text-right sm:text-left">
@@ -364,7 +362,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           </div>
         </div>
 
-        {/* Total Kas Keluar */}
+        {/* Card 3: Total Kas Keluar */}
         <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-rose-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
           <div className="flex items-center space-x-3 sm:space-x-0 sm:justify-between sm:mb-2">
             <div className="bg-rose-100 p-2 sm:p-2.5 rounded-xl text-rose-700 shrink-0">
@@ -372,7 +370,6 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             </div>
             <div>
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Pengeluaran</span>
-              <p className="text-[10px] text-slate-400 font-medium sm:hidden">Operasional ({selectedYear})</p>
             </div>
           </div>
           <div className="text-right sm:text-left">
@@ -381,7 +378,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           </div>
         </div>
 
-        {/* Saldo Kas Bersih */}
+        {/* Card 4: Saldo Kas Bersih */}
         <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-indigo-100 shadow-xs flex items-center justify-between sm:block relative overflow-hidden">
           <div className="flex items-center space-x-3 sm:space-x-0 sm:justify-between sm:mb-2">
             <div className="bg-indigo-100 p-2 sm:p-2.5 rounded-xl text-indigo-700 shrink-0">
@@ -389,7 +386,6 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             </div>
             <div>
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block sm:inline">Saldo Bersih</span>
-              <p className="text-[10px] text-slate-400 font-medium sm:hidden">Kas Saat Ini</p>
             </div>
           </div>
           <div className="text-right sm:text-left">

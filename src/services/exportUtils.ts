@@ -309,17 +309,17 @@ export function exportToPDF(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(22, 101, 52);
-  doc.text('TOTAL MASUK', c1X + 4, cardY + 4.5);
+  doc.text('IURAN SEKOLAH', c1X + 4, cardY + 4.5);
 
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(4, 120, 87); // emerald-700
-  doc.text(formatRupiah(totalKasMasuk), c1X + 4, cardY + 9.5);
+  doc.text(formatRupiah(totalIuranMasuk), c1X + 4, cardY + 9.5);
 
   doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(`Iuran & Non-Iuran (${tahun})`, c1X + 4, cardY + 13);
+  doc.text(`Iuran Bulanan (${tahun})`, c1X + 4, cardY + 13);
 
   // Card 2: NON-IURAN
   const c2X = c1X + cardW + gap;
