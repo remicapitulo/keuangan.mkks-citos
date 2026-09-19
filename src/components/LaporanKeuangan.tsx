@@ -548,19 +548,48 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
 
                     {/* 12 Months Pills Grid */}
                     <div className="grid grid-cols-6 gap-1 mt-3">
-                      {monthStatusList.map((m, bIdx) => (
-                        <div
-                          key={`m-pill-${sek.idSekolah}-${m.bulan}-${bIdx}`}
-                          className={`text-center py-1 rounded-md text-[9px] font-bold border ${
-                            m.isPaid
-                              ? 'bg-emerald-600 text-white border-emerald-700'
-                              : 'bg-white text-slate-400 border-slate-200'
-                          }`}
-                        >
-                          <div>{BULAN_SINGKAT[bIdx]}</div>
-                          <div className="text-[8px] opacity-90">{m.isPaid ? 'LUNAS' : '-'}</div>
-                        </div>
-                      ))}
+                      {monthStatusList.map((m, bIdx) => {
+                        const matchingIuran = m.isPaid ? iuranYear.find(i => 
+                          ((i.idSekolah && sek.idSekolah && i.idSekolah === sek.idSekolah) || 
+                           (i.namaSekolah && sek.namaSekolah && i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim())
+                          ) &&
+                          i.bulan === m.bulan
+                        ) : undefined;
+
+                        return (
+                          <button
+                            key={`m-pill-${sek.idSekolah}-${m.bulan}-${bIdx}`}
+                            type="button"
+                            disabled={!m.isPaid}
+                            onClick={() => {
+                              if (m.isPaid && onOpenStrukModal && matchingIuran) {
+                                onOpenStrukModal({
+                                  jenis: 'iuran',
+                                  noKuitansi: matchingIuran.noKuitansi || `KWT-IURAN/${matchingIuran.tahun}/${matchingIuran.id}`,
+                                  tanggal: matchingIuran.tanggalInput,
+                                  namaSekolah: sek.namaSekolah,
+                                  namaKepsek: sek.namaKepsek || '-',
+                                  alamatSekolah: `${sek.alamat || ''}, ${sek.kelurahan || ''}`,
+                                  tahunBuku: matchingIuran.tahun,
+                                  bulanList: [m.bulan],
+                                  totalNominal: matchingIuran.nominal,
+                                  diinputOleh: resolveNamaBendahara(matchingIuran.diinputOleh, undefined, sekolahList),
+                                  keterangan: matchingIuran.keterangan || ''
+                                });
+                              }
+                            }}
+                            title={m.isPaid ? `Klik untuk cetak kuitansi bulan ${m.bulan}` : `Bulan ${m.bulan} belum lunas`}
+                            className={`text-center py-1 rounded-md text-[9px] font-bold border transition-all ${
+                              m.isPaid
+                                ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white border-emerald-700 cursor-pointer shadow-2xs'
+                                : 'bg-white text-slate-400 border-slate-200 cursor-default'
+                            }`}
+                          >
+                            <div>{BULAN_SINGKAT[bIdx]}</div>
+                            <div className="text-[8px] opacity-90">{m.isPaid ? 'LUNAS' : '-'}</div>
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {/* Card Footer Nominal */}
@@ -635,25 +664,53 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                         )}
                       </td>
 
-                      {monthStatuses.map((isPaid, bIdx) => (
-                        <td key={`status-${sek.idSekolah}-${bIdx}`} className="py-3 px-1 text-center">
-                          {isPaid ? (
-                            <span 
-                              title={`Lunas (Bulan ${BULAN_LIST[bIdx]})`}
-                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 font-black text-xs shadow-2xs"
-                            >
-                              ✓
-                            </span>
-                          ) : (
-                            <span 
-                              title={`Belum Lunas (Bulan ${BULAN_LIST[bIdx]})`}
-                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-slate-100 text-slate-400 font-bold text-xs"
-                            >
-                              -
-                            </span>
-                          )}
-                        </td>
-                      ))}
+                      {monthStatuses.map((isPaid, bIdx) => {
+                        const currentBulan = BULAN_LIST[bIdx];
+                        const matchingIuran = isPaid ? iuranYear.find(i => 
+                          ((i.idSekolah && sek.idSekolah && i.idSekolah === sek.idSekolah) || 
+                           (i.namaSekolah && sek.namaSekolah && i.namaSekolah.toLowerCase().trim() === sek.namaSekolah.toLowerCase().trim())
+                          ) &&
+                          i.bulan === currentBulan
+                        ) : undefined;
+
+                        return (
+                          <td key={`status-${sek.idSekolah}-${bIdx}`} className="py-3 px-1 text-center">
+                            {isPaid ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onOpenStrukModal && matchingIuran) {
+                                    onOpenStrukModal({
+                                      jenis: 'iuran',
+                                      noKuitansi: matchingIuran.noKuitansi || `KWT-IURAN/${matchingIuran.tahun}/${matchingIuran.id}`,
+                                      tanggal: matchingIuran.tanggalInput,
+                                      namaSekolah: sek.namaSekolah,
+                                      namaKepsek: sek.namaKepsek || '-',
+                                      alamatSekolah: `${sek.alamat || ''}, ${sek.kelurahan || ''}`,
+                                      tahunBuku: matchingIuran.tahun,
+                                      bulanList: [currentBulan],
+                                      totalNominal: matchingIuran.nominal,
+                                      diinputOleh: resolveNamaBendahara(matchingIuran.diinputOleh, undefined, sekolahList),
+                                      keterangan: matchingIuran.keterangan || ''
+                                    });
+                                  }
+                                }}
+                                title={`Lunas (Bulan ${currentBulan}) - Klik untuk cetak kuitansi`}
+                                className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-700 font-black text-xs shadow-2xs cursor-pointer transition-transform"
+                              >
+                                ✓
+                              </button>
+                            ) : (
+                              <span 
+                                title={`Belum Lunas (Bulan ${currentBulan})`}
+                                className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-slate-100 text-slate-400 font-bold text-xs"
+                              >
+                                -
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
 
                       <td className="py-3 px-3 text-right font-black text-emerald-700 text-xs">
                         {formatRupiah(totalBayarNominal)}
@@ -751,7 +808,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1.5 border-t border-emerald-100">
                     <span>Diinput: {resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</span>
                     <div className="flex items-center space-x-1.5">
-                      {isBendahara && onOpenStrukModal && (
+                      {onOpenStrukModal && (
                         <button
                           type="button"
                           onClick={() => {
@@ -767,7 +824,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                               bulanList: [i.bulan],
                               totalNominal: i.nominal,
                               diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
-                              keterangan: i.keterangan
+                              keterangan: i.keterangan || ''
                             });
                           }}
                           className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-emerald-200"
@@ -806,10 +863,8 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                   <th className="py-3 px-4">Nama Instansi / Sekolah</th>
                   <th className="py-3 px-3 text-right">Jumlah Nominal</th>
                   <th className="py-3 px-3 min-w-[140px]">Keterangan / Tempat Terima</th>
-                  <th className={`py-3 px-3 text-center ${!isBendahara ? 'rounded-tr-xl' : ''}`}>Diinput Oleh</th>
-                  {isBendahara && (
-                    <th className="py-3 px-3 text-center rounded-tr-xl">Aksi</th>
-                  )}
+                  <th className="py-3 px-3 text-center">Diinput Oleh</th>
+                  <th className="py-3 px-3 text-center rounded-tr-xl">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -831,35 +886,34 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-3 text-center text-slate-700 font-semibold text-[11px]">{resolveNamaBendahara(i.diinputOleh, undefined, sekolahList)}</td>
-                    {isBendahara && (
-                      <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center space-x-1.5">
-                          {onOpenStrukModal && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const schoolOfItem = sekolahList.find(s => (i.idSekolah && s.idSekolah === i.idSekolah) || s.namaSekolah.toLowerCase().trim() === i.namaSekolah.toLowerCase().trim());
-                                onOpenStrukModal({
-                                  jenis: 'iuran',
-                                  noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
-                                  tanggal: i.tanggalInput,
-                                  namaSekolah: i.namaSekolah,
-                                  namaKepsek: schoolOfItem?.namaKepsek || '-',
-                                  alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
-                                  tahunBuku: i.tahun,
-                                  bulanList: [i.bulan],
-                                  totalNominal: i.nominal,
-                                  diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
-                                  keterangan: i.keterangan
-                                });
-                              }}
-                              className="inline-flex items-center space-x-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold text-[11px] transition-colors cursor-pointer"
-                              title="Cetak Kuitansi Iuran"
-                            >
-                              <Printer className="w-3.5 h-3.5" />
-                              <span>Kuitansi</span>
-                            </button>
-                          )}
+                    <td className="py-3 px-3 text-center">
+                      <div className="flex items-center justify-center space-x-1.5">
+                        {onOpenStrukModal && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const schoolOfItem = sekolahList.find(s => (i.idSekolah && s.idSekolah === i.idSekolah) || s.namaSekolah.toLowerCase().trim() === i.namaSekolah.toLowerCase().trim());
+                              onOpenStrukModal({
+                                jenis: 'iuran',
+                                noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
+                                tanggal: i.tanggalInput,
+                                namaSekolah: i.namaSekolah,
+                                namaKepsek: schoolOfItem?.namaKepsek || '-',
+                                alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                                tahunBuku: i.tahun,
+                                bulanList: [i.bulan],
+                                totalNominal: i.nominal,
+                                diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
+                                keterangan: i.keterangan || ''
+                              });
+                            }}
+                            className="inline-flex items-center space-x-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold text-[11px] transition-colors cursor-pointer"
+                            title="Cetak Kuitansi Iuran"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Kuitansi</span>
+                          </button>
+                        )}
                           {onDeleteIuran && (
                             <button
                               type="button"
@@ -873,7 +927,6 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                           )}
                         </div>
                       </td>
-                    )}
                   </tr>
                 ))}
               </tbody>

@@ -77,6 +77,7 @@ export default function App() {
         const nominalParam = Number(urlParams.get('nominal')) || 100000;
         const tglParam = urlParams.get('tgl') || new Date().toISOString().split('T')[0];
         const petugasParam = urlParams.get('petugas') || 'Bendahara MKKS Citos';
+        const ketParam = urlParams.get('ket') || '';
 
         setValidasiData({
           noKuitansi: verifyNo,
@@ -85,7 +86,8 @@ export default function App() {
           bulanList: bulanParam,
           totalNominal: nominalParam,
           tanggal: tglParam,
-          diinputOleh: petugasParam
+          diinputOleh: petugasParam,
+          keterangan: ketParam
         });
         setIsValidasiModalOpen(true);
       }

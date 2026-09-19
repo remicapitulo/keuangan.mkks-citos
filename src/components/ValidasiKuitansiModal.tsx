@@ -138,6 +138,16 @@ export const ValidasiKuitansiModal: React.FC<ValidasiKuitansiModalProps> = ({
               </span>
             </div>
 
+            {/* Catatan / Keterangan if available */}
+            {!isPemasukanLain && data.keterangan && (
+              <div className="flex items-start justify-between pb-2.5 border-b border-emerald-200/60 gap-2 bg-teal-50/70 p-2 rounded-lg border border-teal-200/60">
+                <span className="text-teal-900 font-bold shrink-0">Catatan / Keterangan</span>
+                <span className="font-semibold text-teal-900 text-right leading-snug break-words">
+                  {data.keterangan}
+                </span>
+              </div>
+            )}
+
             {/* Nominal */}
             <div className="flex items-center justify-between pb-2.5 border-b border-emerald-200/60">
               <span className="text-slate-500 font-semibold">Jumlah Nominal</span>

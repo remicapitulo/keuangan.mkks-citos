@@ -138,6 +138,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const inputterFullName = resolveNamaBendahara(paidRecord?.diinputOleh, undefined, sekolahList);
 
     onOpenStrukModal({
+      jenis: 'iuran',
       noKuitansi: receiptNo,
       tanggal: tanggalBayar,
       namaSekolah: mySekolahObj?.namaSekolah || currentUser?.sekolah || 'Sekolah Anggota MKKS',
@@ -146,7 +147,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       tahunBuku: selectedYear,
       bulanList: [bulan],
       totalNominal: paidRecord?.nominal || IURAN_PER_BULAN,
-      diinputOleh: inputterFullName
+      diinputOleh: inputterFullName,
+      keterangan: paidRecord?.keterangan || ''
     });
   };
 

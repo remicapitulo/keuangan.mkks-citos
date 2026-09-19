@@ -151,7 +151,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
     const appPath = typeof window !== 'undefined' ? window.location.pathname : '/';
     
     // Construct the verification URL that when scanned opens the validasi modal
-    const verifyUrl = `${appOrigin}${appPath}?verify=${encodeURIComponent(data.noKuitansi)}&sekolah=${encodeURIComponent(data.sumberDana || data.namaSekolah)}&bulan=${encodeURIComponent(isPemasukanLain ? (data.kategori || 'Pemasukan Lain') : data.bulanList.join(','))}&tahun=${data.tahunBuku}&nominal=${data.totalNominal}&tgl=${encodeURIComponent(data.tanggal)}&petugas=${encodeURIComponent(bendaharaFullName)}`;
+    const verifyUrl = `${appOrigin}${appPath}?verify=${encodeURIComponent(data.noKuitansi)}&sekolah=${encodeURIComponent(data.sumberDana || data.namaSekolah)}&bulan=${encodeURIComponent(isPemasukanLain ? (data.kategori || 'Pemasukan Lain') : data.bulanList.join(','))}&tahun=${data.tahunBuku}&nominal=${data.totalNominal}&tgl=${encodeURIComponent(data.tanggal)}&petugas=${encodeURIComponent(bendaharaFullName)}&ket=${encodeURIComponent(data.keterangan || '')}`;
 
     QRCode.toDataURL(verifyUrl, {
       width: 256,
@@ -491,10 +491,10 @@ export const StrukModal: React.FC<StrukModalProps> = ({
         ctx.fillStyle = '#64748b';
         ctx.font = '500 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('Tempat / Catatan', 40, curY);
+        ctx.fillText('Catatan / Keterangan', 40, curY);
 
-        ctx.fillStyle = '#334155';
-        ctx.font = '500 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillStyle = '#0f766e';
+        ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'right';
         const ketLines = wrapTextLines(ctx, data.keterangan, 320);
         for (let i = 0; i < ketLines.length; i++) {
@@ -755,9 +755,11 @@ export const StrukModal: React.FC<StrukModalProps> = ({
               </div>
 
               {!isPemasukanLain && data.keterangan && (
-                <div className="flex items-start justify-between border-b border-slate-200/80 pb-2 gap-2">
-                  <span className="text-slate-500 font-medium shrink-0">Tempat / Catatan</span>
-                  <span className="font-semibold text-slate-700 text-right max-w-xs text-xs leading-snug">
+                <div className="flex items-start justify-between border-b border-slate-200/80 pb-2 gap-2 bg-teal-50/70 p-2 rounded-lg border border-teal-200/60">
+                  <span className="text-teal-900 font-bold shrink-0 text-xs">
+                    Catatan / Keterangan
+                  </span>
+                  <span className="font-bold text-teal-800 text-right max-w-xs text-xs leading-snug break-words">
                     {data.keterangan}
                   </span>
                 </div>
