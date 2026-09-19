@@ -40,6 +40,7 @@ import {
 
 interface LaporanKeuanganProps {
   sekolahList: Sekolah[];
+  usersList?: User[];
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
   pemasukanLainList?: PemasukanLain[];
@@ -57,6 +58,7 @@ interface LaporanKeuanganProps {
 
 export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   sekolahList,
+  usersList = [],
   iuranList,
   pengeluaranList,
   pemasukanLainList = [],
@@ -80,7 +82,12 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const [filterJenisHapus, setFilterJenisHapus] = useState<string>('all');
   const [isBeritaAcaraOpen, setIsBeritaAcaraOpen] = useState<boolean>(false);
   const [isPejabatModalOpen, setIsPejabatModalOpen] = useState<boolean>(false);
-  const [pejabatData, setPejabatData] = useState<PejabatPenandatangan>(() => StorageService.getPejabat());
+  const [pejabatData, setPejabatData] = useState<PejabatPenandatangan>(() => StorageService.getPejabat(usersList));
+
+  // Sync pejabat whenever usersList changes (e.g. from Google Sheet sync)
+  React.useEffect(() => {
+    setPejabatData(StorageService.getPejabat(usersList));
+  }, [usersList]);
 
   // Local storage sync fallback for rekonsiliasi kas
   const [localRekonsiliasiList, setLocalRekonsiliasiList] = useState<RekonsiliasiKas[]>(() => {
@@ -1603,6 +1610,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           currentAudit={auditTahunThis}
           isBendahara={isBendahara}
           currentUser={currentUser}
+          usersList={usersList}
           sekolahList={sekolahList}
           onSaveAudit={handleSaveAudit}
           onOpenBeritaAcara={() => setIsBeritaAcaraOpen(true)}
@@ -2235,7 +2243,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             <p className="font-bold">{auditTahunThis?.jabatanKetuaMkks || pejabatData.jabatanKetuaMkks || 'Ketua MKKS SMP Cimanggis & Tapos'}</p>
             <div className="h-16"></div>
             <p className="font-extrabold underline text-slate-900">
-              {auditTahunThis?.namaKetuaMkks || pejabatData.namaKetuaMkks || 'Drs. H. M. Supriyadi, M.Pd'}
+              {((auditTahunThis?.namaKetuaMkks && !auditTahunThis.namaKetuaMkks.toLowerCase().includes('gustian') && !auditTahunThis.namaKetuaMkks.toLowerCase().includes('supriyadi')) ? auditTahunThis.namaKetuaMkks : '') || StorageService.getKetuaUser(usersList)?.namaKepsek || pejabatData.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.'}
             </p>
             {(auditTahunThis?.nipKetuaMkks || pejabatData.nipKetuaMkks) && (
               <p className="text-[10px] text-slate-600">NIP. {auditTahunThis?.nipKetuaMkks || pejabatData.nipKetuaMkks}</p>
@@ -2268,9 +2276,10 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         totalIuranMasuk={totalIuranMasuk}
         totalPemasukanLain={totalPemasukanLain}
         sekolahList={sekolahList}
+        usersList={usersList}
         onUpdateAudit={(updated) => {
           handleSaveAudit(updated);
-          setPejabatData(StorageService.getPejabat());
+          setPejabatData(StorageService.getPejabat(usersList));
         }}
       />
 

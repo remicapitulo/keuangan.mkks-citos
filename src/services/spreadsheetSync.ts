@@ -3,7 +3,7 @@ import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INIT
 import { cleanDateInputString } from '../utils/formatters';
 
 export const DEFAULT_PEJABAT: PejabatPenandatangan = {
-  namaKetuaMkks: 'H. Gustian Maskat, S.Ag., M.M.',
+  namaKetuaMkks: 'Ignatius Widi Nugroho, S.Sos.',
   nipKetuaMkks: '',
   jabatanKetuaMkks: 'Ketua MKKS SMP Cimanggis & Tapos',
   namaBendahara: 'Abu Haripin, M.Pd.',
@@ -134,28 +134,64 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
   }
 
   const normalized = rawList.map((u) => {
-    if (!u || typeof u !== 'object') return null;
+    if (!u) return null;
 
-    const username = String(u.username || u.Username || u['User Name'] || u.user || '').trim();
+    const isArrayRow = Array.isArray(u);
+    if (!isArrayRow && typeof u !== 'object') return null;
+
+    // Kolom A: Username
+    const username = String(
+      isArrayRow 
+        ? (u[0] || '') 
+        : (u.username || u.Username || u['User Name'] || u.user || u['Kolom A'] || '')
+    ).trim();
     if (!username) return null;
 
-    const password = String(u.password || u.Password || '123').trim();
-    const rawRole = String(u.role || u.Role || '').trim().toLowerCase();
-    let role: UserRole = 'Sekolah';
-    if (rawRole === 'admin') {
-      role = 'Admin';
-    } else if (rawRole === 'bendahara') {
-      role = 'Bendahara';
-    } else if (rawRole === 'ketua') {
-      role = 'Ketua';
-    }
-    let sekolah = String(u.sekolah || u.Sekolah || u['Nama Sekolah'] || u.namaSekolah || '').trim();
-    const aktif = u.aktif !== undefined ? u.aktif : (u.Aktif !== undefined ? u.Aktif : 'Ya');
-    let namaKepsek = String(
-      u.namaKepsek || u['Nama Kepsek'] || u['Nama Kepala Sekolah'] || u['Kepala Sekolah'] ||
-      u['nama_kepsek'] || u['Nama Lengkap'] || u['namaLengkap'] || u['Nama Petugas'] || ''
+    // Kolom B: Password
+    const password = String(
+      isArrayRow 
+        ? (u[1] || '123') 
+        : (u.password || u.Password || u['Kolom B'] || '123')
     ).trim();
 
+    // Kolom C: ROLE (Kolom C di Sheet User)
+    const rawRole = String(
+      isArrayRow 
+        ? (u[2] || '') 
+        : (u.role || u.Role || u['Role'] || u['ROLE'] || u['Peran'] || u['Jabatan'] || u['Kolom C'] || '')
+    ).trim().toLowerCase();
+
+    let role: UserRole = 'Sekolah';
+    if (rawRole === 'admin' || rawRole.includes('admin')) {
+      role = 'Admin';
+    } else if (rawRole === 'bendahara' || rawRole.includes('bendahara')) {
+      role = 'Bendahara';
+    } else if (rawRole === 'ketua' || rawRole.includes('ketua')) {
+      // Jika di Kolom C terdapat tulisan "Ketua", maka role = Ketua
+      role = 'Ketua';
+    }
+
+    // Kolom D: Sekolah / Nama Sekolah
+    let sekolah = String(
+      isArrayRow 
+        ? (u[3] || '') 
+        : (u.sekolah || u.Sekolah || u['Nama Sekolah'] || u.namaSekolah || u['Kolom D'] || '')
+    ).trim();
+
+    // Kolom E: Aktif
+    const aktif = isArrayRow 
+      ? (u[4] !== undefined ? u[4] : 'Ya') 
+      : (u.aktif !== undefined ? u.aktif : (u.Aktif !== undefined ? u.Aktif : 'Ya'));
+
+    // Kolom F: Nama Kepsek / Nama Kepala Sekolah
+    let namaKepsek = String(
+      isArrayRow 
+        ? (u[5] || '') 
+        : (u.namaKepsek || u['Nama Kepsek'] || u['Nama Kepala Sekolah'] || u['Kepala Sekolah'] ||
+           u['nama_kepsek'] || u['Nama Lengkap'] || u['namaLengkap'] || u['Nama Petugas'] || u['Kolom F'] || '')
+    ).trim();
+
+    // Fallback pencocokan nama kepala sekolah dari tabel sekolahList jika belum terisi di Kolom F
     if (!namaKepsek || namaKepsek.toLowerCase() === username.toLowerCase()) {
       if (username.toLowerCase() === 'gustian') {
         namaKepsek = 'H. Gustian Maskat, S.Ag., M.M.';
@@ -174,6 +210,20 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
       }
     }
 
+    // Jika belum ada namaKepsek, cari dari daftar sekolah (sekolahList) berdasarkan ID Sekolah / Username atau Nama Sekolah
+    if (!namaKepsek && sekolahList && sekolahList.length > 0) {
+      const matchById = sekolahList.find(s => s.idSekolah.toLowerCase().trim() === username.toLowerCase().trim());
+      if (matchById && matchById.namaKepsek) {
+        namaKepsek = matchById.namaKepsek;
+        if (!sekolah) sekolah = matchById.namaSekolah;
+      } else if (sekolah) {
+        const matchByName = sekolahList.find(s => s.namaSekolah.toLowerCase().trim() === sekolah.toLowerCase().trim());
+        if (matchByName && matchByName.namaKepsek) {
+          namaKepsek = matchByName.namaKepsek;
+        }
+      }
+    }
+
     if (role === 'Sekolah') {
       // Primary Key Lock: ID Sekolah = username
       const matchById = sekolahList.find(s => s.idSekolah === username);
@@ -185,18 +235,6 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
         if (matchByName) {
           sekolah = matchByName.namaSekolah;
           if (!namaKepsek) namaKepsek = matchByName.namaKepsek;
-        }
-      }
-    }
-
-    if (!namaKepsek && role === 'Sekolah') {
-      const matchById = sekolahList.find(s => s.idSekolah === username);
-      if (matchById && matchById.namaKepsek) {
-        namaKepsek = matchById.namaKepsek;
-      } else if (sekolah) {
-        const matchByName = sekolahList.find(s => s.namaSekolah.toLowerCase().trim() === sekolah.toLowerCase().trim());
-        if (matchByName && matchByName.namaKepsek) {
-          namaKepsek = matchByName.namaKepsek;
         }
       }
     }
@@ -728,18 +766,23 @@ export class StorageService {
   }
 
   // Get user with role Ketua from sheet User
-  public static getKetuaUser(): User | undefined {
-    const users = this.getUsers();
+  public static getKetuaUser(usersOverride?: User[]): User | undefined {
+    const users = usersOverride && usersOverride.length > 0 ? usersOverride : this.getUsers();
     return users.find(u => {
-      const r = (u.role || '').toLowerCase();
-      const a = String(u.aktif || '').toLowerCase();
-      return r === 'ketua' && (a === 'ya' || a === 'true' || a === '1' || a === '');
-    }) || users.find(u => (u.role || '').toLowerCase() === 'ketua');
+      const r = (u.role || '').toLowerCase().trim();
+      const a = String(u.aktif || '').toLowerCase().trim();
+      const isKetuaRole = r === 'ketua' || r.includes('ketua');
+      const isAktif = a === 'ya' || a === 'true' || a === '1' || a === '' || a === 'aktif';
+      return isKetuaRole && isAktif;
+    }) || users.find(u => {
+      const r = (u.role || '').toLowerCase().trim();
+      return r === 'ketua' || r.includes('ketua');
+    });
   }
 
   // Pejabat Penandatangan Organisasi (Ketua MKKS & Bendahara)
-  public static getPejabat(): PejabatPenandatangan {
-    const ketuaUser = this.getKetuaUser();
+  public static getPejabat(usersOverride?: User[]): PejabatPenandatangan {
+    const ketuaUser = this.getKetuaUser(usersOverride);
     const currentUser = this.getCurrentUser();
 
     const dynamicDefault: PejabatPenandatangan = {
@@ -757,9 +800,18 @@ export class StorageService {
     if (data) {
       try {
         const parsed = JSON.parse(data);
-        // If saved namaKetuaMkks is empty or old placeholder "Drs. H. M. Supriyadi, M.Pd" and we have a real Ketua from sheet User, use real Ketua
-        if (ketuaUser?.namaKepsek && (!parsed.namaKetuaMkks || parsed.namaKetuaMkks === 'Drs. H. M. Supriyadi, M.Pd')) {
-          parsed.namaKetuaMkks = ketuaUser.namaKepsek;
+        // Otomatis deteksi Role: "Ketua" dari sheet User jika ada
+        if (ketuaUser?.namaKepsek) {
+          const isOldKetuaPlaceholder = 
+            !parsed.namaKetuaMkks || 
+            parsed.namaKetuaMkks === 'Drs. H. M. Supriyadi, M.Pd' || 
+            parsed.namaKetuaMkks.toLowerCase().includes('supriyadi') ||
+            parsed.namaKetuaMkks.toLowerCase().includes('gustian') ||
+            parsed.namaKetuaMkks.toLowerCase().includes('maskat') ||
+            parsed.namaKetuaMkks === 'Ketua MKKS';
+          if (isOldKetuaPlaceholder) {
+            parsed.namaKetuaMkks = ketuaUser.namaKepsek;
+          }
         }
         // If saved namaBendahara is empty or old placeholder "H. Nurhasan...", automatically take active login account
         const isOldBendaharaPlaceholder = 

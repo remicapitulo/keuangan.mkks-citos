@@ -701,8 +701,8 @@ export function exportToPDF(
   }
 
   const savedPejabat = StorageService.getPejabat();
-  const namaKetua = rekonsiliasiKas?.namaKetuaMkks || savedPejabat.namaKetuaMkks || 'Drs. H. M. Supriyadi, M.Pd';
-  const nipKetua = rekonsiliasiKas?.nipKetuaMkks || savedPejabat.nipKetuaMkks || '196805121994121001';
+  const namaKetua = rekonsiliasiKas?.namaKetuaMkks || savedPejabat.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.';
+  const nipKetua = rekonsiliasiKas?.nipKetuaMkks || savedPejabat.nipKetuaMkks || '';
   const jabatanKetua = rekonsiliasiKas?.jabatanKetuaMkks || savedPejabat.jabatanKetuaMkks || 'Ketua MKKS SMP Cimanggis & Tapos';
 
   const defaultBendahara = resolveNamaBendahara(currentUser?.namaKepsek || currentUser?.username, undefined, sekolahList);

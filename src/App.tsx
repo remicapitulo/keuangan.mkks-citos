@@ -422,6 +422,7 @@ export default function App() {
               {activeTab === 'laporan-keuangan' && (
                 <LaporanKeuangan
                   sekolahList={sekolahList}
+                  usersList={usersList}
                   iuranList={iuranList}
                   pengeluaranList={pengeluaranList}
                   pemasukanLainList={pemasukanLainList}

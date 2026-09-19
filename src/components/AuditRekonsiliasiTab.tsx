@@ -36,6 +36,7 @@ interface AuditRekonsiliasiTabProps {
   currentAudit: RekonsiliasiKas;
   isBendahara: boolean;
   currentUser: User | null;
+  usersList?: User[];
   sekolahList: Sekolah[];
   onSaveAudit: (record: RekonsiliasiKas) => void;
   onOpenBeritaAcara: () => void;
@@ -52,6 +53,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   currentAudit,
   isBendahara,
   currentUser,
+  usersList = [],
   sekolahList,
   onSaveAudit,
   onOpenBeritaAcara,
@@ -68,12 +70,20 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     cleanDateInputString(currentAudit.tanggalAudit) || cleanDateInputString(new Date().toISOString())
   );
 
-  // Derive Ketua MKKS from sheet User
-  const ketuaFromUserSheet = StorageService.getKetuaUser()?.namaKepsek || 'H. Gustian Maskat, S.Ag., M.M.';
-  // Derive logged in Bendahara/Admin name
-  const namaPemeriksaLogin = currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS';
-
   // Helper to detect old initial placeholders
+  const isOldKetuaPlaceholder = (name?: string) => {
+    if (!name) return true;
+    const lower = name.trim().toLowerCase();
+    return (
+      lower.includes('supriyadi') ||
+      lower.includes('gustian') ||
+      lower.includes('maskat') ||
+      lower === 'ketua mkks' ||
+      lower === 'ketua' ||
+      lower === '-'
+    );
+  };
+
   const isOldBendaharaPlaceholder = (name?: string) => {
     if (!name) return true;
     const lower = name.trim().toLowerCase();
@@ -84,11 +94,26 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     );
   };
 
+  // Derive Ketua MKKS secara otomatis dari sheet User (Role: "Ketua")
+  const detectedKetuaUser = StorageService.getKetuaUser(usersList);
+  const ketuaFromUserSheet = detectedKetuaUser?.namaKepsek || 'Ignatius Widi Nugroho, S.Sos.';
+  // Derive logged in Bendahara/Admin name
+  const namaPemeriksaLogin = currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS';
+
   // Signer / Pejabat states
-  const defaultPejabat = StorageService.getPejabat();
-  const [namaKetuaMkks, setNamaKetuaMkks] = useState<string>(() => 
-    currentAudit.namaKetuaMkks || defaultPejabat.namaKetuaMkks || ketuaFromUserSheet
-  );
+  const defaultPejabat = StorageService.getPejabat(usersList);
+  const [namaKetuaMkks, setNamaKetuaMkks] = useState<string>(() => {
+    if (detectedKetuaUser?.namaKepsek) {
+      if (currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) {
+        return currentAudit.namaKetuaMkks;
+      }
+      return detectedKetuaUser.namaKepsek;
+    }
+    if (currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) {
+      return currentAudit.namaKetuaMkks;
+    }
+    return defaultPejabat.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.';
+  });
   const [nipKetuaMkks, setNipKetuaMkks] = useState<string>(() => 
     currentAudit.nipKetuaMkks || defaultPejabat.nipKetuaMkks || ''
   );
@@ -125,7 +150,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
 
   const [toastSave, setToastSave] = useState<boolean>(false);
 
-  // Sync state when currentAudit prop changes (e.g. year changed)
+  // Sync state when currentAudit prop changes (e.g. year changed) or usersList updates
   useEffect(() => {
     setSaldoCash(currentAudit.saldoCash || 0);
     setSaldoBank(currentAudit.saldoBank || 0);
@@ -137,9 +162,14 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     if (currentAudit.pecahanCash) {
       setPecahan(currentAudit.pecahanCash);
     }
-    const pej = StorageService.getPejabat();
-    const ketuaUser = StorageService.getKetuaUser();
-    const resolvedKetua = currentAudit.namaKetuaMkks || pej.namaKetuaMkks || ketuaUser?.namaKepsek || 'H. Gustian Maskat, S.Ag., M.M.';
+    const pej = StorageService.getPejabat(usersList);
+    const ketuaUser = StorageService.getKetuaUser(usersList);
+    const autoKetua = ketuaUser?.namaKepsek || pej.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.';
+    
+    // Otomatis deteksi Role: "Ketua" dari sheet User, kecuali ada edit manual spesifik yang bukan placeholder lama
+    const resolvedKetua = (ketuaUser?.namaKepsek)
+      ? ((currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) ? currentAudit.namaKetuaMkks : ketuaUser.namaKepsek)
+      : ((currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) ? currentAudit.namaKetuaMkks : autoKetua);
     
     // Otomatis di awal mengambil dari akun login, kecuali ada edit manual spesifik yang bukan placeholder lama
     const resolvedBendahara = (currentAudit.namaBendahara && !isOldBendaharaPlaceholder(currentAudit.namaBendahara))
@@ -152,7 +182,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     setNamaBendahara(resolvedBendahara);
     setNipBendahara(currentAudit.nipBendahara || pej.nipBendahara || '');
     setJabatanBendahara(currentAudit.jabatanBendahara || pej.jabatanBendahara || 'Bendahara MKKS SMP Citos');
-  }, [currentAudit, currentUser]);
+  }, [currentAudit, currentUser, usersList]);
 
   // Total calculated from physical cash bills
   const totalHitungFisikCash = 
@@ -829,31 +859,25 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center justify-between mb-1">
                     <label className="block text-[11px] font-semibold text-slate-700">
                       Nama Lengkap & Gelar Ketua <span className="text-rose-500">*</span>
                     </label>
-                    {ketuaFromUserSheet && (
-                      <button
-                        type="button"
-                        onClick={() => setNamaKetuaMkks(ketuaFromUserSheet)}
-                        className="text-[10px] text-teal-700 hover:text-teal-900 font-semibold underline cursor-pointer"
-                        title="Klik untuk mengambil nama Ketua dari sheet: user"
-                      >
-                        Ambil dari Sheet User
-                      </button>
-                    )}
+                    <span className="inline-flex items-center space-x-1 text-[10px] text-teal-800 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 inline" />
+                      <span>Kolom C: Role "Ketua" (Otomatis)</span>
+                    </span>
                   </div>
                   <input
                     type="text"
                     value={namaKetuaMkks}
                     onChange={(e) => setNamaKetuaMkks(e.target.value)}
-                    placeholder="Contoh: H. Gustian Maskat, S.Ag., M.M."
-                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="Contoh: Ignatius Widi Nugroho, S.Sos."
+                    className="w-full px-3 py-1.5 bg-teal-50/20 border border-teal-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    Default otomatis dari sheet user (Role Ketua). Tetap dapat diketik manual jika ada perubahan dadakan.
-                  </p>
+                  <div className="mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-600 leading-relaxed">
+                    <span className="font-semibold text-teal-800">✓ Deteksi Sheet User Kolom C:</span> Sistem mendeteksi akun dengan <strong>Role: "Ketua"</strong> di Sheet User dan otomatis mengambil nama kepsek <strong>{detectedKetuaUser?.namaKepsek || ketuaFromUserSheet}</strong>{detectedKetuaUser?.sekolah ? ` (${detectedKetuaUser.sekolah})` : ''}. Tetap dapat diedit manual jika ada perubahan dadakan.
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

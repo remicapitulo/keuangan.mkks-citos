@@ -21,9 +21,17 @@ export const INITIAL_USER: User[] = [
     namaKepsek: 'Abu Haripin, M.Pd.'
   },
   {
-    username: 'gustian',
+    username: 'brighton',
     password: '123',
     role: 'Ketua',
+    sekolah: 'SMP BRIGHTON',
+    aktif: 'YA',
+    namaKepsek: 'Ignatius Widi Nugroho, S.Sos.'
+  },
+  {
+    username: 'gustian',
+    password: '123',
+    role: 'Sekolah',
     sekolah: 'SMP GENESIS MEDICARE',
     aktif: 'YA',
     namaKepsek: 'H. Gustian Maskat, S.Ag., M.M.'

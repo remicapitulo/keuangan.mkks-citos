@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, CheckCircle2, AlertTriangle, Building2, Calendar, FileText, Scale, Wallet, Landmark, Edit3, UserCheck, Save, RotateCcw } from 'lucide-react';
-import { RekonsiliasiKas, Sekolah, PejabatPenandatangan } from '../types';
+import { RekonsiliasiKas, Sekolah, PejabatPenandatangan, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
 import { StorageService, DEFAULT_PEJABAT } from '../services/spreadsheetSync';
 
@@ -14,6 +14,7 @@ interface BeritaAcaraAuditModalProps {
   totalIuranMasuk: number;
   totalPemasukanLain: number;
   sekolahList: Sekolah[];
+  usersList?: User[];
   onUpdateAudit?: (updated: RekonsiliasiKas) => void;
 }
 
@@ -27,14 +28,28 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
   totalIuranMasuk,
   totalPemasukanLain,
   sekolahList,
+  usersList = [],
   onUpdateAudit
 }) => {
   if (!isOpen || !auditData) return null;
 
-  const defaultPejabat = StorageService.getPejabat();
+  const defaultPejabat = StorageService.getPejabat(usersList);
   const currentUser = StorageService.getCurrentUser();
   const namaPemeriksaLogin = currentUser?.namaKepsek || currentUser?.username || '';
-  const ketuaUser = StorageService.getKetuaUser();
+  const ketuaUser = StorageService.getKetuaUser(usersList);
+
+  const isOldKetuaPlaceholder = (name?: string) => {
+    if (!name) return true;
+    const lower = name.trim().toLowerCase();
+    return (
+      lower.includes('supriyadi') ||
+      lower.includes('gustian') ||
+      lower.includes('maskat') ||
+      lower === 'ketua mkks' ||
+      lower === 'ketua' ||
+      lower === '-'
+    );
+  };
 
   const isOldBendaharaPlaceholder = (name?: string) => {
     if (!name) return true;
@@ -46,11 +61,16 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
     );
   };
 
+  const autoKetua = ketuaUser?.namaKepsek || defaultPejabat.namaKetuaMkks || DEFAULT_PEJABAT.namaKetuaMkks;
+
   // Signer / Pejabat states
   const [isEditingPejabat, setIsEditingPejabat] = useState<boolean>(false);
-  const [namaKetuaMkks, setNamaKetuaMkks] = useState<string>(
-    auditData.namaKetuaMkks || defaultPejabat.namaKetuaMkks || ketuaUser?.namaKepsek || DEFAULT_PEJABAT.namaKetuaMkks
-  );
+  const [namaKetuaMkks, setNamaKetuaMkks] = useState<string>(() => {
+    if (auditData.namaKetuaMkks && !isOldKetuaPlaceholder(auditData.namaKetuaMkks)) {
+      return auditData.namaKetuaMkks;
+    }
+    return autoKetua;
+  });
   const [nipKetuaMkks, setNipKetuaMkks] = useState<string>(
     auditData.nipKetuaMkks || defaultPejabat.nipKetuaMkks || DEFAULT_PEJABAT.nipKetuaMkks
   );
@@ -77,12 +97,17 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
   // Sync state when auditData changes
   useEffect(() => {
     if (auditData) {
-      const pej = StorageService.getPejabat();
-      const ketua = StorageService.getKetuaUser();
+      const pej = StorageService.getPejabat(usersList);
+      const ketua = StorageService.getKetuaUser(usersList);
       const curr = StorageService.getCurrentUser();
       const loginName = curr?.namaKepsek || curr?.username || '';
+      const autoK = ketua?.namaKepsek || pej.namaKetuaMkks || DEFAULT_PEJABAT.namaKetuaMkks;
 
-      setNamaKetuaMkks(auditData.namaKetuaMkks || pej.namaKetuaMkks || ketua?.namaKepsek || DEFAULT_PEJABAT.namaKetuaMkks);
+      const resolvedKetua = (auditData.namaKetuaMkks && !isOldKetuaPlaceholder(auditData.namaKetuaMkks))
+        ? auditData.namaKetuaMkks
+        : autoK;
+
+      setNamaKetuaMkks(resolvedKetua);
       setNipKetuaMkks(auditData.nipKetuaMkks || pej.nipKetuaMkks || DEFAULT_PEJABAT.nipKetuaMkks);
       setJabatanKetuaMkks(auditData.jabatanKetuaMkks || pej.jabatanKetuaMkks || DEFAULT_PEJABAT.jabatanKetuaMkks);
 
@@ -94,7 +119,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
       setNipBendahara(auditData.nipBendahara || pej.nipBendahara || '');
       setJabatanBendahara(auditData.jabatanBendahara || pej.jabatanBendahara || DEFAULT_PEJABAT.jabatanBendahara);
     }
-  }, [auditData]);
+  }, [auditData, usersList]);
 
   const totalSaldoReal = (auditData.saldoCash || 0) + (auditData.saldoBank || 0);
   const selisih = totalSaldoReal - saldoData;
@@ -434,9 +459,12 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                       type="text"
                       value={namaKetuaMkks}
                       onChange={(e) => setNamaKetuaMkks(e.target.value)}
-                      placeholder="Drs. H. M. Supriyadi, M.Pd"
+                      placeholder="Contoh: H. Gustian Maskat, S.Ag., M.M."
                       className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600"
                     />
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Secara otomatis mendeteksi dari sheet User (Role: Ketua).
+                    </p>
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
