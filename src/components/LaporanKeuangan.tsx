@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
 import { exportToExcel, exportToPDF, exportRiwayatHapusToExcel, exportRiwayatHapusToPDF } from '../services/exportUtils';
 import { 
   FileSpreadsheet, 
@@ -59,7 +59,8 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   onDeletePengeluaran
 }) => {
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const availableYears = getTahunBukuList(iuranList.map((i) => i.tahun));
+  const [selectedYear, setSelectedYear] = useState<number>(() => Math.max(2026, currentYear));
   const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap' | 'riwayat-hapus'>('matrix');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [matrixViewMode, setMatrixViewMode] = useState<'cards' | 'table'>('cards');
@@ -161,7 +162,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               Laporan Keuangan & Matriks Iuran
             </h2>
             <p className="text-xs sm:text-sm text-teal-100/80 mt-1 max-w-xl font-light hidden sm:block">
-              Matriks kelunasan 10 sekolah anggota, penerimaan iuran, pemasukan non-iuran, pengeluaran operasional, dan rekap arus kas.
+              Matriks kelunasan sekolah anggota, penerimaan iuran, pemasukan non-iuran, pengeluaran operasional, dan rekap arus kas.
             </p>
           </div>
 
@@ -179,9 +180,11 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                 aria-label="Filter Tahun Laporan Keuangan"
                 className="bg-teal-950 text-white font-bold text-xs py-1.5 px-3 rounded-lg border border-teal-400/30 focus:outline-none focus:ring-2 focus:ring-teal-300 cursor-pointer w-full sm:w-auto"
               >
-                <option value={2026}>2026 (Tahun Berjalan)</option>
-                <option value={2025}>2025</option>
-                <option value={2024}>2024</option>
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>
+                    {y} {y === currentYear ? '(Tahun Berjalan)' : ''}
+                  </option>
+                ))}
               </select>
             </div>
 

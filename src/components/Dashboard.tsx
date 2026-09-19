@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN } from '../types';
-import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -41,8 +41,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSelectSchoolForIuran,
   onOpenStrukModal
 }) => {
-  const currentYear = new Date().getFullYear(); // 2026
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const currentYear = new Date().getFullYear();
+  const availableYears = getTahunBukuList(iuranList.map(i => i.tahun));
+  const [selectedYear, setSelectedYear] = useState<number>(() => Math.max(2026, currentYear));
 
   // Filter lists by selected year
   const iuranYear = iuranList.filter(i => i.tahun === selectedYear);
@@ -182,7 +183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <p className="hidden sm:block text-sm text-teal-100/90 mt-1.5 max-w-2xl font-light">
               {isBendahara 
-                ? 'Kelola penerimaan iuran 10 sekolah anggota MKKS Citos dan alokasi pengeluaran operasional secara transparan.'
+                ? 'Kelola penerimaan iuran sekolah anggota MKKS Citos dan alokasi pengeluaran operasional secara transparan.'
                 : 'Pantau riwayat pembayaran iuran sekolah Anda dan cetak kuitansi resmi langsung dari dashboard.'}
             </p>
           </div>
@@ -198,9 +199,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               aria-label="Pilih Tahun Buku Dashboard"
               className="bg-teal-900/80 text-white font-bold text-xs py-1 px-2.5 rounded-lg border border-teal-400/30 focus:outline-none focus:ring-2 focus:ring-teal-300 cursor-pointer"
             >
-              <option value={2026}>2026 (Tahun Berjalan)</option>
-              <option value={2025}>2025</option>
-              <option value={2024}>2024</option>
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  {y} {y === currentYear ? '(Tahun Berjalan)' : ''}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -291,7 +294,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1">
               {isBendahara 
-                ? `${10 * 12 - iuranYear.length} Bulan iuran belum terbayar dari 10 sekolah`
+                ? `${sekolahList.length * 12 - iuranYear.length} Bulan iuran belum terbayar dari ${sekolahList.length} sekolah`
                 : `${myTotalPaidMonths} / 12 Bulan telah dibayar`}
             </p>
           </div>

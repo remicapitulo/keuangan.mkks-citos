@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PemasukanLain, KATEGORI_PEMASUKAN_LAIN, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
 import { 
   Coins, 
   PlusCircle, 
@@ -54,6 +54,7 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
   const currentYear = new Date().getFullYear();
+  const availableYears = getTahunBukuList(pemasukanLainList.map((i) => (i.tanggal ? i.tanggal.slice(0, 4) : 2026)));
 
   // Form State
   const [tanggal, setTanggal] = useState<string>(todayStr);
@@ -66,7 +67,7 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Filter & Search State
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedYear, setSelectedYear] = useState<number>(() => Math.max(2026, currentYear));
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
 
@@ -476,8 +477,10 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                 className="bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
               >
-                {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map((y) => (
-                  <option key={y} value={y}>{y}</option>
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>
+                    {y} {y === currentYear ? '(Tahun Berjalan)' : ''}
+                  </option>
                 ))}
               </select>
             </div>

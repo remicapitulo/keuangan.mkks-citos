@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sekolah, Iuran, BULAN_LIST, IURAN_PER_BULAN, PaketDurasi, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
 import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter, MapPin, FileText, Sparkles } from 'lucide-react';
 
 interface InputIuranProps {
@@ -29,10 +29,11 @@ export const InputIuran: React.FC<InputIuranProps> = ({
   currentUser
 }) => {
   const currentYear = new Date().getFullYear();
+  const availableYears = getTahunBukuList(iuranList.map((i) => i.tahun));
   const todayDateStr = new Date().toISOString().split('T')[0];
 
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
-  const [tahunBuku, setTahunBuku] = useState<number>(currentYear);
+  const [tahunBuku, setTahunBuku] = useState<number>(() => Math.max(2026, currentYear));
   const [tanggalPembayaran, setTanggalPembayaran] = useState<string>(todayDateStr);
   const [keterangan, setKeterangan] = useState<string>('');
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -316,9 +317,11 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                     }}
                     className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
                   >
-                    <option value={2026}>Tahun 2026 (Tahun Berjalan)</option>
-                    <option value={2025}>Tahun 2025</option>
-                    <option value={2024}>Tahun 2024</option>
+                    {availableYears.map((y) => (
+                      <option key={y} value={y}>
+                        Tahun {y} {y === currentYear ? '(Tahun Berjalan)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

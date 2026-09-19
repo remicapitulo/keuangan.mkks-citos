@@ -166,3 +166,25 @@ export function resolveNamaBendahara(
 
   return raw;
 }
+
+/**
+ * Menghasilkan daftar Tahun Buku mulai dari tahun 2026 dan otomatis menyertakan
+ * 1 tahun ke depan (misal: saat 2026 -> [2026, 2027]; saat 2027 -> [2026, 2027, 2028]),
+ * tanpa menghilangkan tahun-tahun sebelumnya, serta mencakup tahun transaksi yang ada.
+ */
+export function getTahunBukuList(extraYears: (number | string | undefined)[] = []): number[] {
+  const START_YEAR = 2026;
+  const currentYear = new Date().getFullYear();
+
+  const parsedExtra = extraYears
+    .map((y) => Number(y))
+    .filter((y) => !isNaN(y) && y >= START_YEAR);
+
+  const maxYear = Math.max(START_YEAR + 1, currentYear + 1, ...parsedExtra);
+
+  const list: number[] = [];
+  for (let y = START_YEAR; y <= maxYear; y++) {
+    list.push(y);
+  }
+  return list;
+}
