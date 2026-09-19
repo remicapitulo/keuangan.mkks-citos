@@ -521,11 +521,6 @@ export default function App() {
             <span>•</span>
             <span>© 2026 MKKS Citos. Hak Cipta Dilindungi Undang-Undang.</span>
           </div>
-          {isAdmin && (
-            <p className="text-[11px] text-slate-400 pt-1 font-mono">
-              Database Sync Status: Terhubung dengan Google Spreadsheet ID <span className="font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{spreadsheetId}</span>
-            </p>
-          )}
         </div>
       </footer>
 

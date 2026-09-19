@@ -23,7 +23,7 @@ export const INITIAL_USER: User[] = [
   {
     username: 'brighton',
     password: '123',
-    role: 'Ketua',
+    role: 'Sekolah',
     sekolah: 'SMP BRIGHTON',
     aktif: 'YA',
     namaKepsek: 'Ignatius Widi Nugroho, S.Sos.'

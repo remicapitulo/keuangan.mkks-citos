@@ -19,12 +19,12 @@ import {
   Database,
   UserCheck,
   Edit3,
-  Lock,
-  ShieldCheck
+  ShieldCheck,
+  Clock
 } from 'lucide-react';
 import { RekonsiliasiKas, PecahanUangCash, User, Sekolah } from '../types';
-import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, cleanDateInputString, resolveNamaBendahara } from '../utils/formatters';
-import { StorageService } from '../services/spreadsheetSync';
+import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, cleanDateInputString, getCurrentLocalDateTimeString, resolveNamaBendahara } from '../utils/formatters';
+import { StorageService, DEFAULT_PEJABAT } from '../services/spreadsheetSync';
 
 interface AuditRekonsiliasiTabProps {
   selectedYear: number;
@@ -66,9 +66,12 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   const [nomorRekening, setNomorRekening] = useState<string>(currentAudit.nomorRekening || '102.23.09876.1');
   const [atasNamaRekening, setAtasNamaRekening] = useState<string>(currentAudit.atasNamaRekening || 'MKKS SMP CITOS');
   const [catatanAudit, setCatatanAudit] = useState<string>(currentAudit.catatanAudit || '');
-  const [tanggalAudit, setTanggalAudit] = useState<string>(
-    cleanDateInputString(currentAudit.tanggalAudit) || cleanDateInputString(new Date().toISOString())
-  );
+  const [tanggalAudit, setTanggalAudit] = useState<string>(() => {
+    if (!currentAudit.tanggalAudit || currentAudit.tanggalAudit.startsWith('2026-09-19 09:30')) {
+      return getCurrentLocalDateTimeString();
+    }
+    return cleanDateInputString(currentAudit.tanggalAudit) || getCurrentLocalDateTimeString();
+  });
 
   // Helper to detect old initial placeholders
   const isOldKetuaPlaceholder = (name?: string) => {
@@ -96,7 +99,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
 
   // Derive Ketua MKKS secara otomatis dari sheet User (Role: "Ketua")
   const detectedKetuaUser = StorageService.getKetuaUser(usersList);
-  const ketuaFromUserSheet = detectedKetuaUser?.namaKepsek || 'Ignatius Widi Nugroho, S.Sos.';
+  const ketuaFromUserSheet = detectedKetuaUser?.namaKepsek || '';
   // Derive logged in Bendahara/Admin name
   const namaPemeriksaLogin = currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS';
 
@@ -104,15 +107,9 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   const defaultPejabat = StorageService.getPejabat(usersList);
   const [namaKetuaMkks, setNamaKetuaMkks] = useState<string>(() => {
     if (detectedKetuaUser?.namaKepsek) {
-      if (currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) {
-        return currentAudit.namaKetuaMkks;
-      }
       return detectedKetuaUser.namaKepsek;
     }
-    if (currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) {
-      return currentAudit.namaKetuaMkks;
-    }
-    return defaultPejabat.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.';
+    return currentAudit.namaKetuaMkks || defaultPejabat.namaKetuaMkks || '';
   });
   const [nipKetuaMkks, setNipKetuaMkks] = useState<string>(() => 
     currentAudit.nipKetuaMkks || defaultPejabat.nipKetuaMkks || ''
@@ -120,6 +117,26 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   const [jabatanKetuaMkks, setJabatanKetuaMkks] = useState<string>(() => 
     currentAudit.jabatanKetuaMkks || defaultPejabat.jabatanKetuaMkks || 'Ketua MKKS SMP Cimanggis & Tapos'
   );
+  const [isSyncingKetua, setIsSyncingKetua] = useState<boolean>(false);
+
+  const handleSyncKetuaFromSheet = async () => {
+    setIsSyncingKetua(true);
+    try {
+      const ok = await StorageService.fetchFromAppsScript();
+      const freshUsers = StorageService.getUsers();
+      const freshKetua = StorageService.getKetuaUser(freshUsers);
+      if (freshKetua?.namaKepsek) {
+        setNamaKetuaMkks(freshKetua.namaKepsek);
+        if (onSaveAudit) {
+          onSaveAudit({ ...currentAudit, namaKetuaMkks: freshKetua.namaKepsek });
+        }
+      }
+    } catch (e) {
+      console.error('Sync Ketua failed:', e);
+    } finally {
+      setIsSyncingKetua(false);
+    }
+  };
 
   // Pejabat 2 Bendahara: secara otomatis di awal mengambil dari akun login. Baru nanti jika ada perubahan, petugas cetak dapat mengedit manual.
   const [namaBendahara, setNamaBendahara] = useState<string>(() => {
@@ -158,18 +175,16 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     setNomorRekening(currentAudit.nomorRekening || '102.23.09876.1');
     setAtasNamaRekening(currentAudit.atasNamaRekening || 'MKKS SMP CITOS');
     setCatatanAudit(currentAudit.catatanAudit || '');
-    setTanggalAudit(cleanDateInputString(currentAudit.tanggalAudit) || cleanDateInputString(new Date().toISOString()));
+    const isOldPlaceholderTime = !currentAudit.tanggalAudit || currentAudit.tanggalAudit.startsWith('2026-09-19 09:30');
+    setTanggalAudit(isOldPlaceholderTime ? getCurrentLocalDateTimeString() : (cleanDateInputString(currentAudit.tanggalAudit) || getCurrentLocalDateTimeString()));
     if (currentAudit.pecahanCash) {
       setPecahan(currentAudit.pecahanCash);
     }
     const pej = StorageService.getPejabat(usersList);
     const ketuaUser = StorageService.getKetuaUser(usersList);
-    const autoKetua = ketuaUser?.namaKepsek || pej.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.';
     
-    // Otomatis deteksi Role: "Ketua" dari sheet User, kecuali ada edit manual spesifik yang bukan placeholder lama
-    const resolvedKetua = (ketuaUser?.namaKepsek)
-      ? ((currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) ? currentAudit.namaKetuaMkks : ketuaUser.namaKepsek)
-      : ((currentAudit.namaKetuaMkks && !isOldKetuaPlaceholder(currentAudit.namaKetuaMkks)) ? currentAudit.namaKetuaMkks : autoKetua);
+    // Otomatis deteksi Role: "Ketua" dari sheet User: jika terdeteksi dari sheet User, SELALU prioritaskan
+    const resolvedKetua = ketuaUser?.namaKepsek || currentAudit.namaKetuaMkks || pej.namaKetuaMkks || '';
     
     // Otomatis di awal mengambil dari akun login, kecuali ada edit manual spesifik yang bukan placeholder lama
     const resolvedBendahara = (currentAudit.namaBendahara && !isOldBendaharaPlaceholder(currentAudit.namaBendahara))
@@ -265,6 +280,36 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     setTimeout(() => setToastSave(false), 3000);
   };
 
+  const handleOpenBeritaAcaraWithSync = () => {
+    const effectiveTanggal = cleanDateInputString(tanggalAudit) || getCurrentLocalDateTimeString();
+    const penandatanganBendahara = (namaBendahara && !isOldBendaharaPlaceholder(namaBendahara))
+      ? namaBendahara
+      : (namaPemeriksaLogin || StorageService.getPejabat(usersList).namaBendahara || DEFAULT_PEJABAT.namaBendahara);
+
+    if (onSaveAudit) {
+      onSaveAudit({
+        ...currentAudit,
+        id: currentAudit.id || `AUDIT-${selectedYear}-${Date.now().toString().slice(-4)}`,
+        tahun: selectedYear,
+        saldoCash: Number(saldoCash) || 0,
+        saldoBank: Number(saldoBank) || 0,
+        namaBank: namaBank || 'Bank DKI',
+        nomorRekening: nomorRekening || '-',
+        atasNamaRekening: atasNamaRekening || 'MKKS SMP CITOS',
+        catatanAudit: catatanAudit || '',
+        tanggalAudit: effectiveTanggal,
+        namaKetuaMkks,
+        nipKetuaMkks,
+        jabatanKetuaMkks,
+        namaBendahara: penandatanganBendahara,
+        nipBendahara,
+        jabatanBendahara,
+        pecahanCash: isCalculatorOpen || totalHitungFisikCash > 0 ? pecahan : currentAudit.pecahanCash
+      });
+    }
+    onOpenBeritaAcara();
+  };
+
   return (
     <div className="space-y-6">
       
@@ -330,7 +375,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
 
             <button
               type="button"
-              onClick={onOpenBeritaAcara}
+              onClick={handleOpenBeritaAcaraWithSync}
               className="inline-flex items-center space-x-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
@@ -755,9 +800,20 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
           <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Waktu & Tanggal Audit / Kas Opname
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Waktu & Tanggal Audit / Kas Opname
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setTanggalAudit(getCurrentLocalDateTimeString())}
+                    className="inline-flex items-center space-x-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-200 transition-all cursor-pointer"
+                    title="Klik untuk memperbarui ke waktu aktif saat ini"
+                  >
+                    <Clock className="w-3 h-3 text-teal-600" />
+                    <span>Waktu Sekarang</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   disabled={!isBendahara}
@@ -767,20 +823,14 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100"
                 />
                 <p className="text-[11px] text-teal-700 font-semibold mt-1">
-                  Format Laporan: <strong>{formatDateIndonesian(tanggalAudit)}</strong>
+                  Format Laporan: <strong>{formatDateTimeIndonesian(tanggalAudit)}</strong>
                 </p>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Nama Petugas Pemeriksa Utama (Bendahara)
-                  </label>
-                  <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-teal-800 bg-teal-100/90 px-2 py-0.5 rounded-full border border-teal-200">
-                    <Lock className="w-3 h-3 text-teal-700" />
-                    <span>Otomatis Akun Login</span>
-                  </span>
-                </div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Petugas Pemeriksa Utama (Bendahara)
+                </label>
                 <div className="relative">
                   <input
                     type="text"
@@ -790,9 +840,6 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
                   />
                   <ShieldCheck className="w-4 h-4 text-teal-600 absolute left-3 top-2.5" />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Nama otomatis terkunci mengikuti akun login ({currentUser?.username || 'user'}). Tidak dapat diedit pada bagian ini.
-                </p>
               </div>
             </div>
 
@@ -863,21 +910,24 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
                     <label className="block text-[11px] font-semibold text-slate-700">
                       Nama Lengkap & Gelar Ketua <span className="text-rose-500">*</span>
                     </label>
-                    <span className="inline-flex items-center space-x-1 text-[10px] text-teal-800 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-300">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 inline" />
-                      <span>Kolom C: Role "Ketua" (Otomatis)</span>
-                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSyncKetuaFromSheet}
+                      disabled={isSyncingKetua}
+                      className="inline-flex items-center space-x-1 text-[10px] text-teal-800 font-bold bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-300 transition-all cursor-pointer shadow-2xs"
+                      title="Sinkronkan & deteksi ulang akun Role 'Ketua' langsung dari Sheet User Google Spreadsheet"
+                    >
+                      <RefreshCw className={`w-3 h-3 text-teal-600 ${isSyncingKetua ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingKetua ? 'Menyinkronkan Sheet...' : 'Deteksi dari Sheet User (Role: Ketua)'}</span>
+                    </button>
                   </div>
                   <input
                     type="text"
                     value={namaKetuaMkks}
                     onChange={(e) => setNamaKetuaMkks(e.target.value)}
-                    placeholder="Contoh: Ignatius Widi Nugroho, S.Sos."
+                    placeholder="Nama Lengkap & Gelar Ketua MKKS"
                     className="w-full px-3 py-1.5 bg-teal-50/20 border border-teal-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
-                  <div className="mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-600 leading-relaxed">
-                    <span className="font-semibold text-teal-800">✓ Deteksi Sheet User Kolom C:</span> Sistem mendeteksi akun dengan <strong>Role: "Ketua"</strong> di Sheet User dan otomatis mengambil nama kepsek <strong>{detectedKetuaUser?.namaKepsek || ketuaFromUserSheet}</strong>{detectedKetuaUser?.sekolah ? ` (${detectedKetuaUser.sekolah})` : ''}. Tetap dapat diedit manual jika ada perubahan dadakan.
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -941,9 +991,6 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
                     placeholder={namaPemeriksaLogin || "Nama Bendahara / Petugas Cetak"}
                     className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    Otomatis di awal mengambil dari akun login ({namaPemeriksaLogin || 'Bendahara'}). Petugas cetak dapat mengedit secara manual jika ada perubahan.
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -990,7 +1037,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
             <div className="flex items-center space-x-2.5 w-full sm:w-auto">
               <button
                 type="button"
-                onClick={onOpenBeritaAcara}
+                onClick={handleOpenBeritaAcaraWithSync}
                 className="flex-1 sm:flex-none inline-flex items-center justify-center space-x-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-colors cursor-pointer"
               >
                 <Printer className="w-4 h-4" />

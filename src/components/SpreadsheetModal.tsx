@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StorageService, GOOGLE_APPS_SCRIPT_CODE, SyncStatus } from '../services/spreadsheetSync';
 import { Database, Copy, Check, ExternalLink, RefreshCw, X, ShieldCheck, AlertCircle } from 'lucide-react';
 
@@ -17,13 +17,21 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
   onUpdateSpreadsheetConfig,
   onResetToDefaultData
 }) => {
-  if (!isOpen) return null;
-
   const [inputSheetId, setInputSheetId] = useState<string>(spreadsheetId);
-  const [inputScriptUrl, setInputScriptUrl] = useState<string>(StorageService.getAppsScriptUrl());
+  const [inputScriptUrl, setInputScriptUrl] = useState<string>(() => StorageService.getAppsScriptUrl());
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [isTesting, setIsTesting] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setInputSheetId(spreadsheetId);
+      setInputScriptUrl(StorageService.getAppsScriptUrl());
+      setSyncStatus(null);
+    }
+  }, [isOpen, spreadsheetId]);
+
+  if (!isOpen) return null;
 
   const handleCopyAppsScript = () => {
     navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);

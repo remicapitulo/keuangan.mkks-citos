@@ -3,7 +3,7 @@ import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INIT
 import { cleanDateInputString } from '../utils/formatters';
 
 export const DEFAULT_PEJABAT: PejabatPenandatangan = {
-  namaKetuaMkks: 'Ignatius Widi Nugroho, S.Sos.',
+  namaKetuaMkks: '',
   nipKetuaMkks: '',
   jabatanKetuaMkks: 'Ketua MKKS SMP Cimanggis & Tapos',
   namaBendahara: 'Abu Haripin, M.Pd.',
@@ -139,11 +139,11 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
     const isArrayRow = Array.isArray(u);
     if (!isArrayRow && typeof u !== 'object') return null;
 
-    // Kolom A: Username
+    // Kolom A: Username (bisa dari index 0 atau properti object)
     const username = String(
       isArrayRow 
         ? (u[0] || '') 
-        : (u.username || u.Username || u['User Name'] || u.user || u['Kolom A'] || '')
+        : (getFlexibleValue(u, ['Username', 'User Name', 'User', 'ID Sekolah', 'ID', 'Kolom A']) || (u._rawRow ? u._rawRow[0] : '') || '')
     ).trim();
     if (!username) return null;
 
@@ -151,14 +151,14 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
     const password = String(
       isArrayRow 
         ? (u[1] || '123') 
-        : (u.password || u.Password || u['Kolom B'] || '123')
+        : (getFlexibleValue(u, ['Password', 'Pass', 'Kolom B']) || (u._rawRow ? u._rawRow[1] : '') || '123')
     ).trim();
 
     // Kolom C: ROLE (Kolom C di Sheet User)
     const rawRole = String(
       isArrayRow 
         ? (u[2] || '') 
-        : (u.role || u.Role || u['Role'] || u['ROLE'] || u['Peran'] || u['Jabatan'] || u['Kolom C'] || '')
+        : (getFlexibleValue(u, ['Role', 'ROLE', 'Peran', 'Jabatan', 'Status', 'Kolom C']) || (u._rawRow ? u._rawRow[2] : '') || '')
     ).trim().toLowerCase();
 
     let role: UserRole = 'Sekolah';
@@ -171,55 +171,49 @@ export function normalizeUsersList(rawList: any[], sekolahList: Sekolah[] = INIT
       role = 'Ketua';
     }
 
+    // Periksa juga jika ada cell di baris ini yang mengandung tulisan "ketua" (misal susunan kolom bergeser di spreadsheet pengguna)
+    if (role === 'Sekolah') {
+      const allRowValues = [
+        ...Object.values(u).map(v => String(v || '').trim().toLowerCase()),
+        ...(u._rawRow && Array.isArray(u._rawRow) ? u._rawRow.map((v: any) => String(v || '').trim().toLowerCase()) : [])
+      ];
+      if (allRowValues.some(v => v === 'ketua' || v === 'ketua mkks' || v.startsWith('ketua '))) {
+        role = 'Ketua';
+      }
+    }
+
     // Kolom D: Sekolah / Nama Sekolah
     let sekolah = String(
       isArrayRow 
         ? (u[3] || '') 
-        : (u.sekolah || u.Sekolah || u['Nama Sekolah'] || u.namaSekolah || u['Kolom D'] || '')
+        : (getFlexibleValue(u, ['Sekolah', 'Nama Sekolah', 'namaSekolah', 'Instansi', 'Kolom D']) || (u._rawRow ? u._rawRow[3] : '') || '')
     ).trim();
 
     // Kolom E: Aktif
-    const aktif = isArrayRow 
-      ? (u[4] !== undefined ? u[4] : 'Ya') 
-      : (u.aktif !== undefined ? u.aktif : (u.Aktif !== undefined ? u.Aktif : 'Ya'));
+    const rawAktif = isArrayRow 
+      ? u[4] 
+      : (getFlexibleValue(u, ['Aktif', 'Status Aktif', 'Kolom E']) || (u._rawRow ? u._rawRow[4] : ''));
+    const aktif = rawAktif !== undefined && rawAktif !== null && rawAktif !== '' ? rawAktif : 'Ya';
 
     // Kolom F: Nama Kepsek / Nama Kepala Sekolah
     let namaKepsek = String(
       isArrayRow 
         ? (u[5] || '') 
-        : (u.namaKepsek || u['Nama Kepsek'] || u['Nama Kepala Sekolah'] || u['Kepala Sekolah'] ||
-           u['nama_kepsek'] || u['Nama Lengkap'] || u['namaLengkap'] || u['Nama Petugas'] || u['Kolom F'] || '')
+        : (getFlexibleValue(u, ['Nama Kepsek', 'Nama Kepala Sekolah', 'Kepala Sekolah', 'Nama Lengkap', 'namaLengkap', 'Nama Petugas', 'Kepsek', 'Nama', 'Kolom F']) || (u._rawRow ? u._rawRow[5] : '') || '')
     ).trim();
 
-    // Fallback pencocokan nama kepala sekolah dari tabel sekolahList jika belum terisi di Kolom F
+    // Jika belum ada namaKepsek atau hanya terisi username, cari dari daftar sekolah (sekolahList) berdasarkan ID Sekolah / Username atau Nama Sekolah
     if (!namaKepsek || namaKepsek.toLowerCase() === username.toLowerCase()) {
-      if (username.toLowerCase() === 'gustian') {
-        namaKepsek = 'H. Gustian Maskat, S.Ag., M.M.';
-      } else if (username.toLowerCase() === 'abu') {
-        namaKepsek = 'Abu Haripin, M.Pd.';
-      } else if (username.toLowerCase() === 'neng') {
-        namaKepsek = 'Siti Rogaya, S.Pd.';
-      } else if (username.toLowerCase() === 'marlina') {
-        namaKepsek = 'Marlina, S.Pd.';
-      } else if (username.toLowerCase() === 'lisna') {
-        namaKepsek = 'Lisnawati Suparta, M.Pd';
-      } else if (username.toLowerCase() === 'bendahara') {
-        namaKepsek = 'H. Nurhasan, M.Pd';
-      } else if (username.toLowerCase() === 'admin') {
-        namaKepsek = 'Administrator MKKS Citos';
-      }
-    }
-
-    // Jika belum ada namaKepsek, cari dari daftar sekolah (sekolahList) berdasarkan ID Sekolah / Username atau Nama Sekolah
-    if (!namaKepsek && sekolahList && sekolahList.length > 0) {
-      const matchById = sekolahList.find(s => s.idSekolah.toLowerCase().trim() === username.toLowerCase().trim());
-      if (matchById && matchById.namaKepsek) {
-        namaKepsek = matchById.namaKepsek;
-        if (!sekolah) sekolah = matchById.namaSekolah;
-      } else if (sekolah) {
-        const matchByName = sekolahList.find(s => s.namaSekolah.toLowerCase().trim() === sekolah.toLowerCase().trim());
-        if (matchByName && matchByName.namaKepsek) {
-          namaKepsek = matchByName.namaKepsek;
+      if (sekolahList && sekolahList.length > 0) {
+        const matchById = sekolahList.find(s => s.idSekolah && s.idSekolah.toLowerCase().trim() === username.toLowerCase().trim());
+        if (matchById && matchById.namaKepsek) {
+          namaKepsek = matchById.namaKepsek;
+          if (!sekolah) sekolah = matchById.namaSekolah;
+        } else if (sekolah) {
+          const matchByName = sekolahList.find(s => s.namaSekolah && s.namaSekolah.toLowerCase().trim() === sekolah.toLowerCase().trim());
+          if (matchByName && matchByName.namaKepsek) {
+            namaKepsek = matchByName.namaKepsek;
+          }
         }
       }
     }
@@ -802,16 +796,7 @@ export class StorageService {
         const parsed = JSON.parse(data);
         // Otomatis deteksi Role: "Ketua" dari sheet User jika ada
         if (ketuaUser?.namaKepsek) {
-          const isOldKetuaPlaceholder = 
-            !parsed.namaKetuaMkks || 
-            parsed.namaKetuaMkks === 'Drs. H. M. Supriyadi, M.Pd' || 
-            parsed.namaKetuaMkks.toLowerCase().includes('supriyadi') ||
-            parsed.namaKetuaMkks.toLowerCase().includes('gustian') ||
-            parsed.namaKetuaMkks.toLowerCase().includes('maskat') ||
-            parsed.namaKetuaMkks === 'Ketua MKKS';
-          if (isOldKetuaPlaceholder) {
-            parsed.namaKetuaMkks = ketuaUser.namaKepsek;
-          }
+          parsed.namaKetuaMkks = ketuaUser.namaKepsek;
         }
         // If saved namaBendahara is empty or old placeholder "H. Nurhasan...", automatically take active login account
         const isOldBendaharaPlaceholder = 
@@ -1199,10 +1184,18 @@ function doGet(e) {
   
   // 1. Ambil Data dari Google Sheet (7 Sheet Lengkap)
   if (action === 'getData') {
+    var users = getSheetData(ss, 'User');
+    if (!users || users.length === 0) users = getSheetData(ss, 'Users');
+    if (!users || users.length === 0) users = getSheetData(ss, 'Data User');
+    if (!users || users.length === 0) users = getSheetData(ss, 'Akun');
+
+    var sekolah = getSheetData(ss, 'Sekolah');
+    if (!sekolah || sekolah.length === 0) sekolah = getSheetData(ss, 'Data Sekolah');
+
     return ContentService.createTextOutput(JSON.stringify({
       status: 'success',
-      sekolah: getSheetData(ss, 'Sekolah'),
-      users: getSheetData(ss, 'User'),
+      sekolah: sekolah,
+      users: users,
       iuran: getSheetData(ss, 'Iuran'),
       pengeluaran: getSheetData(ss, 'Pengeluaran'),
       pemasukanLain: getSheetData(ss, 'Pemasukan_Lain') || getSheetData(ss, 'PemasukanLain'),
@@ -1277,8 +1270,12 @@ function getSheetData(ss, sheetName) {
   for (var i = 1; i < data.length; i++) {
     var row = {};
     for (var j = 0; j < headers.length; j++) {
-      row[headers[j]] = data[i][j];
+      var headerKey = String(headers[j] || '').trim();
+      if (headerKey) {
+        row[headerKey] = data[i][j];
+      }
     }
+    row['_rawRow'] = data[i];
     result.push(row);
   }
   return result;

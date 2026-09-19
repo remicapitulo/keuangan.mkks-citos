@@ -1,8 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { X, Printer, CheckCircle2, AlertTriangle, Building2, Calendar, FileText, Scale, Wallet, Landmark, Edit3, UserCheck, Save, RotateCcw } from 'lucide-react';
+import { 
+  X, 
+  Printer, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Building2, 
+  Calendar, 
+  FileText, 
+  Scale, 
+  Wallet, 
+  Landmark, 
+  Edit3, 
+  UserCheck, 
+  Save, 
+  RotateCcw,
+  Download,
+  Loader2,
+  Clock
+} from 'lucide-react';
 import { RekonsiliasiKas, Sekolah, PejabatPenandatangan, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { 
+  formatRupiah, 
+  formatDateIndonesian, 
+  formatDateTimeIndonesian, 
+  cleanDateInputString, 
+  getCurrentLocalDateTimeString, 
+  resolveNamaBendahara 
+} from '../utils/formatters';
 import { StorageService, DEFAULT_PEJABAT } from '../services/spreadsheetSync';
+import { exportBeritaAcaraToPDF } from '../services/exportUtils';
 
 interface BeritaAcaraAuditModalProps {
   isOpen: boolean;
@@ -31,8 +57,6 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
   usersList = [],
   onUpdateAudit
 }) => {
-  if (!isOpen || !auditData) return null;
-
   const defaultPejabat = StorageService.getPejabat(usersList);
   const currentUser = StorageService.getCurrentUser();
   const namaPemeriksaLogin = currentUser?.namaKepsek || currentUser?.username || '';
@@ -66,33 +90,40 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
   // Signer / Pejabat states
   const [isEditingPejabat, setIsEditingPejabat] = useState<boolean>(false);
   const [namaKetuaMkks, setNamaKetuaMkks] = useState<string>(() => {
-    if (auditData.namaKetuaMkks && !isOldKetuaPlaceholder(auditData.namaKetuaMkks)) {
-      return auditData.namaKetuaMkks;
+    if (ketuaUser?.namaKepsek) {
+      return ketuaUser.namaKepsek;
     }
-    return autoKetua;
+    return auditData?.namaKetuaMkks || defaultPejabat.namaKetuaMkks || '';
   });
   const [nipKetuaMkks, setNipKetuaMkks] = useState<string>(
-    auditData.nipKetuaMkks || defaultPejabat.nipKetuaMkks || DEFAULT_PEJABAT.nipKetuaMkks
+    auditData?.nipKetuaMkks || defaultPejabat.nipKetuaMkks || DEFAULT_PEJABAT.nipKetuaMkks
   );
   const [jabatanKetuaMkks, setJabatanKetuaMkks] = useState<string>(
-    auditData.jabatanKetuaMkks || defaultPejabat.jabatanKetuaMkks || DEFAULT_PEJABAT.jabatanKetuaMkks
+    auditData?.jabatanKetuaMkks || defaultPejabat.jabatanKetuaMkks || DEFAULT_PEJABAT.jabatanKetuaMkks
   );
 
   const [namaBendahara, setNamaBendahara] = useState<string>(() => {
-    if (auditData.namaBendahara && !isOldBendaharaPlaceholder(auditData.namaBendahara)) {
+    if (auditData?.namaBendahara && !isOldBendaharaPlaceholder(auditData.namaBendahara)) {
       return auditData.namaBendahara;
     }
     return namaPemeriksaLogin || defaultPejabat.namaBendahara || DEFAULT_PEJABAT.namaBendahara;
   });
   const [nipBendahara, setNipBendahara] = useState<string>(
-    auditData.nipBendahara || defaultPejabat.nipBendahara || ''
+    auditData?.nipBendahara || defaultPejabat.nipBendahara || ''
   );
   const [jabatanBendahara, setJabatanBendahara] = useState<string>(
-    auditData.jabatanBendahara || defaultPejabat.jabatanBendahara || DEFAULT_PEJABAT.jabatanBendahara
+    auditData?.jabatanBendahara || defaultPejabat.jabatanBendahara || DEFAULT_PEJABAT.jabatanBendahara
   );
 
   const [kotaAudit, setKotaAudit] = useState<string>('Depok');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+  const [tanggalAuditLocal, setTanggalAuditLocal] = useState<string>(() => {
+    if (!auditData?.tanggalAudit || auditData.tanggalAudit.startsWith('2026-09-19 09:30')) {
+      return getCurrentLocalDateTimeString();
+    }
+    return cleanDateInputString(auditData.tanggalAudit) || getCurrentLocalDateTimeString();
+  });
 
   // Sync state when auditData changes
   useEffect(() => {
@@ -103,9 +134,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
       const loginName = curr?.namaKepsek || curr?.username || '';
       const autoK = ketua?.namaKepsek || pej.namaKetuaMkks || DEFAULT_PEJABAT.namaKetuaMkks;
 
-      const resolvedKetua = (auditData.namaKetuaMkks && !isOldKetuaPlaceholder(auditData.namaKetuaMkks))
-        ? auditData.namaKetuaMkks
-        : autoK;
+      const resolvedKetua = ketua?.namaKepsek || auditData.namaKetuaMkks || autoK || '';
 
       setNamaKetuaMkks(resolvedKetua);
       setNipKetuaMkks(auditData.nipKetuaMkks || pej.nipKetuaMkks || DEFAULT_PEJABAT.nipKetuaMkks);
@@ -118,8 +147,13 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
       setNamaBendahara(resolvedBendahara);
       setNipBendahara(auditData.nipBendahara || pej.nipBendahara || '');
       setJabatanBendahara(auditData.jabatanBendahara || pej.jabatanBendahara || DEFAULT_PEJABAT.jabatanBendahara);
+
+      const isOldDefault = !auditData.tanggalAudit || auditData.tanggalAudit.startsWith('2026-09-19 09:30');
+      setTanggalAuditLocal(isOldDefault ? getCurrentLocalDateTimeString() : (cleanDateInputString(auditData.tanggalAudit) || getCurrentLocalDateTimeString()));
     }
   }, [auditData, usersList]);
+
+  if (!isOpen || !auditData) return null;
 
   const totalSaldoReal = (auditData.saldoCash || 0) + (auditData.saldoBank || 0);
   const selisih = totalSaldoReal - saldoData;
@@ -127,7 +161,127 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
   const isLebih = selisih > 0;
 
   const handlePrint = () => {
-    window.print();
+    const printElement = document.getElementById('berita-acara-printable');
+    if (!printElement) {
+      window.print();
+      return;
+    }
+
+    try {
+      const existingFrame = document.getElementById('audit-print-iframe');
+      if (existingFrame) {
+        existingFrame.remove();
+      }
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'audit-print-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        window.print();
+        return;
+      }
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Berita Acara Audit Kas MKKS Citos - ${auditData.tahun}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              @page {
+                size: A4 portrait;
+                margin: 12mm 15mm 12mm 15mm;
+              }
+              * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+                box-sizing: border-box !important;
+              }
+              body {
+                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background: #ffffff !important;
+                color: #0f172a !important;
+                margin: 0;
+                padding: 0;
+              }
+              table {
+                border-collapse: collapse !important;
+                width: 100% !important;
+              }
+            </style>
+          </head>
+          <body>
+            <div>
+              ${printElement.innerHTML}
+            </div>
+            <script>
+              setTimeout(() => {
+                window.focus();
+                window.print();
+              }, 500);
+            </script>
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (err) {
+          window.print();
+        }
+      }, 600);
+    } catch (e) {
+      window.print();
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!auditData) return;
+    setIsDownloadingPdf(true);
+
+    try {
+      // Small pause to ensure button shows loading state
+      await new Promise(resolve => setTimeout(resolve, 80));
+
+      const filename = exportBeritaAcaraToPDF({
+        auditData,
+        saldoData,
+        totalKasMasuk,
+        totalKasKeluar,
+        totalIuranMasuk,
+        totalPemasukanLain,
+        kotaAudit,
+        namaKetuaMkks,
+        nipKetuaMkks,
+        jabatanKetuaMkks,
+        namaBendahara,
+        nipBendahara,
+        jabatanBendahara,
+        tanggalAudit: cleanDateInputString(tanggalAuditLocal) || cleanDateInputString(auditData.tanggalAudit) || getCurrentLocalDateTimeString()
+      });
+
+      setToastMessage(`Dokumen PDF berhasil diunduh: ${filename}`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (error) {
+      console.error('Gagal membuat PDF:', error);
+      setToastMessage('Terjadi kendala teknis saat mengunduh PDF. Silakan gunakan menu Cetak Dokumen.');
+      setTimeout(() => setToastMessage(null), 4000);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   const handleSavePejabat = (e?: React.FormEvent) => {
@@ -152,7 +306,8 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
       namaBendahara,
       nipBendahara,
       jabatanBendahara,
-      diauditOleh: auditData.diauditOleh || namaBendahara
+      diauditOleh: auditData.diauditOleh || namaBendahara,
+      tanggalAudit: cleanDateInputString(tanggalAuditLocal) || getCurrentLocalDateTimeString()
     };
 
     StorageService.saveSingleRekonsiliasi(updatedRecord);
@@ -162,7 +317,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
     }
 
     setIsEditingPejabat(false);
-    setToastMessage('Nama Ketua MKKS & Bendahara berhasil diperbarui!');
+    setToastMessage('Data Berita Acara & Pejabat berhasil diperbarui!');
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -206,21 +361,37 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                   ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
                   : 'bg-teal-700/80 hover:bg-teal-600 text-white border border-teal-500/40'
               }`}
-              title="Edit nama Ketua MKKS dan Bendahara penandatangan Berita Acara"
+              title="Edit nama Ketua MKKS, Bendahara, dan tanggal pemeriksaan"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isEditingPejabat ? 'Tutup Edit Pejabat' : 'Edit Nama Pejabat'}</span>
-              <span className="sm:hidden">{isEditingPejabat ? 'Tutup' : 'Edit Nama'}</span>
+              <span className="hidden sm:inline">{isEditingPejabat ? 'Tutup Edit Pejabat' : 'Edit Pejabat & Tanggal'}</span>
+              <span className="sm:hidden">{isEditingPejabat ? 'Tutup' : 'Edit'}</span>
+            </button>
+
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPdf}
+              type="button"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 sm:px-3 sm:py-2 bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              title="Unduh langsung file PDF Berita Acara"
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">{isDownloadingPdf ? 'Membuat PDF...' : 'Unduh PDF'}</span>
+              <span className="sm:hidden">PDF</span>
             </button>
 
             <button
               onClick={handlePrint}
               type="button"
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
-              title="Cetak Berita Acara atau Simpan sebagai PDF"
+              title="Cetak Berita Acara Audit"
             >
               <Printer className="w-4 h-4" />
-              <span>Cetak / PDF</span>
+              <span>Cetak</span>
             </button>
             <button
               onClick={onClose}
@@ -264,9 +435,6 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
             <div className="text-lg sm:text-2xl font-black uppercase text-slate-900 tracking-tight mt-0.5">
               Kecamatan Cimanggis & Tapos (CITOS)
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-500 mt-1">
-              Sekretariat: Jl. Raya Bogor / Cimanggis & Tapos, Kota Depok, Jawa Barat
-            </p>
           </div>
 
           {/* Judul Surat Berita Acara */}
@@ -281,7 +449,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
 
           {/* Pernyataan Pengantar */}
           <p className="text-xs leading-relaxed text-slate-700 mb-5 text-justify">
-            Pada hari ini, tanggal <strong className="text-slate-900">{formatDateIndonesian(auditData.tanggalAudit)}</strong>, telah dilakukan pemeriksaan dan audit keselarasan keuangan (Kas Opname & Rekonsiliasi Bank) atas pembukuan kas MKKS SMP Cimanggis & Tapos (CITOS) untuk Tahun Anggaran / Buku <strong>{auditData.tahun}</strong>. Berdasarkan hasil pemeriksaan data sistem dan penghitungan fisik uang tunai serta rekening bank, diperoleh hasil sebagai berikut:
+            Pada hari ini, tanggal <strong className="text-slate-900">{formatDateIndonesian(tanggalAuditLocal || auditData.tanggalAudit)}</strong>, telah dilakukan pemeriksaan dan audit keselarasan keuangan (Kas Opname & Rekonsiliasi Bank) atas pembukuan kas MKKS SMP Cimanggis & Tapos (CITOS) untuk Tahun Anggaran / Buku <strong>{auditData.tahun}</strong>. Berdasarkan hasil pemeriksaan data sistem dan penghitungan fisik uang tunai serta rekening bank, diperoleh hasil sebagai berikut:
           </p>
 
           {/* Tabel Komparasi Data vs Real */}
@@ -521,9 +689,6 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                       placeholder={namaPemeriksaLogin || "Nama Bendahara / Petugas Cetak"}
                       className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600"
                     />
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Otomatis di awal mengambil dari akun login. Petugas cetak dapat mengedit secara manual jika ada perubahan.
-                    </p>
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
@@ -554,15 +719,37 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
 
               {/* Kota & Tanggal */}
               <div className="bg-white p-3 rounded-xl border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="flex items-center space-x-2 w-full sm:w-auto">
-                  <label className="font-semibold text-slate-700 shrink-0">Kota Penandatangan:</label>
-                  <input
-                    type="text"
-                    value={kotaAudit}
-                    onChange={(e) => setKotaAudit(e.target.value)}
-                    placeholder="Depok"
-                    className="px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 w-32 focus:outline-none focus:ring-2 focus:ring-teal-600"
-                  />
+                <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                  <div className="flex items-center space-x-1.5">
+                    <label className="font-semibold text-slate-700 shrink-0">Kota:</label>
+                    <input
+                      type="text"
+                      value={kotaAudit}
+                      onChange={(e) => setKotaAudit(e.target.value)}
+                      placeholder="Depok"
+                      className="px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 w-24 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-1.5">
+                    <label className="font-semibold text-slate-700 shrink-0">Waktu & Tanggal:</label>
+                    <input
+                      type="text"
+                      value={tanggalAuditLocal}
+                      onChange={(e) => setTanggalAuditLocal(e.target.value)}
+                      placeholder="YYYY-MM-DD HH:mm"
+                      className="px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono text-slate-800 w-36 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTanggalAuditLocal(getCurrentLocalDateTimeString())}
+                      className="inline-flex items-center space-x-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-200 transition-all cursor-pointer"
+                      title="Set ke waktu aktif saat ini"
+                    >
+                      <Clock className="w-3 h-3 text-teal-600" />
+                      <span>Sekarang</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
                   <button
@@ -628,7 +815,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                 </span>
               </div>
               <p className="font-black text-slate-900 underline group-hover:text-teal-700 transition-colors">
-                {namaKetuaMkks || 'Drs. H. M. Supriyadi, M.Pd'}
+                {namaKetuaMkks || 'Ketua MKKS'}
               </p>
               <p className="text-[10px] text-slate-500">
                 {nipKetuaMkks ? `NIP. ${nipKetuaMkks}` : 'NIP. -'}
@@ -648,7 +835,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
               }`}
               title={!isEditingPejabat ? 'Klik untuk mengedit data Bendahara' : undefined}
             >
-              <p className="text-slate-500 mb-1">{kotaAudit}, {formatDateIndonesian(auditData.tanggalAudit)}</p>
+              <p className="text-slate-500 mb-1">{kotaAudit}, {formatDateIndonesian(tanggalAuditLocal || auditData.tanggalAudit)}</p>
               <p className="font-bold text-slate-800">{jabatanBendahara || 'Bendahara MKKS SMP Citos'}</p>
               <div className="h-16 flex items-center justify-center">
                 <span className="text-[10px] text-slate-300 print:hidden group-hover:text-teal-600 font-sans italic">
@@ -681,16 +868,26 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
             Tutup
           </button>
           <div className="flex items-center space-x-2">
-            <span className="text-[11px] text-slate-500 hidden sm:inline">
-              Simpan sebagai PDF atau cetak fisik dokumen
-            </span>
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPdf}
+              type="button"
+              className="inline-flex items-center space-x-2 px-4 py-2 sm:py-2.5 bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>{isDownloadingPdf ? 'Memproses PDF...' : 'Unduh File PDF'}</span>
+            </button>
             <button
               onClick={handlePrint}
               type="button"
               className="inline-flex items-center space-x-2 px-5 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Cetak Berita Acara / PDF</span>
+              <span>Cetak Berita Acara</span>
             </button>
           </div>
         </div>

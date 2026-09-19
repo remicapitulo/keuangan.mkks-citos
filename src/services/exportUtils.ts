@@ -594,7 +594,7 @@ export function exportToPDF(
 
   const rekapAkhirHead = [['Komponen Arus Kas', 'Jumlah Nominal (Rp)', 'Rincian & Keterangan']];
   const rekapAkhirRows = [
-    ['Total Penerimaan Iuran Anggota', formatRupiah(totalIuranMasuk), `Iuran 10 Sekolah Anggota MKKS (${iuranTahunThis.length} kali bayar)`],
+    ['Total Penerimaan Iuran Anggota', formatRupiah(totalIuranMasuk), 'Iuran Sekolah Anggota MKKS'],
     ['Total Pemasukan Non-Iuran', formatRupiah(totalPemasukanLain), `${pemasukanLainTahunThis.length} Transaksi Non-Iuran (Sponsor/Sisa/Donasi)`],
     ['TOTAL KAS MASUK (Iuran + Non-Iuran)', formatRupiah(totalKasMasuk), 'Akumulasi Seluruh Penerimaan Dana Kas Masuk'],
     ['TOTAL KAS KELUAR (Pengeluaran Operasional)', formatRupiah(totalKasKeluar), `${pengeluaranTahunThis.length} Transaksi Pengeluaran Operasional & Program`],
@@ -700,8 +700,9 @@ export function exportToPDF(
     signatureY = 25;
   }
 
+  const ketuaUser = StorageService.getKetuaUser();
   const savedPejabat = StorageService.getPejabat();
-  const namaKetua = rekonsiliasiKas?.namaKetuaMkks || savedPejabat.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.';
+  const namaKetua = ketuaUser?.namaKepsek || rekonsiliasiKas?.namaKetuaMkks || savedPejabat.namaKetuaMkks || 'Ketua MKKS';
   const nipKetua = rekonsiliasiKas?.nipKetuaMkks || savedPejabat.nipKetuaMkks || '';
   const jabatanKetua = rekonsiliasiKas?.jabatanKetuaMkks || savedPejabat.jabatanKetuaMkks || 'Ketua MKKS SMP Cimanggis & Tapos';
 
@@ -856,4 +857,278 @@ export function exportRiwayatHapusToPDF(
   doc.text(bendaharaName, 220, signatureY + 25);
 
   doc.save(`Laporan_Riwayat_Penghapusan_Data_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+export interface ExportBeritaAcaraPDFParams {
+  auditData: RekonsiliasiKas;
+  saldoData: number;
+  totalKasMasuk: number;
+  totalKasKeluar: number;
+  totalIuranMasuk: number;
+  totalPemasukanLain: number;
+  kotaAudit?: string;
+  namaKetuaMkks?: string;
+  nipKetuaMkks?: string;
+  jabatanKetuaMkks?: string;
+  namaBendahara?: string;
+  nipBendahara?: string;
+  jabatanBendahara?: string;
+  tanggalAudit?: string;
+}
+
+export function exportBeritaAcaraToPDF(params: ExportBeritaAcaraPDFParams) {
+  const {
+    auditData,
+    saldoData,
+    totalKasMasuk,
+    totalKasKeluar,
+    totalIuranMasuk,
+    totalPemasukanLain,
+    kotaAudit = 'Depok',
+    namaKetuaMkks = 'Dra. H. Nurbaiti',
+    nipKetuaMkks = '-',
+    jabatanKetuaMkks = 'Ketua MKKS SMP Citos',
+    namaBendahara = 'H. Nurhasan, M.Pd',
+    nipBendahara = '',
+    jabatanBendahara = 'Bendahara MKKS SMP Citos',
+    tanggalAudit = auditData.tanggalAudit
+  } = params;
+
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const totalSaldoReal = (auditData.saldoCash || 0) + (auditData.saldoBank || 0);
+  const selisih = totalSaldoReal - saldoData;
+  const isBalance = Math.abs(selisih) === 0;
+  const isLebih = selisih > 0;
+
+  // 1. Kop Dokumen Resmi
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text('MUSYAWARAH KERJA KEPALA SEKOLAH (MKKS) SMP', 105, 16, { align: 'center' });
+
+  doc.setFontSize(14.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('KECAMATAN CIMANGGIS & TAPOS (CITOS)', 105, 22.5, { align: 'center' });
+
+  // Double border line kop surat
+  doc.setDrawColor(15, 23, 42);
+  doc.setLineWidth(0.6);
+  doc.line(15, 26, 195, 26);
+  doc.setLineWidth(0.2);
+  doc.line(15, 27.2, 195, 27.2);
+
+  // 2. Judul Berita Acara
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(15, 23, 42);
+  doc.text('BERITA ACARA PEMERIKSAAN KAS & REKONSILIASI', 105, 34, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Nomor: BA.KAS/${auditData.tahun}/${auditData.id || '01'}`, 105, 39, { align: 'center' });
+
+  // 3. Kalimat Pengantar
+  const tglTeks = formatDateIndonesian(tanggalAudit || auditData.tanggalAudit);
+  const introText = `Pada hari ini, tanggal ${tglTeks}, telah dilakukan pemeriksaan dan audit keselarasan keuangan (Kas Opname & Rekonsiliasi Bank) atas pembukuan kas MKKS SMP Cimanggis & Tapos (CITOS) untuk Tahun Anggaran / Buku ${auditData.tahun}. Berdasarkan hasil pemeriksaan data sistem dan penghitungan fisik uang tunai serta rekening bank, diperoleh hasil sebagai berikut:`;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  const splitIntro = doc.splitTextToSize(introText, 180);
+  doc.text(splitIntro, 15, 45);
+
+  let curY = 45 + (splitIntro.length * 4.2) + 2;
+
+  // 4. Tabel I: Data Pembukuan Sistem
+  autoTable(doc, {
+    startY: curY,
+    margin: { left: 15, right: 15 },
+    head: [[
+      { content: 'I. SALDO MENURUT PEMBUKUAN DATA (SISTEM)', styles: { halign: 'left', fontStyle: 'bold' } },
+      { content: formatRupiah(saldoData), styles: { halign: 'right', fontStyle: 'bold' } }
+    ]],
+    body: [
+      ['Total Penerimaan Iuran Anggota Sekolah', formatRupiah(totalIuranMasuk)],
+      ['Total Pemasukan Non-Iuran (Sponsor / Donasi / Sisa)', formatRupiah(totalPemasukanLain)],
+      [{ content: 'TOTAL PENERIMAAN KAS (A)', styles: { fontStyle: 'bold', fillColor: [236, 253, 245], textColor: [6, 95, 70] } }, { content: formatRupiah(totalKasMasuk), styles: { fontStyle: 'bold', halign: 'right', fillColor: [236, 253, 245], textColor: [6, 95, 70] } }],
+      [{ content: 'TOTAL PENGELUARAN OPERASIONAL & PROGRAM (B)', styles: { fontStyle: 'bold', fillColor: [255, 241, 242], textColor: [159, 18, 57] } }, { content: formatRupiah(totalKasKeluar), styles: { fontStyle: 'bold', halign: 'right', fillColor: [255, 241, 242], textColor: [159, 18, 57] } }],
+      [{ content: 'SALDO BERSIH MENURUT DATA (A - B)', styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] } }, { content: formatRupiah(saldoData), styles: { fontStyle: 'bold', halign: 'right', fillColor: [241, 245, 249], textColor: [15, 23, 42] } }]
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { cellWidth: 130 },
+      1: { cellWidth: 50, halign: 'right' }
+    }
+  });
+
+  curY = (doc as any).lastAutoTable.finalY + 4;
+
+  // 5. Tabel II: Saldo Fisik & Bank
+  autoTable(doc, {
+    startY: curY,
+    margin: { left: 15, right: 15 },
+    head: [[
+      { content: 'II. SALDO KEUANGAN SECARA REAL (FISIK & BANK)', styles: { halign: 'left', fontStyle: 'bold' } },
+      { content: formatRupiah(totalSaldoReal), styles: { halign: 'right', fontStyle: 'bold' } }
+    ]],
+    body: [
+      [
+        '1. Uang Tunai / Cash (Brankas Bendahara) - Hasil hitung fisik uang tunai',
+        formatRupiah(auditData.saldoCash || 0)
+      ],
+      [
+        `2. Uang di Rekening Bank - ${auditData.namaBank || 'Bank'} No. ${auditData.nomorRekening || '-'} (a.n. ${auditData.atasNamaRekening || '-'})`,
+        formatRupiah(auditData.saldoBank || 0)
+      ],
+      [
+        { content: 'TOTAL SALDO REAL FISIK (1 + 2)', styles: { fontStyle: 'bold', fillColor: [204, 251, 241], textColor: [19, 78, 74] } },
+        { content: formatRupiah(totalSaldoReal), styles: { fontStyle: 'bold', halign: 'right', fillColor: [204, 251, 241], textColor: [19, 78, 74] } }
+      ]
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: [204, 251, 241], textColor: [19, 78, 74], fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { cellWidth: 130 },
+      1: { cellWidth: 50, halign: 'right' }
+    }
+  });
+
+  curY = (doc as any).lastAutoTable.finalY + 4;
+
+  // 6. Box III: Kesimpulan & Status
+  const statusLabel = isBalance 
+    ? 'BALANCE / COCOK (Rp 0)' 
+    : isLebih 
+    ? `SELISIH LEBIH (+${formatRupiah(selisih)})` 
+    : `SELISIH KURANG (-${formatRupiah(Math.abs(selisih))})`;
+
+  const statusExplanation = isBalance
+    ? 'Seluruh pencatatan kas menurut sistem pembukuan telah SINKRON SEMPURNA (BALANCE) dengan total uang fisik tunai di bendahara dan saldo di rekening bank. Tidak terdapat selisih pembukuan.'
+    : isLebih
+    ? `Ditemukan SELISIH LEBIH sebesar ${formatRupiah(selisih)} di mana total uang fisik/rekening lebih banyak daripada saldo yang tercatat di laporan. Harap cek kembali kemungkinan adanya penerimaan yang belum terinput.`
+    : `Ditemukan SELISIH KURANG sebesar ${formatRupiah(Math.abs(selisih))} di mana uang fisik/rekening lebih kecil daripada saldo di laporan pembukuan. Harap cek kembali kemungkinan adanya kuitansi pengeluaran yang belum dicatat atau kekurangan kas.`;
+
+  const boxBgColor: [number, number, number] = isBalance ? [236, 253, 245] : isLebih ? [254, 243, 199] : [255, 241, 242];
+  const boxBorderColor: [number, number, number] = isBalance ? [110, 231, 183] : isLebih ? [252, 211, 77] : [253, 164, 175];
+  const boxTextColor: [number, number, number] = isBalance ? [6, 95, 70] : isLebih ? [146, 64, 14] : [159, 18, 57];
+
+  doc.setFillColor(...boxBgColor);
+  doc.setDrawColor(...boxBorderColor);
+  doc.setLineWidth(0.35);
+
+  const splitExp = doc.splitTextToSize(statusExplanation, 172);
+  const noteLines = auditData.catatanAudit ? doc.splitTextToSize(`Catatan Pemeriksa: "${auditData.catatanAudit}"`, 172) : [];
+  const boxHeight = 12 + (splitExp.length * 3.8) + (noteLines.length ? (noteLines.length * 3.8 + 4) : 0);
+
+  doc.roundedRect(15, curY, 180, boxHeight, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...boxTextColor);
+  doc.text('III. KESIMPULAN HASIL AUDIT / REKONSILIASI', 19, curY + 6);
+  doc.text(statusLabel, 191, curY + 6, { align: 'right' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(splitExp, 19, curY + 11);
+
+  if (noteLines.length) {
+    const noteY = curY + 11 + (splitExp.length * 3.8) + 2;
+    doc.setFont('helvetica', 'italic');
+    doc.text(noteLines, 19, noteY);
+  }
+
+  curY += boxHeight + 4;
+
+  // 7. Rincian Pecahan Uang Kertas & Koin (jika ada)
+  if (auditData.pecahanCash) {
+    const p = auditData.pecahanCash;
+    const cashDetailText = `Rincian Fisik Kas: 100rb: ${p.pecahan100k || 0} lbr • 50rb: ${p.pecahan50k || 0} lbr • 20rb: ${p.pecahan20k || 0} lbr • 10rb: ${p.pecahan10k || 0} lbr • 5rb: ${p.pecahan5k || 0} lbr • 2rb: ${p.pecahan2k || 0} lbr • 1rb: ${p.pecahan1k || 0} lbr • Koin: ${formatRupiah(p.koin || 0)}`;
+    
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(15, curY, 180, 8, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(cashDetailText, 19, curY + 5.2);
+
+    curY += 11;
+  }
+
+  // 8. Kalimat Penutup
+  const closingText = 'Demikian Berita Acara Pemeriksaan Kas ini dibuat dengan sebenarnya dalam rangkap secukupnya untuk dipergunakan sebagaimana mestinya dan menjadi dokumen pertanggungjawaban keuangan organisasi.';
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  const splitClose = doc.splitTextToSize(closingText, 180);
+  doc.text(splitClose, 15, curY);
+
+  curY += (splitClose.length * 4) + 6;
+
+  // Check if we need page break for signature or adjust
+  if (curY > 240) {
+    doc.addPage('a4', 'portrait');
+    curY = 25;
+  }
+
+  // 9. Kolom Tanda Tangan (2 Kolom Sejajar)
+  // Kolom Kiri: Ketua MKKS
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Mengetahui,', 40, curY, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(jabatanKetuaMkks || 'Ketua MKKS SMP Citos', 40, curY + 5, { align: 'center' });
+
+  // Kolom Kanan: Bendahara
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`${kotaAudit}, ${tglTeks}`, 160, curY, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(jabatanBendahara || 'Bendahara MKKS SMP Citos', 160, curY + 5, { align: 'center' });
+
+  // Ruang Tanda Tangan
+  const sigY = curY + 26;
+
+  // Nama & NIP Ketua MKKS
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(namaKetuaMkks || 'Dra. H. Nurbaiti', 40, sigY, { align: 'center' });
+  doc.setLineWidth(0.3);
+  const ketuaWidth = doc.getTextWidth(namaKetuaMkks || 'Dra. H. Nurbaiti');
+  doc.line(40 - (ketuaWidth / 2), sigY + 1, 40 + (ketuaWidth / 2), sigY + 1);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(nipKetuaMkks && nipKetuaMkks !== '-' ? `NIP. ${nipKetuaMkks}` : 'Ketua MKKS SMP Citos', 40, sigY + 5.5, { align: 'center' });
+
+  // Nama & NIP Bendahara
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(namaBendahara || 'H. Nurhasan, M.Pd', 160, sigY, { align: 'center' });
+  const bendaharaWidth = doc.getTextWidth(namaBendahara || 'H. Nurhasan, M.Pd');
+  doc.line(160 - (bendaharaWidth / 2), sigY + 1, 160 + (bendaharaWidth / 2), sigY + 1);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(nipBendahara ? `NIP. ${nipBendahara}` : 'Petugas Pemeriksa Kas', 160, sigY + 5.5, { align: 'center' });
+
+  // Save PDF
+  const filename = `Berita-Acara-Audit-Kas-CITOS-${auditData.tahun || 2026}.pdf`;
+  doc.save(filename);
+  return filename;
 }

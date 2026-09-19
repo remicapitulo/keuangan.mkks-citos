@@ -27,11 +27,12 @@ export const ModalEditPejabat: React.FC<ModalEditPejabatProps> = ({
   useEffect(() => {
     if (isOpen) {
       const current = StorageService.getPejabat();
+      const ketua = StorageService.getKetuaUser();
       const currentUser = StorageService.getCurrentUser();
       const namaLogin = currentUser?.namaKepsek || currentUser?.username || '';
       const isOldBendahara = !current.namaBendahara || current.namaBendahara.includes('Nurhasan');
 
-      setNamaKetuaMkks(current.namaKetuaMkks || DEFAULT_PEJABAT.namaKetuaMkks);
+      setNamaKetuaMkks(ketua?.namaKepsek || current.namaKetuaMkks || '');
       setNipKetuaMkks(current.nipKetuaMkks || DEFAULT_PEJABAT.nipKetuaMkks);
       setJabatanKetuaMkks(current.jabatanKetuaMkks || DEFAULT_PEJABAT.jabatanKetuaMkks);
 
@@ -45,7 +46,8 @@ export const ModalEditPejabat: React.FC<ModalEditPejabatProps> = ({
   if (!isOpen) return null;
 
   const handleResetDefault = () => {
-    setNamaKetuaMkks(DEFAULT_PEJABAT.namaKetuaMkks);
+    const ketua = StorageService.getKetuaUser();
+    setNamaKetuaMkks(ketua?.namaKepsek || '');
     setNipKetuaMkks(DEFAULT_PEJABAT.nipKetuaMkks);
     setJabatanKetuaMkks(DEFAULT_PEJABAT.jabatanKetuaMkks);
 
@@ -217,9 +219,6 @@ export const ModalEditPejabat: React.FC<ModalEditPejabatProps> = ({
                 placeholder="Contoh: Abu Haripin, M.Pd."
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600"
               />
-              <p className="text-[10px] text-slate-500 mt-1">
-                Secara otomatis di awal mengambil dari akun login. Petugas cetak dapat mengedit secara manual jika ada perubahan.
-              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Sekolah } from '../types';
 import { UserCheck, X, Lock, LogIn, User as UserIcon, RefreshCw } from 'lucide-react';
 import { StorageService } from '../services/spreadsheetSync';
@@ -20,12 +20,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onSelectUser,
   isForceLogin = false
 }) => {
-  if (!isOpen) return null;
-
   const [usernameInput, setUsernameInput] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg(null);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const handleSyncDatabase = async () => {
     setIsSyncing(true);

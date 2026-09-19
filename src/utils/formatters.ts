@@ -113,6 +113,19 @@ export function cleanDateInputString(val?: string | null): string {
 }
 
 /**
+ * Return current local date and time in format YYYY-MM-DD HH:mm
+ */
+export function getCurrentLocalDateTimeString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
  * Convert numbers to Indonesian words (Terbilang)
  */
 export function terbilang(n: number): string {

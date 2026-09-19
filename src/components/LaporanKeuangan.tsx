@@ -2124,7 +2124,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <tr>
                 <td className="p-2 border border-slate-300 font-semibold">Total Penerimaan Iuran Anggota</td>
                 <td className="p-2 border border-slate-300 text-right font-bold text-slate-800">{formatRupiah(totalIuranMasuk)}</td>
-                <td className="p-2 border border-slate-300 text-slate-600">Iuran 10 Sekolah Anggota MKKS ({iuranYear.length} transaksi)</td>
+                <td className="p-2 border border-slate-300 text-slate-600">Iuran Sekolah Anggota MKKS</td>
               </tr>
               <tr>
                 <td className="p-2 border border-slate-300 font-semibold">Total Pemasukan Kas Non-Iuran</td>
@@ -2243,7 +2243,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
             <p className="font-bold">{auditTahunThis?.jabatanKetuaMkks || pejabatData.jabatanKetuaMkks || 'Ketua MKKS SMP Cimanggis & Tapos'}</p>
             <div className="h-16"></div>
             <p className="font-extrabold underline text-slate-900">
-              {((auditTahunThis?.namaKetuaMkks && !auditTahunThis.namaKetuaMkks.toLowerCase().includes('gustian') && !auditTahunThis.namaKetuaMkks.toLowerCase().includes('supriyadi')) ? auditTahunThis.namaKetuaMkks : '') || StorageService.getKetuaUser(usersList)?.namaKepsek || pejabatData.namaKetuaMkks || 'Ignatius Widi Nugroho, S.Sos.'}
+              {StorageService.getKetuaUser(usersList)?.namaKepsek || auditTahunThis?.namaKetuaMkks || pejabatData.namaKetuaMkks || 'Ketua MKKS'}
             </p>
             {(auditTahunThis?.nipKetuaMkks || pejabatData.nipKetuaMkks) && (
               <p className="text-[10px] text-slate-600">NIP. {auditTahunThis?.nipKetuaMkks || pejabatData.nipKetuaMkks}</p>
