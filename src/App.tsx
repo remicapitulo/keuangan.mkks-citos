@@ -106,6 +106,10 @@ export default function App() {
 
   // Save new Iuran items
   const handleSaveIuran = async (newItems: Omit<Iuran, 'id'>[]) => {
+    if (isKetua) {
+      showToast('Aksi Input ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     const created: Iuran[] = newItems.map((item, idx) => ({
       ...item,
       id: `IUR-${Date.now()}-${idx}`
@@ -125,6 +129,10 @@ export default function App() {
 
   // Save new Pemasukan Lain item
   const handleSavePemasukanLain = async (newIncome: Omit<PemasukanLain, 'id'>) => {
+    if (isKetua) {
+      showToast('Aksi Input ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     const created: PemasukanLain = {
       ...newIncome,
       id: `INC-${Date.now()}`
@@ -144,6 +152,10 @@ export default function App() {
 
   // Save new Pengeluaran item
   const handleSavePengeluaran = async (newExpense: Omit<Pengeluaran, 'id'>) => {
+    if (isKetua) {
+      showToast('Aksi Input ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     const created: Pengeluaran = {
       ...newExpense,
       id: `OUT-${Date.now()}`
@@ -163,6 +175,10 @@ export default function App() {
 
   // Triggers for Deletion from Laporan Keuangan
   const handleRequestDeleteIuran = (item: Iuran) => {
+    if (isKetua) {
+      showToast('Aksi Delete ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     setTargetHapusData({
       id: item.id,
       jenis: 'Iuran',
@@ -178,6 +194,10 @@ export default function App() {
   };
 
   const handleRequestDeletePemasukanLain = (item: PemasukanLain) => {
+    if (isKetua) {
+      showToast('Aksi Delete ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     setTargetHapusData({
       id: item.id,
       jenis: 'Pemasukan Lain',
@@ -193,6 +213,10 @@ export default function App() {
   };
 
   const handleRequestDeletePengeluaran = (item: Pengeluaran) => {
+    if (isKetua) {
+      showToast('Aksi Delete ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     setTargetHapusData({
       id: item.id,
       jenis: 'Pengeluaran',
@@ -213,6 +237,10 @@ export default function App() {
     namaPetugas: string,
     roleUser: string
   ) => {
+    if (isKetua) {
+      showToast('Aksi Delete ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     const newRiwayat: RiwayatHapus = {
       id: `DEL-${Date.now()}`,
       idTransaksi: target.id,
@@ -304,6 +332,10 @@ export default function App() {
 
   // Save Audit Rekonsiliasi Kas
   const handleSaveRekonsiliasiKas = async (record: RekonsiliasiKas) => {
+    if (isKetua) {
+      showToast('Aksi Input/Audit ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
     const updated = StorageService.saveSingleRekonsiliasi(record);
     setRekonsiliasiKasList(updated);
     
@@ -322,7 +354,20 @@ export default function App() {
     currentUser.username?.toLowerCase().includes('admin')
   ) : false;
 
+  const isKetua = currentUser ? (
+    currentUser.role === 'Ketua' ||
+    currentUser.role?.toLowerCase() === 'ketua'
+  ) : false;
+
   const isBendahara = currentUser?.role === 'Bendahara' || isAdmin;
+  const canAccessBendaharaMenu = isBendahara && !isKetua;
+
+  // Auto redirect Ketua to dashboard if currently on closed tabs
+  useEffect(() => {
+    if (isKetua && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran')) {
+      setActiveTab('dashboard');
+    }
+  }, [isKetua, activeTab]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col justify-between selection:bg-teal-500 selection:text-white">
@@ -382,6 +427,7 @@ export default function App() {
                 <Dashboard
                   currentUser={currentUser}
                   sekolahList={sekolahList}
+                  usersList={usersList}
                   iuranList={iuranList}
                   pengeluaranList={pengeluaranList}
                   pemasukanLainList={pemasukanLainList}
@@ -391,7 +437,7 @@ export default function App() {
                 />
               )}
 
-              {activeTab === 'input-iuran' && isBendahara && (
+              {activeTab === 'input-iuran' && canAccessBendaharaMenu && (
                 <InputIuran
                   sekolahList={sekolahList}
                   iuranList={iuranList}
@@ -399,23 +445,26 @@ export default function App() {
                   onOpenStrukModal={handleOpenStrukModal}
                   selectedSchoolNameFromDashboard={selectedSchoolForIuran}
                   currentUser={currentUser}
+                  readOnly={isKetua}
                 />
               )}
 
-              {activeTab === 'pemasukan-lain' && isBendahara && (
+              {activeTab === 'pemasukan-lain' && canAccessBendaharaMenu && (
                 <InputPemasukanLain
                   pemasukanLainList={pemasukanLainList}
                   onSavePemasukanLain={handleSavePemasukanLain}
                   onOpenStrukModal={handleOpenStrukModal}
                   currentUser={currentUser}
+                  readOnly={isKetua}
                 />
               )}
 
-              {activeTab === 'kelola-pengeluaran' && isBendahara && (
+              {activeTab === 'kelola-pengeluaran' && canAccessBendaharaMenu && (
                 <KelolaPengeluaran
                   pengeluaranList={pengeluaranList}
                   onSavePengeluaran={handleSavePengeluaran}
                   currentUser={currentUser}
+                  readOnly={isKetua}
                 />
               )}
 
@@ -432,20 +481,20 @@ export default function App() {
                   userSchoolName={currentUser?.sekolah}
                   currentUser={currentUser}
                   onOpenStrukModal={handleOpenStrukModal}
-                  onDeleteIuran={handleRequestDeleteIuran}
-                  onDeletePemasukanLain={handleRequestDeletePemasukanLain}
-                  onDeletePengeluaran={handleRequestDeletePengeluaran}
+                  onDeleteIuran={isKetua ? undefined : handleRequestDeleteIuran}
+                  onDeletePemasukanLain={isKetua ? undefined : handleRequestDeletePemasukanLain}
+                  onDeletePengeluaran={isKetua ? undefined : handleRequestDeletePengeluaran}
                   onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
                 />
               )}
 
-              {/* Access denied fallback if Sekolah attempts Bendahara route */}
-              {!isBendahara && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran') && (
+              {/* Access denied fallback if user attempts closed route */}
+              {!canAccessBendaharaMenu && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran') && (
                 <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12 space-y-3">
                   <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto" />
                   <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Bendahara)</h3>
                   <p className="text-xs text-slate-500">
-                    Menu ini khusus diakses oleh pengurus Bendahara MKKS Citos. Akun sekolah dapat mengakses menu Dashboard dan Laporan Keuangan.
+                    Menu Input Iuran, Pemasukan Lain, dan Kelola Pengeluaran ditutup untuk akun {isKetua ? 'Ketua' : 'Sekolah'}. Silakan gunakan menu Dashboard atau Laporan Keuangan.
                   </p>
                   <button
                     onClick={() => setActiveTab('dashboard')}

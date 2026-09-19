@@ -42,6 +42,8 @@ interface BeritaAcaraAuditModalProps {
   sekolahList: Sekolah[];
   usersList?: User[];
   onUpdateAudit?: (updated: RekonsiliasiKas) => void;
+  currentUser?: User | null;
+  readOnly?: boolean;
 }
 
 export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
@@ -55,10 +57,14 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
   totalPemasukanLain,
   sekolahList,
   usersList = [],
-  onUpdateAudit
+  onUpdateAudit,
+  currentUser: propCurrentUser,
+  readOnly = false
 }) => {
   const defaultPejabat = StorageService.getPejabat(usersList);
-  const currentUser = StorageService.getCurrentUser();
+  const currentUser = propCurrentUser || StorageService.getCurrentUser();
+  const isKetua = currentUser?.role === 'Ketua' || currentUser?.role?.toLowerCase() === 'ketua';
+  const isReadOnly = Boolean(readOnly || isKetua);
   const namaPemeriksaLogin = currentUser?.namaKepsek || currentUser?.username || '';
   const ketuaUser = StorageService.getKetuaUser(usersList);
 
@@ -286,6 +292,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
 
   const handleSavePejabat = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isReadOnly) return;
 
     // 1. Save globally to localStorage for all documents
     StorageService.savePejabat({
@@ -353,20 +360,22 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
 
           <div className="flex items-center space-x-2 shrink-0 ml-2">
             {/* Button Toggle Edit Pejabat */}
-            <button
-              onClick={() => setIsEditingPejabat(!isEditingPejabat)}
-              type="button"
-              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 sm:px-3 sm:py-2 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer ${
-                isEditingPejabat
-                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                  : 'bg-teal-700/80 hover:bg-teal-600 text-white border border-teal-500/40'
-              }`}
-              title="Edit nama Ketua MKKS, Bendahara, dan tanggal pemeriksaan"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isEditingPejabat ? 'Tutup Edit Pejabat' : 'Edit Pejabat & Tanggal'}</span>
-              <span className="sm:hidden">{isEditingPejabat ? 'Tutup' : 'Edit'}</span>
-            </button>
+            {!isReadOnly && (
+              <button
+                onClick={() => setIsEditingPejabat(!isEditingPejabat)}
+                type="button"
+                className={`inline-flex items-center space-x-1.5 px-3 py-1.5 sm:px-3 sm:py-2 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer ${
+                  isEditingPejabat
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                    : 'bg-teal-700/80 hover:bg-teal-600 text-white border border-teal-500/40'
+                }`}
+                title="Edit nama Ketua MKKS, Bendahara, dan tanggal pemeriksaan"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{isEditingPejabat ? 'Tutup Edit Pejabat' : 'Edit Pejabat & Tanggal'}</span>
+                <span className="sm:hidden">{isEditingPejabat ? 'Tutup' : 'Edit'}</span>
+              </button>
+            )}
 
             <button
               onClick={handleDownloadPDF}

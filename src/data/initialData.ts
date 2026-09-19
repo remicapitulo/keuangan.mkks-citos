@@ -37,6 +37,14 @@ export const INITIAL_USER: User[] = [
     namaKepsek: 'H. Gustian Maskat, S.Ag., M.M.'
   },
   {
+    username: 'ketua',
+    password: '123',
+    role: 'Ketua',
+    sekolah: 'Pengurus MKKS Citos',
+    aktif: 'YA',
+    namaKepsek: 'H. Gustian Maskat, S.Ag., M.M.'
+  },
+  {
     username: 'bendahara',
     password: '123',
     role: 'Bendahara',

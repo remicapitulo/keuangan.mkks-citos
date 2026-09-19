@@ -23,6 +23,7 @@ import {
 interface DashboardProps {
   currentUser: User | null;
   sekolahList: Sekolah[];
+  usersList?: User[];
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
   pemasukanLainList?: PemasukanLain[];
@@ -34,6 +35,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   currentUser,
   sekolahList,
+  usersList = [],
   iuranList,
   pengeluaranList,
   pemasukanLainList = [],
@@ -108,20 +110,95 @@ export const Dashboard: React.FC<DashboardProps> = ({
   ) : false;
 
   const isBendahara = currentUser?.role === 'Bendahara' || isAdmin;
-  
-  // Sekolah role data - Primary Key Lock on ID Sekolah (username = idSekolah)
-  const mySekolahObj = sekolahList.find(s => 
-    (currentUser?.username && s.idSekolah === currentUser.username) ||
-    (currentUser?.sekolah && s.namaSekolah.toLowerCase().trim() === currentUser.sekolah.toLowerCase().trim())
-  );
-  const myIuran = iuranYear.filter(i => 
-    (mySekolahObj && i.idSekolah && i.idSekolah === mySekolahObj.idSekolah) ||
-    (currentUser?.username && i.idSekolah && i.idSekolah === currentUser.username) ||
-    (mySekolahObj 
-      ? i.namaSekolah.toLowerCase().trim() === mySekolahObj.namaSekolah.toLowerCase().trim() 
-      : (currentUser?.sekolah ? i.namaSekolah.toLowerCase().trim() === currentUser.sekolah.toLowerCase().trim() : false)
-    )
-  );
+  const isKetua = currentUser?.role === 'Ketua' || currentUser?.role?.toLowerCase() === 'ketua';
+  const canViewManagementDashboard = isBendahara || isKetua;
+  const canInput = isBendahara;
+
+  // Selected school override for Ketua (stored locally so Ketua can pick/switch their school)
+  const [selectedSchoolIdForKetua, setSelectedSchoolIdForKetua] = useState<string>(() => {
+    try {
+      return localStorage.getItem('mkks_ketua_selected_school') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  // Smart School Resolution (for Sekolah role AND Ketua role)
+  const mySekolahObj = React.useMemo(() => {
+    if (!sekolahList || sekolahList.length === 0) return undefined;
+
+    // 1. If Ketua explicitly selected a school from the switcher
+    if (isKetua && selectedSchoolIdForKetua) {
+      const selected = sekolahList.find(s => 
+        (s.idSekolah && s.idSekolah === selectedSchoolIdForKetua) ||
+        (s.namaSekolah && s.namaSekolah.toLowerCase().trim() === selectedSchoolIdForKetua.toLowerCase().trim())
+      );
+      if (selected) return selected;
+    }
+
+    // 2. Direct match by username = idSekolah
+    if (currentUser?.username) {
+      const byId = sekolahList.find(s => s.idSekolah && s.idSekolah.toLowerCase().trim() === currentUser.username.toLowerCase().trim());
+      if (byId) return byId;
+    }
+
+    // 3. Direct match by currentUser.sekolah (if not generic 'Pengurus')
+    if (currentUser?.sekolah && !currentUser.sekolah.toLowerCase().includes('pengurus')) {
+      const byName = sekolahList.find(s => s.namaSekolah.toLowerCase().trim() === currentUser.sekolah.toLowerCase().trim());
+      if (byName) return byName;
+
+      const bySub = sekolahList.find(s => 
+        currentUser.sekolah.toLowerCase().includes(s.namaSekolah.toLowerCase().trim()) ||
+        s.namaSekolah.toLowerCase().includes(currentUser.sekolah.toLowerCase().trim())
+      );
+      if (bySub) return bySub;
+    }
+
+    // 4. Match by namaKepsek (e.g., H. Gustian Maskat -> SMP GENESIS MEDICARE)
+    if (currentUser?.namaKepsek) {
+      const cleanUserKepsek = currentUser.namaKepsek.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanUserKepsek.length > 3) {
+        const byKepsek = sekolahList.find(s => {
+          if (!s.namaKepsek) return false;
+          const cleanSchoolKepsek = s.namaKepsek.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanSchoolKepsek.includes(cleanUserKepsek) || cleanUserKepsek.includes(cleanSchoolKepsek);
+        });
+        if (byKepsek) return byKepsek;
+      }
+    }
+
+    // 5. Match from usersList if another account with same namaKepsek has a school
+    if (currentUser?.namaKepsek && usersList && usersList.length > 0) {
+      const cleanUserKepsek = currentUser.namaKepsek.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const userMatch = usersList.find(u => {
+        if (!u.namaKepsek || !u.sekolah || u.sekolah.toLowerCase().includes('pengurus')) return false;
+        const cleanU = u.namaKepsek.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cleanU.includes(cleanUserKepsek) || cleanUserKepsek.includes(cleanU);
+      });
+      if (userMatch && userMatch.sekolah) {
+        const byUserSekolah = sekolahList.find(s => 
+          s.namaSekolah.toLowerCase().trim() === userMatch.sekolah.toLowerCase().trim() ||
+          userMatch.sekolah.toLowerCase().includes(s.namaSekolah.toLowerCase().trim())
+        );
+        if (byUserSekolah) return byUserSekolah;
+      }
+    }
+
+    // 6. Default fallback for Ketua: first school in list
+    if (isKetua && sekolahList.length > 0) {
+      return sekolahList[0];
+    }
+
+    return undefined;
+  }, [currentUser, sekolahList, usersList, selectedSchoolIdForKetua, isKetua]);
+
+  const myIuran = iuranYear.filter(i => {
+    if (!mySekolahObj) return false;
+    if (i.idSekolah && mySekolahObj.idSekolah && i.idSekolah === mySekolahObj.idSekolah) return true;
+    if (i.namaSekolah && mySekolahObj.namaSekolah && i.namaSekolah.toLowerCase().trim() === mySekolahObj.namaSekolah.toLowerCase().trim()) return true;
+    return false;
+  });
+
   const myTotalPaidMonths = myIuran.length;
   const myTotalPaidNominal = myIuran.reduce((a, b) => a + b.nominal, 0);
   const myTunggakan = Math.max(0, (12 - myTotalPaidMonths) * IURAN_PER_BULAN);
@@ -173,20 +250,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <h2 className="text-base sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white leading-snug">
-              {isBendahara ? 'Dashboard Pengelolaan Keuangan Bendahara' : `Dashboard Status Iuran: ${currentUser?.sekolah}`}
+              {isBendahara 
+                ? 'Dashboard Pengelolaan Keuangan Bendahara' 
+                : isKetua 
+                  ? 'Dashboard Pengawasan Keuangan Ketua MKKS'
+                  : `Dashboard Status Iuran: ${currentUser?.sekolah}`}
             </h2>
 
             {(currentUser?.namaKepsek || mySekolahObj?.namaKepsek) && (
-              <div className="mt-2 inline-flex items-center space-x-1.5 bg-emerald-500/25 text-emerald-100 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-semibold border border-emerald-300/30 backdrop-blur-md shadow-xs">
-                <UserCheck className="w-3.5 h-3.5 text-emerald-300 flex-shrink-0" />
-                <span>Kepala Sekolah: <strong className="text-white font-bold">{currentUser?.namaKepsek || mySekolahObj?.namaKepsek}</strong></span>
+              <div className="mt-2 flex items-center space-x-2 flex-wrap gap-y-1.5">
+                <div className="inline-flex items-center space-x-1.5 bg-emerald-500/25 text-emerald-100 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-semibold border border-emerald-300/30 backdrop-blur-md shadow-xs">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-300 flex-shrink-0" />
+                  <span>Kepala Sekolah: <strong className="text-white font-bold">{currentUser?.namaKepsek || mySekolahObj?.namaKepsek}</strong></span>
+                </div>
+                {isKetua && mySekolahObj && (
+                  <div className="inline-flex items-center space-x-1.5 bg-indigo-500/30 text-indigo-100 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-semibold border border-indigo-300/30 backdrop-blur-md shadow-xs">
+                    <Building2 className="w-3.5 h-3.5 text-indigo-200 flex-shrink-0" />
+                    <span>Sekolah Anda: <strong className="text-white font-bold">{mySekolahObj.namaSekolah}</strong></span>
+                  </div>
+                )}
               </div>
             )}
 
             <p className="hidden sm:block text-sm text-teal-100/90 mt-1.5 max-w-2xl font-light">
               {isBendahara 
                 ? 'Kelola penerimaan iuran sekolah anggota MKKS Citos dan alokasi pengeluaran operasional secara transparan.'
-                : 'Pantau riwayat pembayaran iuran sekolah Anda dan cetak kuitansi resmi langsung dari dashboard.'}
+                : isKetua
+                  ? 'Pantau seluruh penerimaan iuran sekolah, pemasukan non-iuran, dan pengeluaran operasional MKKS Citos secara menyeluruh (Mode Monitoring View).'
+                  : 'Pantau riwayat pembayaran iuran sekolah Anda dan cetak kuitansi resmi langsung dari dashboard.'}
             </p>
           </div>
 
@@ -284,28 +375,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
           <div className="flex items-center justify-between">
             <span className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">
-              {isBendahara ? 'Sisa Tunggakan MKKS' : 'Tunggakan Sekolah Anda'}
+              {canViewManagementDashboard ? 'Sisa Tunggakan MKKS' : 'Tunggakan Sekolah Anda'}
             </span>
-            <div className={`p-2.5 sm:p-3 rounded-xl ${isBendahara ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'} group-hover:scale-110 transition-transform`}>
-              {isBendahara ? <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" /> : <Coins className="w-5 h-5 sm:w-6 sm:h-6" />}
+            <div className={`p-2.5 sm:p-3 rounded-xl ${canViewManagementDashboard ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'} group-hover:scale-110 transition-transform`}>
+              {canViewManagementDashboard ? <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" /> : <Coins className="w-5 h-5 sm:w-6 sm:h-6" />}
             </div>
           </div>
           <div className="mt-3">
-            <div className={`text-2xl sm:text-3xl lg:text-3xl font-black tracking-tight ${isBendahara ? 'text-amber-600' : 'text-indigo-600'}`}>
-              {formatRupiah(isBendahara ? totalTunggakan : myTunggakan)}
+            <div className={`text-2xl sm:text-3xl lg:text-3xl font-black tracking-tight ${canViewManagementDashboard ? 'text-amber-600' : 'text-indigo-600'}`}>
+              {formatRupiah(canViewManagementDashboard ? totalTunggakan : myTunggakan)}
             </div>
             <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1">
-              {isBendahara 
+              {canViewManagementDashboard 
                 ? `${sekolahList.length * 12 - iuranYear.length} Bulan iuran belum terbayar dari ${sekolahList.length} sekolah`
                 : `${myTotalPaidMonths} / 12 Bulan telah dibayar`}
             </p>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm">
             <span className="text-slate-600 font-medium">Status Pembayaran:</span>
-            {isBendahara ? (
-              <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                {100 - percentageLunas}% Tunggakan
-              </span>
+            {canViewManagementDashboard ? (
+              <div className="flex items-center space-x-1.5 flex-wrap justify-end">
+                <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                  {100 - percentageLunas}% Tunggakan MKKS
+                </span>
+                {isKetua && mySekolahObj && (
+                  <span className={`font-bold text-[10px] px-2 py-0.5 rounded-full ${myTotalPaidMonths === 12 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                    {mySekolahObj.namaSekolah}: {myTotalPaidMonths === 12 ? 'Lunas 100%' : `Sisa ${12 - myTotalPaidMonths} Bln`}
+                  </span>
+                )}
+              </div>
             ) : (
               <span className={`font-bold px-2 py-0.5 rounded-full ${myTotalPaidMonths === 12 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                 {myTotalPaidMonths === 12 ? 'LUNAS 1 TAHUN' : `${12 - myTotalPaidMonths} Bulan Belum Lunas`}
@@ -316,26 +414,65 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       </div>
 
-      {/* Sekolah Specific Highlight (If logged in as Sekolah role) */}
-      {!isBendahara && mySekolahObj && (
+      {/* Sekolah Specific Highlight (If logged in as Sekolah role OR Ketua role) */}
+      {(!isBendahara || isKetua) && mySekolahObj && (
         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border-2 border-teal-300/80 rounded-2xl p-4 sm:p-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
             <div>
               <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                <span className="bg-emerald-600 text-white font-bold text-[10px] sm:text-xs px-2.5 py-1 rounded-lg shrink-0">
-                  INFO SEKOLAH
+                <span className="bg-emerald-600 text-white font-bold text-[10px] sm:text-xs px-2.5 py-1 rounded-lg shrink-0 flex items-center space-x-1">
+                  <Building2 className="w-3 h-3 text-white" />
+                  <span>{isKetua ? 'KEUANGAN SEKOLAH KETUA' : 'INFO SEKOLAH'}</span>
                 </span>
                 <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-snug">{mySekolahObj.namaSekolah}</h3>
+                {isKetua && (
+                  <span className="bg-indigo-100 text-indigo-800 font-bold text-[10px] px-2 py-0.5 rounded-full border border-indigo-200">
+                    Sekolah Mandiri Anda
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-600 mt-1">
                 Kepala Sekolah: <strong className="text-slate-800">{mySekolahObj.namaKepsek}</strong> • Alamat: {mySekolahObj.alamat}, Kel. {mySekolahObj.kelurahan}
               </p>
+
+              {isKetua && sekolahList.length > 1 && (
+                <div className="mt-2.5 flex items-center space-x-2 flex-wrap gap-1">
+                  <label htmlFor="ketua-school-selector" className="text-[11px] font-semibold text-slate-600">
+                    Pilih / Ganti Sekolah Anda:
+                  </label>
+                  <select
+                    id="ketua-school-selector"
+                    value={mySekolahObj.idSekolah || mySekolahObj.namaSekolah}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedSchoolIdForKetua(val);
+                      try {
+                        localStorage.setItem('mkks_ketua_selected_school', val);
+                      } catch {}
+                    }}
+                    className="text-xs font-bold bg-white border border-teal-300 text-teal-900 rounded-lg px-2.5 py-1 shadow-xs focus:ring-2 focus:ring-teal-400 focus:outline-none cursor-pointer"
+                  >
+                    {sekolahList.map((s, idx) => (
+                      <option key={`opt-ketua-sek-${s.idSekolah || s.namaSekolah}-${idx}`} value={s.idSekolah || s.namaSekolah}>
+                        {s.namaSekolah} {s.namaKepsek ? `(${s.namaKepsek})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between sm:justify-end space-x-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-teal-200/60">
               <div className="text-left sm:text-right">
                 <div className="text-[11px] sm:text-xs text-slate-500">Total Terbayar ({selectedYear})</div>
                 <div className="text-lg sm:text-xl font-extrabold text-emerald-700">{formatRupiah(myTotalPaidNominal)}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                  {myTotalPaidMonths === 12 ? (
+                    <span className="text-emerald-700 font-bold">LUNAS 100% (12 Bulan)</span>
+                  ) : (
+                    <span className="text-amber-700 font-semibold">Tunggakan: {formatRupiah(myTunggakan)} ({12 - myTotalPaidMonths} Bln)</span>
+                  )}
+                </div>
               </div>
               <button
                 id="btn-lihat-laporan-sekolah"
@@ -394,11 +531,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Financial Trend Chart & Quick Actions (For Bendahara: 2 cols chart + 1 col Ringkasan; For Sekolah: Full width chart only) */}
-      <div className={`grid grid-cols-1 ${isBendahara ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6`}>
+      {/* Financial Trend Chart & Quick Actions (For Management: 2 cols chart + 1 col Ringkasan; For Sekolah: Full width chart only) */}
+      <div className={`grid grid-cols-1 ${canViewManagementDashboard ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6`}>
         
         {/* Visual Trend Bar Chart */}
-        <div className={`${isBendahara ? 'lg:col-span-2' : 'w-full'} bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between`}>
+        <div className={`${canViewManagementDashboard ? 'lg:col-span-2' : 'w-full'} bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between`}>
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div>
@@ -478,8 +615,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Quick Overview Per School Status (ONLY SHOWN FOR BENDAHARA / ADMIN) */}
-        {isBendahara && (
+        {/* Quick Overview Per School Status (SHOWN FOR BENDAHARA / ADMIN / KETUA) */}
+        {canViewManagementDashboard && (
           <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -496,14 +633,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {sekolahList.map((sek, idx) => {
                   const paidCount = iuranYear.filter(i => i.idSekolah === sek.idSekolah).length;
                   const isFullyPaid = paidCount === 12;
+                  const isMySchool = mySekolahObj && (
+                    (sek.idSekolah && mySekolahObj.idSekolah && sek.idSekolah === mySekolahObj.idSekolah) ||
+                    (sek.namaSekolah && mySekolahObj.namaSekolah && sek.namaSekolah.toLowerCase().trim() === mySekolahObj.namaSekolah.toLowerCase().trim())
+                  );
 
                   return (
                     <div
                       key={`dash-sek-${sek.idSekolah || sek.namaSekolah}-${idx}`}
-                      className="p-2.5 sm:p-3 rounded-xl border border-slate-100 hover:border-teal-200 hover:bg-teal-50/40 transition-all flex items-center justify-between text-xs gap-2"
+                      className={`p-2.5 sm:p-3 rounded-xl border transition-all flex items-center justify-between text-xs gap-2 ${
+                        isMySchool 
+                          ? 'border-teal-400 bg-teal-50/80 shadow-xs ring-2 ring-teal-300/60' 
+                          : 'border-slate-100 hover:border-teal-200 hover:bg-teal-50/40'
+                      }`}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-slate-800 truncate">{sek.namaSekolah}</div>
+                        <div className="font-bold text-slate-800 truncate flex items-center">
+                          <span>{sek.namaSekolah}</span>
+                          {isMySchool && (
+                            <span className="ml-1.5 bg-teal-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0">
+                              Sekolah Anda
+                            </span>
+                          )}
+                        </div>
                         <div className="text-slate-500 text-[10px] sm:text-[11px] truncate">Kepsek: {sek.namaKepsek}</div>
                       </div>
 
@@ -517,7 +669,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </div>
                         </div>
 
-                        {!isFullyPaid && onSelectSchoolForIuran && (
+                        {!isFullyPaid && onSelectSchoolForIuran && canInput && (
                           <button
                             id={`btn-quick-iuran-${sek.idSekolah}`}
                             onClick={() => {
@@ -537,23 +689,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            <div className="mt-4 pt-3.5 border-t border-slate-100">
-              <button
-                id="btn-goto-input-iuran"
-                onClick={() => onNavigateToTab('input-iuran')}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer"
-              >
-                <Wallet className="w-4 h-4" />
-                <span>+ Input Pembayaran Iuran Baru</span>
-              </button>
-            </div>
+            {canInput && (
+              <div className="mt-4 pt-3.5 border-t border-slate-100">
+                <button
+                  id="btn-goto-input-iuran"
+                  onClick={() => onNavigateToTab('input-iuran')}
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs py-2.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <Wallet className="w-4 h-4" />
+                  <span>+ Input Pembayaran Iuran Baru</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
       </div>
 
-      {/* Recent Activity Section (ONLY SHOWN FOR BENDAHARA / ADMIN) */}
-      {isBendahara && (
+      {/* Recent Activity Section (SHOWN FOR BENDAHARA / ADMIN / KETUA) */}
+      {canViewManagementDashboard && (
         <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
             <div>

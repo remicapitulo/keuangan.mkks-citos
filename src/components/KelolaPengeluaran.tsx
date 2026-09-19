@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Pengeluaran, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
-import { Receipt, PlusCircle, Calendar, FileText, TrendingDown, Tag, AlertCircle } from 'lucide-react';
+import { Receipt, PlusCircle, Calendar, FileText, TrendingDown, Tag, AlertCircle, Lock } from 'lucide-react';
 
 interface KelolaPengeluaranProps {
   pengeluaranList: Pengeluaran[];
   onSavePengeluaran: (newExpense: Omit<Pengeluaran, 'id'>) => void;
   currentUser?: User | null;
+  readOnly?: boolean;
 }
 
 const CATEGORY_PROJECTS = [
@@ -22,8 +23,10 @@ const CATEGORY_PROJECTS = [
 export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
   pengeluaranList,
   onSavePengeluaran,
-  currentUser
+  currentUser,
+  readOnly = false
 }) => {
+  const isReadOnly = Boolean(readOnly || currentUser?.role === 'Ketua' || currentUser?.role?.toLowerCase() === 'ketua');
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [tanggal, setTanggal] = useState<string>(todayStr);
@@ -34,6 +37,7 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly) return;
     setErrorMsg(null);
 
     const amount = Number(nominal);
@@ -76,11 +80,15 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
         <div>
           <div className="inline-flex items-center space-x-2 bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-xs font-semibold mb-2 border border-rose-200">
             <Receipt className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-            <span>Pencatatan Kas Keluar Bendahara</span>
+            <span>{isReadOnly ? 'Monitoring Kas Keluar Pengurus (Mode View)' : 'Pencatatan Kas Keluar Bendahara'}</span>
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-800">Kelola Pengeluaran Operasional MKKS Citos</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800">
+            {isReadOnly ? 'Pemantauan Pengeluaran Operasional MKKS Citos' : 'Kelola Pengeluaran Operasional MKKS Citos'}
+          </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Catat setiap pengeluaran anggaran untuk kegiatan rapat, workshop, lomba, dan operasional pengurus.
+            {isReadOnly
+              ? 'Pantau rincian pembukuan kas keluar, realisasi anggaran kegiatan, dan riwayat transaksi (Akses input pengeluaran ditutup).'
+              : 'Catat setiap pengeluaran anggaran untuk kegiatan rapat, workshop, lomba, dan operasional pengurus.'}
           </p>
         </div>
 
@@ -94,10 +102,29 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
         
         {/* Input Form (1 Column) */}
         <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-4 sm:space-y-5">
-          <div className="flex items-center space-x-2 pb-3 border-b border-slate-100">
-            <PlusCircle className="w-5 h-5 text-rose-600 shrink-0" />
-            <h3 className="font-bold text-slate-800 text-sm">Form Tambah Pengeluaran Baru</h3>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center space-x-2">
+              <PlusCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <h3 className="font-bold text-slate-800 text-sm">
+                {isReadOnly ? 'Form Pengeluaran (Mode View)' : 'Form Tambah Pengeluaran Baru'}
+              </h3>
+            </div>
+            {isReadOnly && (
+              <span className="text-[11px] text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full font-semibold border border-amber-200">
+                Role: Ketua MKKS (View Only)
+              </span>
+            )}
           </div>
+
+          {isReadOnly && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-900 text-xs flex items-start space-x-2.5">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Mode Monitoring Ketua MKKS (Akses Input Ditutup)</span>
+                <span>Role Ketua memiliki hak akses monitoring (View Only) terhadap seluruh pembukuan kas keluar. Aksi input dan penambahan pengeluaran dinonaktifkan.</span>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             
@@ -113,7 +140,8 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
                   type="date"
                   value={tanggal}
                   onChange={(e) => setTanggal(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  disabled={isReadOnly}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   required
                 />
               </div>
@@ -132,24 +160,27 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
                   placeholder="Contoh: Raker MKKS Citos..."
                   value={project}
                   onChange={(e) => setProject(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  disabled={isReadOnly}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   required
                 />
               </div>
 
               {/* Quick suggestions */}
-              <div className="mt-2 flex flex-wrap gap-1">
-                {CATEGORY_PROJECTS.map((cat, idx) => (
-                  <button
-                    key={`cat-sug-${cat}-${idx}`}
-                    type="button"
-                    onClick={() => setProject(cat)}
-                    className="text-[10px] bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 px-2 py-1 rounded-lg border border-slate-200 transition-colors"
-                  >
-                    + {cat}
-                  </button>
-                ))}
-              </div>
+              {!isReadOnly && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {CATEGORY_PROJECTS.map((cat, idx) => (
+                    <button
+                      key={`cat-sug-${cat}-${idx}`}
+                      type="button"
+                      onClick={() => setProject(cat)}
+                      className="text-[10px] bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 px-2 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                    >
+                      + {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* 3. Keterangan Tambahan */}
@@ -165,7 +196,8 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
                   placeholder="Rincian nota/kuitansi, jumlah peserta, lokasi..."
                   value={keterangan}
                   onChange={(e) => setKeterangan(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  disabled={isReadOnly}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -183,7 +215,8 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
                   placeholder="0"
                   value={nominal}
                   onChange={(e) => setNominal(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  disabled={isReadOnly}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                   required
                 />
               </div>
@@ -203,14 +236,25 @@ export const KelolaPengeluaran: React.FC<KelolaPengeluaranProps> = ({
             )}
 
             {/* Submit Button */}
-            <button
-              id="btn-simpan-pengeluaran"
-              type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2"
-            >
-              <Receipt className="w-4 h-4 shrink-0" />
-              <span>Simpan Pembukuan Pengeluaran</span>
-            </button>
+            {isReadOnly ? (
+              <button
+                type="button"
+                disabled
+                className="w-full bg-slate-100 border border-slate-200 text-slate-400 font-bold text-xs py-3.5 rounded-xl cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Akses Input Ditutup (Mode View Ketua)</span>
+              </button>
+            ) : (
+              <button
+                id="btn-simpan-pengeluaran"
+                type="submit"
+                className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-bold text-xs py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
+              >
+                <Receipt className="w-4 h-4 shrink-0" />
+                <span>Simpan Pembukuan Pengeluaran</span>
+              </button>
+            )}
 
           </form>
         </div>

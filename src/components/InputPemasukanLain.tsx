@@ -18,7 +18,8 @@ import {
   Download,
   HandCoins,
   Receipt,
-  Layers
+  Layers,
+  Lock
 } from 'lucide-react';
 
 interface InputPemasukanLainProps {
@@ -26,6 +27,7 @@ interface InputPemasukanLainProps {
   onSavePemasukanLain: (newIncome: Omit<PemasukanLain, 'id'>) => void;
   onOpenStrukModal?: (kuitansiData: any) => void;
   currentUser?: User | null;
+  readOnly?: boolean;
 }
 
 const QUICK_SUGGESTIONS = [
@@ -50,8 +52,10 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
   pemasukanLainList,
   onSavePemasukanLain,
   onOpenStrukModal,
-  currentUser
+  currentUser,
+  readOnly = false
 }) => {
+  const isReadOnly = Boolean(readOnly || currentUser?.role === 'Ketua' || currentUser?.role?.toLowerCase() === 'ketua');
   const todayStr = new Date().toISOString().split('T')[0];
   const currentYear = new Date().getFullYear();
   const availableYears = getTahunBukuList(pemasukanLainList.map((i) => (i.tanggal ? i.tanggal.slice(0, 4) : 2026)));
@@ -73,6 +77,7 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
 
   // Quick Amount Addition
   const handleAddAmount = (addVal: number) => {
+    if (isReadOnly) return;
     const current = Number(nominal) || 0;
     setNominal(String(current + addVal));
   };
@@ -87,6 +92,7 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
 
   const handleSubmit = (e: React.FormEvent, andPrint = false) => {
     e.preventDefault();
+    if (isReadOnly) return;
     setErrorMsg(null);
 
     const amount = Number(nominal);
@@ -209,11 +215,15 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
         <div>
           <div className="inline-flex items-center space-x-2 bg-teal-50 text-teal-700 px-3 py-1 rounded-full text-xs font-semibold mb-2 border border-teal-200">
             <Coins className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-            <span>Penerimaan Kas Masuk Non-Iuran</span>
+            <span>{isReadOnly ? 'Monitoring Penerimaan Kas Non-Iuran (Mode View)' : 'Penerimaan Kas Masuk Non-Iuran'}</span>
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-800">Input Pemasukan Kas Selain Iuran</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800">
+            {isReadOnly ? 'Pemantauan Pemasukan Kas Selain Iuran' : 'Input Pemasukan Kas Selain Iuran'}
+          </h2>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-            Catat sumber uang masuk dari sponsor kemitraan, sisa pengembalian dana panitia kegiatan, sumbangan donatur, dana hibah, dan pendapatan kas lainnya.
+            {isReadOnly 
+              ? 'Pantau rincian sumber dana pemasukan non-iuran, riwayat transaksi, dan cetak kuitansi penerimaan (Akses input kas ditutup).' 
+              : 'Catat sumber uang masuk dari sponsor kemitraan, sisa pengembalian dana panitia kegiatan, sumbangan donatur, dana hibah, dan pendapatan kas lainnya.'}
           </p>
         </div>
 
@@ -264,12 +274,26 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center space-x-2">
               <PlusCircle className="w-5 h-5 text-teal-600 shrink-0" />
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">Form Tambah Pemasukan Baru</h3>
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base">
+                {isReadOnly ? 'Form Data Pemasukan (Mode View)' : 'Form Tambah Pemasukan Baru'}
+              </h3>
             </div>
-            <span className="text-[11px] text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full font-semibold border border-teal-200">
-              Bendahara MKKS
+            <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${
+              isReadOnly ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-teal-700 bg-teal-50 border-teal-200'
+            }`}>
+              {isReadOnly ? 'Role: Ketua MKKS (View Only)' : 'Bendahara MKKS'}
             </span>
           </div>
+
+          {isReadOnly && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-900 text-xs flex items-start space-x-2.5">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Mode Monitoring Ketua MKKS (Akses Input Ditutup)</span>
+                <span>Role Ketua memiliki akses melihat (View Only) seluruh catatan kas masuk non-iuran dan mencetak kuitansi. Aksi penambahan data baru dinonaktifkan.</span>
+              </div>
+            </div>
+          )}
 
           {errorMsg && (
             <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center space-x-2">
@@ -297,8 +321,9 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
                 type="date"
                 value={tanggal}
                 onChange={(e) => setTanggal(e.target.value)}
+                disabled={isReadOnly}
                 required
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -311,15 +336,16 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
               <select
                 value={kategori}
                 onChange={(e) => setKategori(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer"
+                disabled={isReadOnly}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
               >
                 {KATEGORI_PEMASUKAN_LAIN.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
-                <option value="Lainnya">+ Tambah Kategori Baru / Lainnya</option>
+                {!isReadOnly && <option value="Lainnya">+ Tambah Kategori Baru / Lainnya</option>}
               </select>
 
-              {kategori === 'Lainnya' && (
+              {kategori === 'Lainnya' && !isReadOnly && (
                 <input
                   type="text"
                   placeholder="Tuliskan nama kategori baru..."
@@ -344,24 +370,27 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
                 placeholder="Contoh: PT Telkom Indonesia / Panitia FLS2N 2026 / H. Ahmad"
                 value={sumberDana}
                 onChange={(e) => setSumberDana(e.target.value)}
+                disabled={isReadOnly}
                 required
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
               />
 
               {/* Quick suggestions */}
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="text-[10px] text-slate-400 self-center">Pilihan cepat:</span>
-                {QUICK_SUGGESTIONS.map((sug) => (
-                  <button
-                    key={sug}
-                    type="button"
-                    onClick={() => setSumberDana(sug)}
-                    className="text-[10px] bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 transition-colors cursor-pointer"
-                  >
-                    + {sug}
-                  </button>
-                ))}
-              </div>
+              {!isReadOnly && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="text-[10px] text-slate-400 self-center">Pilihan cepat:</span>
+                  {QUICK_SUGGESTIONS.map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onClick={() => setSumberDana(sug)}
+                      className="text-[10px] bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                    >
+                      + {sug}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Keterangan / Uraian Rinci */}
@@ -375,7 +404,8 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
                 placeholder="Contoh: Sisa dana operasional lomba FLS2N setelah pelunasan sewa sound system dan panggung..."
                 value={keterangan}
                 onChange={(e) => setKeterangan(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all resize-none"
+                disabled={isReadOnly}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-800 text-xs sm:text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all resize-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -396,8 +426,9 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
                   placeholder="0"
                   value={nominal}
                   onChange={(e) => setNominal(e.target.value)}
+                  disabled={isReadOnly}
                   required
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm sm:text-base font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm sm:text-base font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -408,48 +439,63 @@ export const InputPemasukanLain: React.FC<InputPemasukanLainProps> = ({
               )}
 
               {/* Shortcut buttons */}
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {[100000, 250000, 500000, 1000000, 2500000, 5000000].map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => handleAddAmount(amt)}
-                    className="text-[11px] bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-700 font-semibold px-2 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer"
-                  >
-                    +{amt >= 1000000 ? `${amt / 1000000} Jt` : `${amt / 1000} Rb`}
-                  </button>
-                ))}
-                {Number(nominal) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setNominal('')}
-                    className="text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold px-2 py-1 rounded-lg border border-rose-200 transition-colors cursor-pointer ml-auto"
-                  >
-                    Reset
-                  </button>
-                )}
-              </div>
+              {!isReadOnly && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[100000, 250000, 500000, 1000000, 2500000, 5000000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => handleAddAmount(amt)}
+                      className="text-[11px] bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-700 font-semibold px-2 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                    >
+                      +{amt >= 1000000 ? `${amt / 1000000} Jt` : `${amt / 1000} Rb`}
+                    </button>
+                  ))}
+                  {Number(nominal) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setNominal('')}
+                      className="text-[11px] bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold px-2 py-1 rounded-lg border border-rose-200 transition-colors cursor-pointer ml-auto"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-2 flex flex-col sm:flex-row gap-2">
-              <button
-                type="submit"
-                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Simpan Pemasukan</span>
-              </button>
+            {isReadOnly ? (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full bg-slate-100 border border-slate-200 text-slate-400 font-bold text-xs sm:text-sm py-3 rounded-xl cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span>Akses Input Ditutup (Mode View Ketua)</span>
+                </button>
+              </div>
+            ) : (
+              <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Simpan Pemasukan</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={(e) => handleSubmit(e, true)}
-                className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98 shrink-0"
-              >
-                <Printer className="w-4 h-4 text-teal-400" />
-                <span>Simpan & Cetak Kuitansi</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e, true)}
+                  className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98 shrink-0"
+                >
+                  <Printer className="w-4 h-4 text-teal-400" />
+                  <span>Simpan & Cetak Kuitansi</span>
+                </button>
+              </div>
+            )}
 
           </form>
         </div>

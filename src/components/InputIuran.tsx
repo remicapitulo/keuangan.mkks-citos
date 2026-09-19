@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sekolah, Iuran, BULAN_LIST, IURAN_PER_BULAN, PaketDurasi, User } from '../types';
 import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
-import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter, MapPin, FileText, Sparkles } from 'lucide-react';
+import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter, MapPin, FileText, Sparkles, Lock, ShieldAlert } from 'lucide-react';
 
 interface InputIuranProps {
   sekolahList: Sekolah[];
@@ -10,6 +10,7 @@ interface InputIuranProps {
   onOpenStrukModal: (kuitansiData: any) => void;
   selectedSchoolNameFromDashboard?: string;
   currentUser?: User | null;
+  readOnly?: boolean;
 }
 
 const PAKET_LIST: PaketDurasi[] = [
@@ -26,8 +27,10 @@ export const InputIuran: React.FC<InputIuranProps> = ({
   onSaveIuran,
   onOpenStrukModal,
   selectedSchoolNameFromDashboard,
-  currentUser
+  currentUser,
+  readOnly = false
 }) => {
+  const isReadOnly = readOnly || currentUser?.role === 'Ketua' || currentUser?.role?.toLowerCase() === 'ketua';
   const currentYear = new Date().getFullYear();
   const availableYears = getTahunBukuList(iuranList.map((i) => i.tahun));
   const todayDateStr = new Date().toISOString().split('T')[0];
@@ -112,6 +115,7 @@ export const InputIuran: React.FC<InputIuranProps> = ({
   // Submit Handler
   const handleSubmitPembukuan = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly) return;
     setErrorMsg(null);
 
     if (!activeSchool) {
@@ -202,11 +206,15 @@ export const InputIuran: React.FC<InputIuranProps> = ({
         <div>
           <div className="inline-flex items-center space-x-2 bg-teal-50 text-teal-700 px-3 py-1 rounded-full text-xs sm:text-sm font-bold mb-2 border border-teal-200">
             <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-600 shrink-0" />
-            <span>Form Pembukuan Kas Masuk Bendahara</span>
+            <span>{isReadOnly ? 'Mode Monitoring Kas Masuk (Role: Ketua MKKS)' : 'Form Pembukuan Kas Masuk Bendahara'}</span>
           </div>
-          <h2 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-slate-800">Input Pembayaran Iuran Sekolah</h2>
+          <h2 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-slate-800">
+            {isReadOnly ? 'Pemantauan Setoran Iuran Sekolah' : 'Input Pembayaran Iuran Sekolah'}
+          </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Pilih sekolah, paket durasi, dan bulan yang akan dibayarkan. Sistem akan memvalidasi agar tidak terjadi dobel pembayaran.
+            {isReadOnly 
+              ? 'Pilih nama sekolah untuk melihat status kelunasan, paket durasi, riwayat pembayaran, serta mencetak kuitansi resmi (Mode View).'
+              : 'Pilih sekolah, paket durasi, dan bulan yang akan dibayarkan. Sistem akan memvalidasi agar tidak terjadi dobel pembayaran.'}
           </p>
         </div>
 
@@ -222,6 +230,19 @@ export const InputIuran: React.FC<InputIuranProps> = ({
         <div className="lg:col-span-2 bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-5 sm:space-y-6">
           <form onSubmit={handleSubmitPembukuan} className="space-y-5 sm:space-y-6">
             
+            {/* Warning Banner for Ketua (Read Only) */}
+            {isReadOnly && (
+              <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-3.5 flex items-start space-x-3 text-xs shadow-xs">
+                <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-sm text-amber-900">Hak Akses Monitoring (Role: Ketua MKKS)</div>
+                  <p className="text-amber-800 mt-0.5 leading-relaxed">
+                    Aksi input kas masuk dan simpan pembukuan ditutup untuk akun Ketua. Anda dapat memilih sekolah untuk melihat rincian bulan yang sudah terbayar, sisa tunggakan, riwayat transaksi, serta mencetak kuitansi resmi.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* 1. Nama Sekolah Searchable Selector */}
             <div className="relative space-y-1.5">
               <label htmlFor="school-search-input" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -333,9 +354,14 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                 </label>
                 <select
                   id="paket-durasi-select"
+                  disabled={isReadOnly}
                   value={selectedPaketIndex}
                   onChange={(e) => handlePaketSelect(Number(e.target.value))}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
+                  className={`w-full px-3 py-2.5 border rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                    isReadOnly 
+                      ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' 
+                      : 'bg-slate-50 border-slate-300 text-teal-800 cursor-pointer'
+                  }`}
                 >
                   {PAKET_LIST.map((pkt, idx) => (
                     <option key={`pkt-opt-${pkt.bulanCount}-${idx}`} value={idx}>{pkt.label}</option>
@@ -365,11 +391,13 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                     <button
                       type="button"
                       key={`input-bulan-btn-${bulan}-${idx}`}
-                      disabled={isPaid}
+                      disabled={isPaid || isReadOnly}
                       onClick={() => handleToggleMonth(bulan)}
                       className={`p-2.5 sm:p-3 rounded-xl border text-left text-xs font-semibold transition-all relative flex flex-col justify-between min-h-[60px] sm:min-h-[64px] ${
                         isPaid
                           ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
+                          : isReadOnly
+                          ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
                           : isSelected
                           ? 'bg-teal-600 text-white border-teal-700 shadow-md ring-2 ring-teal-500/30'
                           : 'bg-white text-slate-700 border-slate-200 hover:border-teal-400 hover:bg-teal-50/50'
@@ -402,7 +430,7 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                   <span>5. Tempat & Waktu Terima Iuran (Keterangan)</span>
                 </label>
                 <span className="text-[10px] text-teal-800 font-semibold bg-teal-100/70 px-2 py-0.5 rounded-full w-fit">
-                  Pengingat Bendahara
+                  {isReadOnly ? 'Mode View' : 'Pengingat Bendahara'}
                 </span>
               </div>
 
@@ -417,9 +445,14 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                     <input
                       id="tanggal-pembayaran-input"
                       type="date"
+                      disabled={isReadOnly}
                       value={tanggalPembayaran}
                       onChange={(e) => setTanggalPembayaran(e.target.value)}
-                      className="w-full pl-9 pr-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs cursor-pointer"
+                      className={`w-full pl-9 pr-2.5 py-2 border rounded-xl text-xs font-semibold shadow-xs ${
+                        isReadOnly 
+                          ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                          : 'bg-white border-slate-300 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer'
+                      }`}
                     />
                   </div>
                 </div>
@@ -434,65 +467,72 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                     <input
                       id="keterangan-iuran-input"
                       type="text"
-                      placeholder="Contoh: Diterima tunai saat rapat MKKS di SDN Cisalak 1"
+                      disabled={isReadOnly}
+                      placeholder={isReadOnly ? 'Tidak ada catatan input (Mode View)' : 'Contoh: Diterima tunai saat rapat MKKS di SDN Cisalak 1'}
                       value={keterangan}
                       onChange={(e) => setKeterangan(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xs"
+                      className={`w-full pl-9 pr-3 py-2 border rounded-xl text-xs shadow-xs ${
+                        isReadOnly
+                          ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                          : 'bg-white border-slate-300 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500'
+                      }`}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Quick Suggestion Chips */}
-              <div className="pt-1 border-t border-slate-200/60">
-                <div className="text-[10px] font-bold text-slate-500 mb-1.5 flex items-center space-x-1">
-                  <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
-                  <span>Pilihan Cepat Catatan Tempat:</span>
+              {/* Quick Suggestion Chips (Only for Bendahara) */}
+              {!isReadOnly && (
+                <div className="pt-1 border-t border-slate-200/60">
+                  <div className="text-[10px] font-bold text-slate-500 mb-1.5 flex items-center space-x-1">
+                    <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
+                    <span>Pilihan Cepat Catatan Tempat:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickNotesSuggestions.map((item, qIdx) => (
+                      <button
+                        key={`quick-note-${qIdx}`}
+                        type="button"
+                        onClick={() => {
+                          if (!keterangan) {
+                            setKeterangan(item);
+                          } else if (!keterangan.includes(item)) {
+                            setKeterangan(prev => `${prev} (${item})`);
+                          }
+                        }}
+                        className="text-[10px] font-semibold bg-white hover:bg-teal-50 text-slate-600 hover:text-teal-700 px-2.5 py-1 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors shadow-xs cursor-pointer"
+                      >
+                        + {item}
+                      </button>
+                    ))}
+                    {activeSchool && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const noteSchool = `Diterima di ${activeSchool.namaSekolah}`;
+                          if (!keterangan) {
+                            setKeterangan(noteSchool);
+                          } else if (!keterangan.includes(activeSchool.namaSekolah)) {
+                            setKeterangan(prev => `${prev} (${noteSchool})`);
+                          }
+                        }}
+                        className="text-[10px] font-semibold bg-teal-50 hover:bg-teal-100 text-teal-800 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors shadow-xs cursor-pointer"
+                      >
+                        + Di {activeSchool.namaSekolah}
+                      </button>
+                    )}
+                    {keterangan && (
+                      <button
+                        type="button"
+                        onClick={() => setKeterangan('')}
+                        className="text-[10px] font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer ml-auto"
+                      >
+                        Hapus Catatan
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {quickNotesSuggestions.map((item, qIdx) => (
-                    <button
-                      key={`quick-note-${qIdx}`}
-                      type="button"
-                      onClick={() => {
-                        if (!keterangan) {
-                          setKeterangan(item);
-                        } else if (!keterangan.includes(item)) {
-                          setKeterangan(prev => `${prev} (${item})`);
-                        }
-                      }}
-                      className="text-[10px] font-semibold bg-white hover:bg-teal-50 text-slate-600 hover:text-teal-700 px-2.5 py-1 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors shadow-xs cursor-pointer"
-                    >
-                      + {item}
-                    </button>
-                  ))}
-                  {activeSchool && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const noteSchool = `Diterima di ${activeSchool.namaSekolah}`;
-                        if (!keterangan) {
-                          setKeterangan(noteSchool);
-                        } else if (!keterangan.includes(activeSchool.namaSekolah)) {
-                          setKeterangan(prev => `${prev} (${noteSchool})`);
-                        }
-                      }}
-                      className="text-[10px] font-semibold bg-teal-50 hover:bg-teal-100 text-teal-800 px-2.5 py-1 rounded-lg border border-teal-200 transition-colors shadow-xs cursor-pointer"
-                    >
-                      + Di {activeSchool.namaSekolah}
-                    </button>
-                  )}
-                  {keterangan && (
-                    <button
-                      type="button"
-                      onClick={() => setKeterangan('')}
-                      className="text-[10px] font-semibold text-rose-500 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer ml-auto"
-                    >
-                      Hapus Catatan
-                    </button>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Error / Validation Warning */}
@@ -512,19 +552,31 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                 </div>
               </div>
 
-              <button
-                id="btn-simpan-pembukuan-iuran"
-                type="submit"
-                disabled={selectedMonths.length === 0}
-                className={`w-full sm:w-auto px-6 py-3.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center space-x-2 ${
-                  selectedMonths.length > 0
-                    ? 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-teal-600/30'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <PlusCircle className="w-5 h-5 shrink-0" />
-                <span>Simpan Pembukuan & Cetak Struk</span>
-              </button>
+              {isReadOnly ? (
+                <button
+                  id="btn-simpan-pembukuan-iuran-locked"
+                  type="button"
+                  disabled
+                  className="w-full sm:w-auto px-6 py-3.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span>Akses Input Ditutup (Mode View Ketua)</span>
+                </button>
+              ) : (
+                <button
+                  id="btn-simpan-pembukuan-iuran"
+                  type="submit"
+                  disabled={selectedMonths.length === 0}
+                  className={`w-full sm:w-auto px-6 py-3.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center space-x-2 ${
+                    selectedMonths.length > 0
+                      ? 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-teal-600/30'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <PlusCircle className="w-5 h-5 shrink-0" />
+                  <span>Simpan Pembukuan & Cetak Struk</span>
+                </button>
+              )}
             </div>
 
           </form>

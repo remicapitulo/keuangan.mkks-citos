@@ -67,8 +67,29 @@ export const Navigation: React.FC<NavigationProps> = ({
     }
   ];
 
+  const menuKetua: { id: ActiveTab; label: string; icon: React.ReactNode; desc: string }[] = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: <LayoutDashboard className="w-5 h-5" />,
+      desc: 'Ringkasan Pengawasan'
+    },
+    {
+      id: 'laporan-keuangan',
+      label: 'Laporan Keuangan',
+      icon: <FileText className="w-5 h-5" />,
+      desc: 'Matriks & Rekap Kas'
+    }
+  ];
+
   const isAdmin = role === 'Admin' || String(role).toLowerCase() === 'admin';
-  const currentMenu = (role === 'Bendahara' || role === 'Admin' || isAdmin) ? menuBendahara : menuSekolah;
+  const isBendahara = role === 'Bendahara' || String(role).toLowerCase() === 'bendahara';
+  const isKetua = role === 'Ketua' || String(role).toLowerCase() === 'ketua';
+  const currentMenu = (isBendahara || isAdmin) 
+    ? menuBendahara 
+    : isKetua 
+      ? menuKetua 
+      : menuSekolah;
   const activeMenuItem = currentMenu.find(m => m.id === activeTab) || currentMenu[0];
 
   const handleSelectTab = (tabId: ActiveTab) => {

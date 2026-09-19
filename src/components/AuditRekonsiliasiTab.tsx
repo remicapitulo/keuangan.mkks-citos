@@ -20,7 +20,8 @@ import {
   UserCheck,
   Edit3,
   ShieldCheck,
-  Clock
+  Clock,
+  Lock
 } from 'lucide-react';
 import { RekonsiliasiKas, PecahanUangCash, User, Sekolah } from '../types';
 import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, cleanDateInputString, getCurrentLocalDateTimeString, resolveNamaBendahara } from '../utils/formatters';
@@ -41,6 +42,7 @@ interface AuditRekonsiliasiTabProps {
   onSaveAudit: (record: RekonsiliasiKas) => void;
   onOpenBeritaAcara: () => void;
   onOpenSpreadsheetModal?: () => void;
+  readOnly?: boolean;
 }
 
 export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
@@ -57,8 +59,12 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   sekolahList,
   onSaveAudit,
   onOpenBeritaAcara,
-  onOpenSpreadsheetModal
+  onOpenSpreadsheetModal,
+  readOnly = false
 }) => {
+  const isKetua = currentUser?.role === 'Ketua' || currentUser?.role?.toLowerCase() === 'ketua';
+  const isReadOnly = Boolean(readOnly || isKetua || !isBendahara);
+
   // Form state
   const [saldoCash, setSaldoCash] = useState<number>(currentAudit.saldoCash || 0);
   const [saldoBank, setSaldoBank] = useState<number>(currentAudit.saldoBank || 0);
