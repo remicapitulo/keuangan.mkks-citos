@@ -168,13 +168,9 @@ export function isPlaceholderAuditTime(val?: string | null): boolean {
   if (!val) return true;
   const s = String(val).trim();
   return (
+    s.startsWith('2026-09-20') ||
+    s.includes('2026-09-20') ||
     s.startsWith('2026-09-19 09:30') ||
-    s.startsWith('2026-09-20 03:14') ||
-    s.startsWith('2026-09-20 02:35') ||
-    s.startsWith('2026-09-20 02:36') ||
-    s.includes('2026-09-20T03:14') ||
-    s.includes('2026-09-20T02:35') ||
-    s.includes('2026-09-20T02:36') ||
     s === '-'
   );
 }

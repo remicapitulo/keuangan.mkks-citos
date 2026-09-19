@@ -753,7 +753,7 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                   </div>
 
                   <div className="flex items-center space-x-1.5">
-                    <label className="font-semibold text-slate-700 shrink-0">Waktu & Tanggal (WIB):</label>
+                    <label className="font-semibold text-slate-700 shrink-0">Waktu & Tanggal:</label>
                     <input
                       type="text"
                       value={tanggalAuditLocal}
@@ -765,10 +765,10 @@ export const BeritaAcaraAuditModal: React.FC<BeritaAcaraAuditModalProps> = ({
                       type="button"
                       onClick={() => setTanggalAuditLocal(getCurrentWIBDateTimeString())}
                       className="inline-flex items-center space-x-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded border border-teal-200 transition-all cursor-pointer"
-                      title="Set ke waktu aktif saat ini (WIB / UTC+7)"
+                      title="Set ke waktu aktif saat ini"
                     >
                       <Clock className="w-3 h-3 text-teal-600" />
-                      <span>Sekarang (WIB)</span>
+                      <span>Waktu Sekarang</span>
                     </button>
                   </div>
                 </div>

@@ -91,6 +91,11 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     return false;
   };
 
+  const [liveWIB, setLiveWIB] = useState<string>(() => getCurrentWIBDateTimeString());
+  const [otomatisWaktuSekarang, setOtomatisWaktuSekarang] = useState<boolean>(() => {
+    return isPlaceholderAudit(currentAudit);
+  });
+
   const [tanggalAudit, setTanggalAudit] = useState<string>(() => {
     // If no tanggalAudit saved yet or it matches old default static seed/timezone shift, always use live WIB now
     if (isPlaceholderAudit(currentAudit)) {
@@ -98,6 +103,18 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     }
     return cleanDateInputString(currentAudit.tanggalAudit) || getCurrentWIBDateTimeString();
   });
+
+  // Keep live time updated every 5 seconds if automatic mode is on
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const nowWib = getCurrentWIBDateTimeString();
+      setLiveWIB(nowWib);
+      if (otomatisWaktuSekarang) {
+        setTanggalAudit(nowWib);
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [otomatisWaktuSekarang]);
 
   // Helper to detect old initial placeholders
   const isOldKetuaPlaceholder = (name?: string) => {
@@ -202,7 +219,11 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     setAtasNamaRekening(currentAudit.atasNamaRekening || 'MKKS SMP CITOS');
     setCatatanAudit(currentAudit.catatanAudit || '');
     const isOldPlaceholderTime = isPlaceholderAudit(currentAudit);
-    setTanggalAudit(isOldPlaceholderTime ? getCurrentWIBDateTimeString() : (cleanDateInputString(currentAudit.tanggalAudit) || getCurrentWIBDateTimeString()));
+    if (isOldPlaceholderTime || otomatisWaktuSekarang) {
+      setTanggalAudit(getCurrentWIBDateTimeString());
+    } else {
+      setTanggalAudit(cleanDateInputString(currentAudit.tanggalAudit) || getCurrentWIBDateTimeString());
+    }
     if (currentAudit.pecahanCash) {
       setPecahan(currentAudit.pecahanCash);
     }
@@ -281,10 +302,14 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
       jabatanBendahara
     });
 
+    const finalTanggalAudit = otomatisWaktuSekarang 
+      ? getCurrentWIBDateTimeString() 
+      : (cleanDateInputString(tanggalAudit) || getCurrentWIBDateTimeString());
+
     const recordToSave: RekonsiliasiKas = {
       id: currentAudit.id || `AUDIT-${selectedYear}-${Date.now().toString().slice(-4)}`,
       tahun: selectedYear,
-      tanggalAudit: cleanDateInputString(tanggalAudit) || getCurrentWIBDateTimeString(),
+      tanggalAudit: finalTanggalAudit,
       saldoCash: Number(saldoCash) || 0,
       saldoBank: Number(saldoBank) || 0,
       namaBank: namaBank || 'Bank DKI',
@@ -827,35 +852,56 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center space-x-1.5">
-                    <label className="block text-xs font-bold text-slate-700">
-                      Waktu & Tanggal Audit / Kas Opname
-                    </label>
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      WIB (UTC+7)
-                    </span>
-                  </div>
+                  <label className="block text-xs font-bold text-slate-700">
+                    Waktu & Tanggal Audit / Kas Opname
+                  </label>
                   <button
                     type="button"
-                    onClick={() => setTanggalAudit(getCurrentWIBDateTimeString())}
-                    className="inline-flex items-center space-x-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-200 transition-all cursor-pointer"
-                    title="Klik untuk memperbarui ke waktu aktif saat ini (Waktu Indonesia Barat / UTC+7)"
+                    onClick={() => {
+                      const nowWib = getCurrentWIBDateTimeString();
+                      setTanggalAudit(nowWib);
+                      setOtomatisWaktuSekarang(true);
+                    }}
+                    className="inline-flex items-center space-x-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-lg border border-teal-200 transition-all cursor-pointer shadow-xs active:scale-95"
+                    title="Perbarui langsung ke tanggal dan jam saat ini"
                   >
                     <Clock className="w-3 h-3 text-teal-600" />
-                    <span>Waktu Sekarang (WIB)</span>
+                    <span>Waktu Sekarang</span>
                   </button>
                 </div>
-                <input
-                  type="text"
-                  disabled={!isBendahara}
-                  value={tanggalAudit}
-                  onChange={(e) => setTanggalAudit(e.target.value)}
-                  placeholder="YYYY-MM-DD HH:mm"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100"
-                />
-                <p className="text-[11px] text-teal-700 font-semibold mt-1">
-                  Format Laporan: <strong>{formatDateTimeIndonesian(tanggalAudit)}</strong>
-                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    disabled={!isBendahara}
+                    value={tanggalAudit}
+                    onChange={(e) => {
+                      setTanggalAudit(e.target.value);
+                      setOtomatisWaktuSekarang(false);
+                    }}
+                    placeholder="YYYY-MM-DD HH:mm"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100"
+                  />
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
+                  <p className="text-[11px] text-teal-700 font-semibold">
+                    Format Laporan: <strong>{formatDateTimeIndonesian(tanggalAudit)}</strong>
+                  </p>
+                  <label className="inline-flex items-center space-x-1.5 text-[11px] text-slate-600 font-medium cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={otomatisWaktuSekarang}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setOtomatisWaktuSekarang(checked);
+                        if (checked) {
+                          setTanggalAudit(getCurrentWIBDateTimeString());
+                        }
+                      }}
+                      className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                    />
+                    <span>Otomatis ikuti tanggal & jam sekarang</span>
+                  </label>
+                </div>
               </div>
 
               <div>
@@ -949,7 +995,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
                       title="Sinkronkan & deteksi ulang akun Role 'Ketua' langsung dari Sheet User Google Spreadsheet"
                     >
                       <RefreshCw className={`w-3 h-3 text-teal-600 ${isSyncingKetua ? 'animate-spin' : ''}`} />
-                      <span>{isSyncingKetua ? 'Menyinkronkan Sheet...' : 'Deteksi dari Sheet User (Role: Ketua)'}</span>
+                      <span>{isSyncingKetua ? 'Menyinkronkan...' : 'Deteksi Ketua'}</span>
                     </button>
                   </div>
                   <input
