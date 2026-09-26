@@ -417,3 +417,27 @@ export function getTahunBukuList(extraYears: (number | string | undefined)[] = [
   }
   return list;
 }
+
+/**
+ * Normalizes a school name for alphabetical sorting by ignoring common
+ * institutional prefixes such as "SMP", "SMPIT", "SMP IT", "SMPK", etc.
+ * Example: "SMPIT Pondok Duta" -> "Pondok Duta"
+ * Example: "SMP BRIGHTON" -> "BRIGHTON"
+ * Example: "SMP 20 MEI" -> "20 MEI"
+ */
+export function getSchoolSortKey(name: string): string {
+  if (!name) return '';
+  let cleaned = name.trim();
+
+  // Strip institution prefixes at the beginning:
+  // SMPIT, SMP IT, SMP-IT, SMPK, SMP K, SMPS, SMPN, SMP, MTS, MTsN, etc.
+  const prefixRegex = /^(SMP[-/\s]*IT|SMPIT|SMP[-/\s]*K|SMPK|SMPS|SMPN|SMP|MTS[-/\s]*N|MTSS|MTS)\b\s*[-/.]?\s*/i;
+
+  while (prefixRegex.test(cleaned)) {
+    const next = cleaned.replace(prefixRegex, '').trim();
+    if (!next) break; // Don't strip to empty if school name was literally just "SMP"
+    cleaned = next;
+  }
+
+  return cleaned || name.trim();
+}

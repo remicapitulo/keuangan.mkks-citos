@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN } from '../types';
-import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara, getTahunBukuList, getSchoolSortKey } from '../utils/formatters';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -630,7 +630,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                {sekolahList.map((sek, idx) => {
+                {[...sekolahList]
+                  .sort((a, b) => {
+                    const keyA = getSchoolSortKey(a.namaSekolah || '');
+                    const keyB = getSchoolSortKey(b.namaSekolah || '');
+                    const comp = keyA.localeCompare(keyB, 'id', { sensitivity: 'base', numeric: true });
+                    if (comp !== 0) return comp;
+                    return (a.namaSekolah || '').localeCompare(b.namaSekolah || '', 'id');
+                  })
+                  .map((sek, idx) => {
                   const paidCount = iuranYear.filter(i => i.idSekolah === sek.idSekolah).length;
                   const isFullyPaid = paidCount === 12;
                   const isMySchool = mySekolahObj && (

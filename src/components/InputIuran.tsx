@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sekolah, Iuran, BULAN_LIST, IURAN_PER_BULAN, PaketDurasi, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList, getSchoolSortKey } from '../utils/formatters';
 import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter, MapPin, FileText, Sparkles, Lock, ShieldAlert } from 'lucide-react';
 
 interface InputIuranProps {
@@ -191,12 +191,20 @@ export const InputIuran: React.FC<InputIuranProps> = ({
     .filter(i => isMatchSchool(i, activeSchool))
     .sort((a, b) => new Date(b.tanggalInput).getTime() - new Date(a.tanggalInput).getTime());
 
-  // Filter schools for search
+  // Filter schools for search (Sorted A to Z)
   const schoolSearchQuery = (searchSchoolQuery || '').toLowerCase();
-  const filteredSchools = sekolahList.filter(s =>
-    (s.namaSekolah || '').toLowerCase().includes(schoolSearchQuery) ||
-    (s.namaKepsek || '').toLowerCase().includes(schoolSearchQuery)
-  );
+  const filteredSchools = [...sekolahList]
+    .filter(s =>
+      (s.namaSekolah || '').toLowerCase().includes(schoolSearchQuery) ||
+      (s.namaKepsek || '').toLowerCase().includes(schoolSearchQuery)
+    )
+    .sort((a, b) => {
+      const keyA = getSchoolSortKey(a.namaSekolah || '');
+      const keyB = getSchoolSortKey(b.namaSekolah || '');
+      const comp = keyA.localeCompare(keyB, 'id', { sensitivity: 'base', numeric: true });
+      if (comp !== 0) return comp;
+      return (a.namaSekolah || '').localeCompare(b.namaSekolah || '', 'id');
+    });
 
   return (
     <div id="input-iuran-container" className="space-y-4 sm:space-y-6">

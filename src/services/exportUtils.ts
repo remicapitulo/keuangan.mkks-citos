@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas } from '../types';
-import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getSchoolSortKey } from '../utils/formatters';
 import { StorageService } from './spreadsheetSync';
 
 export function exportToExcel(
@@ -26,7 +26,15 @@ export function exportToExcel(
       return String(b.id || '').localeCompare(String(a.id || ''));
     });
   
-  const matrixData = sekolahList.map((s, index) => {
+  const sortedSekolahList = [...sekolahList].sort((a, b) => {
+    const keyA = getSchoolSortKey(a.namaSekolah || '');
+    const keyB = getSchoolSortKey(b.namaSekolah || '');
+    const comp = keyA.localeCompare(keyB, 'id', { sensitivity: 'base', numeric: true });
+    if (comp !== 0) return comp;
+    return (a.namaSekolah || '').localeCompare(b.namaSekolah || '', 'id');
+  });
+
+  const matrixData = sortedSekolahList.map((s, index) => {
     const row: Record<string, any> = {
       'No': index + 1,
       'Nama Sekolah': s.namaSekolah,
@@ -400,7 +408,14 @@ export function exportToPDF(
   currentY += 3.5;
 
   const matrixHead = [['No', 'Nama Sekolah', ...BULAN_SINGKAT, 'Lunas (Rp)', 'Tunggakan (Rp)']];
-  const matrixRows = sekolahList.map((s, idx) => {
+  const sortedPdfSekolah = [...sekolahList].sort((a, b) => {
+    const keyA = getSchoolSortKey(a.namaSekolah || '');
+    const keyB = getSchoolSortKey(b.namaSekolah || '');
+    const comp = keyA.localeCompare(keyB, 'id', { sensitivity: 'base', numeric: true });
+    if (comp !== 0) return comp;
+    return (a.namaSekolah || '').localeCompare(b.namaSekolah || '', 'id');
+  });
+  const matrixRows = sortedPdfSekolah.map((s, idx) => {
     let lunasCount = 0;
     const monthsStatus = BULAN_LIST.map(bulan => {
       const isPaid = iuranTahunThis.some(i => i.idSekolah === s.idSekolah && i.bulan === bulan);

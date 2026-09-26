@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas, PejabatPenandatangan } from '../types';
-import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList, getCurrentWIBDateTimeString } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList, getCurrentWIBDateTimeString, getSchoolSortKey } from '../utils/formatters';
 import { exportToExcel, exportToPDF, exportRiwayatHapusToExcel, exportRiwayatHapusToPDF } from '../services/exportUtils';
 import { StorageService } from '../services/spreadsheetSync';
 import { AuditRekonsiliasiTab } from './AuditRekonsiliasiTab';
@@ -36,7 +36,8 @@ import {
   Scale,
   Landmark,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  ArrowUpDown
 } from 'lucide-react';
 
 interface LaporanKeuanganProps {
@@ -80,6 +81,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap' | 'audit' | 'riwayat-hapus'>('matrix');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [matrixViewMode, setMatrixViewMode] = useState<'cards' | 'table'>('cards');
+  const [matrixSortOrder, setMatrixSortOrder] = useState<'asc' | 'desc'>('asc');
   const [filterJenisHapus, setFilterJenisHapus] = useState<string>('all');
   const [isBeritaAcaraOpen, setIsBeritaAcaraOpen] = useState<boolean>(false);
   const [isPejabatModalOpen, setIsPejabatModalOpen] = useState<boolean>(false);
@@ -188,12 +190,22 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
     }
   }, [isRoleSekolah, activeTab]);
 
-  // Filtered lists for search
+  // Filtered and sorted lists for search (Matriks Iuran diurutkan abjad berdasarkan nama asli sekolah tanpa awalan SMP/SMPIT/SMPK)
   const query = (searchFilter || '').toLowerCase();
-  const filteredSekolah = sekolahList.filter(s =>
-    (s.namaSekolah || '').toLowerCase().includes(query) ||
-    (s.namaKepsek || '').toLowerCase().includes(query)
-  );
+  const filteredSekolah = [...sekolahList]
+    .filter(s =>
+      (s.namaSekolah || '').toLowerCase().includes(query) ||
+      (s.namaKepsek || '').toLowerCase().includes(query)
+    )
+    .sort((a, b) => {
+      const keyA = getSchoolSortKey(a.namaSekolah || '');
+      const keyB = getSchoolSortKey(b.namaSekolah || '');
+      const comp = keyA.localeCompare(keyB, 'id', { sensitivity: 'base', numeric: true });
+      if (comp !== 0) {
+        return matrixSortOrder === 'asc' ? comp : -comp;
+      }
+      return (a.namaSekolah || '').localeCompare(b.namaSekolah || '', 'id');
+    });
 
   const filteredKasMasuk = iuranYear
     .filter(i =>
@@ -623,15 +635,31 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           {/* Header Controls for Matrix */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
             <div>
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-                Matriks Status Iuran Per Sekolah ({selectedYear})
-              </h3>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-bold text-slate-800 text-sm sm:text-base">
+                  Matriks Status Iuran Per Sekolah ({selectedYear})
+                </h3>
+                <span className="text-[10px] font-bold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-200">
+                  {matrixSortOrder === 'asc' ? 'Urutan: A → Z' : 'Urutan: Z → A'}
+                </span>
+              </div>
               <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                Iuran Rp 100.000 / bulan. Menampilkan status kelunasan Januari s.d. Desember.
+                Iuran Rp 100.000 / bulan. Menampilkan status kelunasan Januari s.d. Desember (sekolah diurutkan abjad nama asli A to Z, awalan SMP/SMPIT/SMPK diabaikan).
               </p>
             </div>
             
-            <div className="flex items-center justify-between sm:justify-end space-x-3 pt-1 sm:pt-0">
+            <div className="flex items-center justify-between sm:justify-end space-x-2.5 pt-1 sm:pt-0">
+              
+              {/* Sort Toggle Button (A-Z / Z-A) */}
+              <button
+                type="button"
+                onClick={() => setMatrixSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className="px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center space-x-1 transition-all bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer"
+                title="Urutkan sekolah berdasarkan nama sekolah (A-Z atau Z-A)"
+              >
+                <ArrowUpDown className="w-3 h-3 text-teal-600" />
+                <span>{matrixSortOrder === 'asc' ? 'A → Z' : 'Z → A'}</span>
+              </button>
               
               {/* Mobile View Toggle Buttons */}
               <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 sm:hidden">
@@ -823,7 +851,19 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               <thead>
                 <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-extrabold">
                   <th className="py-3.5 px-3 text-center w-10 rounded-tl-xl">No</th>
-                  <th className="py-3.5 px-4 min-w-[170px]">Nama Sekolah</th>
+                  <th 
+                    className="py-3.5 px-4 min-w-[170px] cursor-pointer hover:bg-slate-800 transition-colors select-none group"
+                    onClick={() => setMatrixSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    title="Urutkan Sekolah Berdasarkan Nama (Klik untuk ubah A-Z / Z-A)"
+                  >
+                    <div className="flex items-center space-x-1.5">
+                      <span>Nama Sekolah</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-800 text-teal-200 font-extrabold flex items-center gap-0.5 border border-teal-600/40">
+                        <ArrowUpDown className="w-2.5 h-2.5 text-teal-300" />
+                        <span>{matrixSortOrder === 'asc' ? 'A-Z' : 'Z-A'}</span>
+                      </span>
+                    </div>
+                  </th>
                   {BULAN_SINGKAT.map((b, idx) => (
                     <th key={`head-month-${idx}`} className="py-3.5 px-1 text-center w-9 font-mono">
                       {b}
@@ -2072,7 +2112,15 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
               </tr>
             </thead>
             <tbody>
-              {sekolahList.map((s, idx) => {
+              {[...sekolahList]
+                .sort((a, b) => {
+                  const keyA = getSchoolSortKey(a.namaSekolah || '');
+                  const keyB = getSchoolSortKey(b.namaSekolah || '');
+                  const comp = keyA.localeCompare(keyB, 'id', { sensitivity: 'base', numeric: true });
+                  if (comp !== 0) return comp;
+                  return (a.namaSekolah || '').localeCompare(b.namaSekolah || '', 'id');
+                })
+                .map((s, idx) => {
                 let lunasCount = 0;
                 const monthsStatus = BULAN_LIST.map(bulan => {
                   const isPaid = iuranYear.some(i => i.idSekolah === s.idSekolah && i.bulan === bulan);
