@@ -57,7 +57,7 @@ export function exportToExcel(
     const totalTunggakanNominal = (12 - totalLunasCount) * IURAN_PER_BULAN;
 
     row['Total Lunas (Rp)'] = totalBayarNominal;
-    row['Sisa Tunggakan (Rp)'] = totalTunggakanNominal;
+    row['Sisa Tunggakan (Rp)'] = totalTunggakanNominal === 0 ? 'LUNAS' : totalTunggakanNominal;
 
     return row;
   });
@@ -434,7 +434,7 @@ export function exportToPDF(
       s.namaSekolah,
       ...monthsStatus,
       formatRupiah(lunasNominal),
-      formatRupiah(tunggakanNominal)
+      tunggakanNominal === 0 ? 'LUNAS' : formatRupiah(tunggakanNominal)
     ];
   });
 

@@ -644,7 +644,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                Iuran Rp 100.000 / bulan. Menampilkan status kelunasan Januari s.d. Desember (sekolah diurutkan abjad nama asli A to Z, awalan SMP/SMPIT/SMPK diabaikan).
+                Iuran Rp 100.000 / bulan. Menampilkan status kelunasan Januari s.d. Desember.
               </p>
             </div>
             
@@ -833,9 +833,15 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                       </div>
                       <div>
                         <span className="text-slate-500">Tunggakan: </span>
-                        <span className={`font-extrabold ${sisaTunggakan > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
-                          {formatRupiah(sisaTunggakan)}
-                        </span>
+                        {sisaTunggakan === 0 ? (
+                          <span className="font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md text-[10px]">
+                            LUNAS
+                          </span>
+                        ) : (
+                          <span className="font-extrabold text-rose-600">
+                            {formatRupiah(sisaTunggakan)}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -961,9 +967,15 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                         {formatRupiah(totalBayarNominal)}
                       </td>
                       <td className="py-3 px-3 text-right font-black text-xs">
-                        <span className={totalTunggakanNominal > 0 ? 'text-rose-600' : 'text-slate-400'}>
-                          {formatRupiah(totalTunggakanNominal)}
-                        </span>
+                        {totalTunggakanNominal === 0 ? (
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-black text-[11px] tracking-wide">
+                            LUNAS
+                          </span>
+                        ) : (
+                          <span className="text-rose-600 font-bold">
+                            {formatRupiah(totalTunggakanNominal)}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -2143,7 +2155,9 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                       </td>
                     ))}
                     <td className="p-1.5 border border-slate-300 text-right font-bold text-emerald-700">{formatRupiah(totalLunas)}</td>
-                    <td className="p-1.5 border border-slate-300 text-right font-bold text-rose-600">{formatRupiah(totalTunggakan)}</td>
+                    <td className={`p-1.5 border border-slate-300 text-right font-bold ${totalTunggakan === 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {totalTunggakan === 0 ? 'LUNAS' : formatRupiah(totalTunggakan)}
+                    </td>
                   </tr>
                 );
               })}
