@@ -1,6 +1,6 @@
 import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole, RiwayatHapus, RekonsiliasiKas, PejabatPenandatangan } from '../types';
 import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, INITIAL_RIWAYAT_HAPUS, INITIAL_REKONSILIASI_KAS, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
-import { cleanDateInputString, getCurrentWIBDateTimeString, getCurrentWIBDateString, isPlaceholderAuditTime, getSchoolSortKey } from '../utils/formatters';
+import { cleanDateInputString, getCurrentWIBDateTimeString, getCurrentWIBDateString, isPlaceholderAuditTime } from '../utils/formatters';
 
 export const DEFAULT_PEJABAT: PejabatPenandatangan = {
   namaKetuaMkks: '',
@@ -123,14 +123,6 @@ export function normalizeSekolahList(rawList: any[]): Sekolah[] {
       kelurahan: kelurahan.trim(),
       kecamatan: kecamatan.trim()
     });
-  });
-
-  normalized.sort((a, b) => {
-    const keyA = getSchoolSortKey(a.namaSekolah || '');
-    const keyB = getSchoolSortKey(b.namaSekolah || '');
-    const comp = keyA.localeCompare(keyB, 'id', { sensitivity: 'base', numeric: true });
-    if (comp !== 0) return comp;
-    return (a.namaSekolah || '').localeCompare(b.namaSekolah || '', 'id');
   });
 
   return normalized;
@@ -1016,8 +1008,6 @@ export class StorageService {
     const payload = {
       action: 'syncAll',
       spreadsheetId: this.getSpreadsheetId(),
-      sekolah: this.getSekolah(),
-      users: this.getUsers(),
       iuran: formattedIuran,
       pengeluaran: formattedPengeluaran,
       pemasukanLain: formattedPemasukanLain,
@@ -1222,8 +1212,6 @@ function doGet(e) {
   if (action === 'syncAll' && e && e.parameter && e.parameter.data) {
     try {
       var data = JSON.parse(e.parameter.data);
-      if (data.sekolah) writeSheetData(ss, 'Sekolah', data.sekolah);
-      if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
@@ -1257,8 +1245,6 @@ function doPost(e) {
     } catch(tzErr) {}
     
     if (data && data.action === 'syncAll') {
-      if (data.sekolah) writeSheetData(ss, 'Sekolah', data.sekolah);
-      if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);

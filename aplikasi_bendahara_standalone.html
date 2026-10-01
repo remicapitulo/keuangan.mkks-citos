@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aplikasi Bendahara Sederhana</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    [x-cloak] { display: none !important; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+    }
+  </style>
+<script src="/_aistudio-iframe.js?v=2c34bde1"></script></head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
+
+  <!-- ========================================== -->
+  <!-- NOTIFIKASI TOAST FLOATING                  -->
+  <!-- ========================================== -->
+  <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- ========================================== -->
+  <!-- 1. HALAMAN LOGIN                           -->
+  <!-- ========================================== -->
+  <div id="loginView" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900">
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 transition-all">
+      <!-- Header Login Card -->
+      <div class="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 text-white text-center relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+        <div class="w-16 h-16 mx-auto mb-4 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/30">
+          <i class="fa-solid fa-wallet text-3xl text-emerald-100"></i>
+        </div>
+        <h1 class="text-2xl font-extrabold tracking-tight">Aplikasi Bendahara</h1>
+        <p class="text-emerald-100 text-sm mt-1">Sistem Pencatatan Pemasukan Kas</p>
+      </div>
+
+      <!-- Form Login -->
+      <div class="p-8">
+        <!-- Banner Info Konfigurasi URL -->
+        <div id="urlWarningBanner" class="hidden mb-5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2.5">
+          <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm mt-0.5"></i>
+          <div>
+            <span class="font-bold">Konfigurasi API Diperlukan:</span>
+            <p class="mt-0.5">Harap isi variabel <code class="bg-amber-100 px-1 rounded font-mono">GAS_API_URL</code> dengan tautan Web App Apps Script Anda.</p>
+          </div>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5" for="inputUsername">
+              Username
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                <i class="fa-regular fa-user"></i>
+              </span>
+              <input 
+                type="text" 
+                id="inputUsername" 
+                required 
+                placeholder="Masukkan username Anda" 
+                class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5" for="inputPassword">
+              Password
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                <i class="fa-solid fa-lock"></i>
+              </span>
+              <input 
+                type="password" 
+                id="inputPassword" 
+                required 
+                placeholder="••••••••" 
+                class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+              <button 
+                type="button" 
+                onclick="togglePasswordVisibility()" 
+                class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
+                <i id="togglePassIcon" class="fa-regular fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            id="btnLoginSubmit"
+            class="w-full mt-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer">
+            <span id="btnLoginText">Masuk ke Sistem</span>
+            <i id="btnLoginSpinner" class="fa-solid fa-circle-notch fa-spin hidden"></i>
+          </button>
+        </form>
+
+        <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col gap-2 text-center text-xs text-slate-500">
+          <p class="flex items-center justify-center gap-1.5">
+            <i class="fa-brands fa-google text-emerald-600"></i> Database: Google Spreadsheet
+          </p>
+          <button type="button" onclick="openConfigModal()" class="text-emerald-700 font-semibold hover:underline">
+            <i class="fa-solid fa-gear"></i> Ubah URL Google Apps Script
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- 2. HALAMAN DASHBOARD                       -->
+  <!-- ========================================== -->
+  <div id="dashboardView" class="hidden min-h-screen flex flex-col">
+    <!-- Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-600/20">
+            <i class="fa-solid fa-scale-balanced text-lg"></i>
+          </div>
+          <div>
+            <h1 class="text-base font-bold text-slate-800 leading-tight">Aplikasi Bendahara</h1>
+            <p class="text-xs text-slate-500">Pencatatan Pemasukan Google Sheets</p>
+          </div>
+        </div>
+
+        <!-- Profil & Logout -->
+        <div class="flex items-center gap-3">
+          <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200">
+            <div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold uppercase">
+              <span id="navUserInitial">A</span>
+            </div>
+            <div class="text-xs font-semibold text-slate-700" id="navUserName">Admin</div>
+            <span class="text-[10px] uppercase font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full" id="navUserRole">Bendahara</span>
+          </div>
+
+          <button 
+            type="button" 
+            onclick="openConfigModal()" 
+            title="Pengaturan API" 
+            class="p-2 text-slate-500 hover:text-emerald-600 hover:bg-slate-100 rounded-xl transition">
+            <i class="fa-solid fa-gear"></i>
+          </button>
+
+          <button 
+            type="button" 
+            onclick="handleLogout()" 
+            class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition cursor-pointer">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span class="hidden sm:inline">Keluar</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      
+      <!-- Ringkasan Statistik Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Total Pemasukan -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pemasukan</p>
+            <p id="statTotalNominal" class="text-xl sm:text-2xl font-extrabold text-emerald-700 mt-1">Rp 0</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Akumulasi seluruh pemasukan</p>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-rupiah-sign"></i>
+          </div>
+        </div>
+
+        <!-- Jumlah Transaksi -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah Transaksi</p>
+            <p id="statTotalCount" class="text-xl sm:text-2xl font-extrabold text-slate-800 mt-1">0 Transaksi</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Tercatat di sheet pemasukan</p>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-receipt"></i>
+          </div>
+        </div>
+
+        <!-- Pemasukan Hari Ini -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pemasukan Hari Ini</p>
+            <p id="statTodayNominal" class="text-xl sm:text-2xl font-extrabold text-teal-700 mt-1">Rp 0</p>
+            <p class="text-[11px] text-slate-400 mt-0.5" id="statTodayDateLabel">Hari Ini</p>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-calendar-day"></i>
+          </div>
+        </div>
+
+        <!-- User Aktif -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">User Pencatat</p>
+            <p id="statCurrentUsername" class="text-lg font-bold text-slate-800 mt-1 truncate max-w-[130px]">-</p>
+            <span class="inline-block mt-0.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              Sesi Aktif
+            </span>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layout Grid Form & Tabel -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Form Input Pemasukan (Kolom Kiri 4/12) -->
+        <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-20">
+          <div class="px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <i class="fa-solid fa-circle-plus text-lg"></i>
+              <h2 class="font-bold text-sm">Input Data Pemasukan</h2>
+            </div>
+            <span class="text-[11px] bg-white/20 px-2 py-0.5 rounded-full font-mono">POST</span>
+          </div>
+
+          <form id="addPemasukanForm" onsubmit="handleAddPemasukanSubmit(event)" class="p-5 space-y-4">
+            
+            <!-- Tanggal Transaksi -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs font-bold text-slate-700" for="inputTanggal">
+                  Tanggal Transaksi <span class="text-rose-500">*</span>
+                </label>
+                <button type="button" onclick="setFormToday()" class="text-[11px] text-emerald-600 hover:underline font-semibold">
+                  Hari Ini
+                </button>
+              </div>
+              <input 
+                type="date" 
+                id="inputTanggal" 
+                required 
+                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+            </div>
+
+            <!-- Produk / Keterangan -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5" for="inputProduk">
+                Produk / Keterangan Pemasukan <span class="text-rose-500">*</span>
+              </label>
+              <input 
+                type="text" 
+                id="inputProduk" 
+                required 
+                placeholder="Contoh: Iuran Kas Kelas, Penjualan Seragam..." 
+                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+              />
+              <!-- Quick Suggestions -->
+              <div class="flex flex-wrap gap-1.5 mt-2">
+                <button type="button" onclick="setProdukValue('Iuran Kas Bulanan')" class="text-[10px] bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2 py-1 rounded-md transition border border-slate-200">
+                  + Iuran Kas
+                </button>
+                <button type="button" onclick="setProdukValue('Dana Donasi/Sumbangan')" class="text-[10px] bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2 py-1 rounded-md transition border border-slate-200">
+                  + Donasi
+                </button>
+                <button type="button" onclick="setProdukValue('Penjualan Merchandise')" class="text-[10px] bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2 py-1 rounded-md transition border border-slate-200">
+                  + Merchandise
+                </button>
+              </div>
+            </div>
+
+            <!-- Nominal -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5" for="inputNominal">
+                Nominal (Rp) <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center font-bold text-slate-400 text-xs">
+                  Rp
+                </span>
+                <input 
+                  type="number" 
+                  id="inputNominal" 
+                  required 
+                  min="1" 
+                  step="1"
+                  placeholder="0" 
+                  class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                  oninput="updateNominalPreview(this.value)"
+                />
+              </div>
+              <p id="nominalPreview" class="text-[11px] text-emerald-700 font-medium mt-1"></p>
+
+              <!-- Quick Nominal Buttons -->
+              <div class="grid grid-cols-4 gap-1.5 mt-2">
+                <button type="button" onclick="addNominal(50000)" class="text-[10px] font-medium py-1 bg-slate-100 hover:bg-emerald-100 text-slate-700 rounded transition text-center">+50rb</button>
+                <button type="button" onclick="addNominal(100000)" class="text-[10px] font-medium py-1 bg-slate-100 hover:bg-emerald-100 text-slate-700 rounded transition text-center">+100rb</button>
+                <button type="button" onclick="addNominal(500000)" class="text-[10px] font-medium py-1 bg-slate-100 hover:bg-emerald-100 text-slate-700 rounded transition text-center">+500rb</button>
+                <button type="button" onclick="addNominal(1000000)" class="text-[10px] font-medium py-1 bg-slate-100 hover:bg-emerald-100 text-slate-700 rounded transition text-center">+1jt</button>
+              </div>
+            </div>
+
+            <!-- Nama User (Otomatis dari Session) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5" for="inputNamaUser">
+                Pencatat (nama_user)
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-xs">
+                  <i class="fa-solid fa-lock"></i>
+                </span>
+                <input 
+                  type="text" 
+                  id="inputNamaUser" 
+                  readonly 
+                  class="w-full pl-9 pr-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-600 font-medium cursor-not-allowed"
+                />
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1">Otomatis terisi dari akun yang sedang login.</p>
+            </div>
+
+            <!-- Submit Button -->
+            <button 
+              type="submit" 
+              id="btnAddSubmit"
+              class="w-full mt-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer">
+              <i id="btnAddIcon" class="fa-solid fa-floppy-disk"></i>
+              <span id="btnAddText">Simpan ke Spreadsheet</span>
+              <i id="btnAddSpinner" class="fa-solid fa-circle-notch fa-spin hidden"></i>
+            </button>
+          </form>
+        </div>
+
+        <!-- Tabel Data Pemasukan (Kolom Kanan 8/12) -->
+        <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          
+          <!-- Header Card & Controls -->
+          <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-table-list text-emerald-600"></i>
+                Data Sheet: <code class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-mono text-xs">pemasukan</code>
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5">Sinkronisasi langsung dengan Google Spreadsheet</p>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <button 
+                type="button" 
+                onclick="loadPemasukanData()" 
+                id="btnRefresh"
+                class="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
+                <span>Muat Ulang</span>
+              </button>
+              <button 
+                type="button" 
+                onclick="exportToCSV()" 
+                class="px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-file-csv"></i>
+                <span>Export CSV</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filter & Search Toolbar -->
+          <div class="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-3">
+            <div class="relative w-full sm:w-72">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </span>
+              <input 
+                type="text" 
+                id="searchQuery" 
+                placeholder="Cari produk, ID, atau nama user..." 
+                oninput="handleSearchTable()" 
+                class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto ml-auto text-xs text-slate-500">
+              <span>Menampilkan:</span>
+              <span id="filteredCountBadge" class="font-bold text-slate-700">0 baris</span>
+            </div>
+          </div>
+
+          <!-- Table Wrapper -->
+          <div class="overflow-x-auto min-h-[300px]">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">ID Pemasukan</th>
+                  <th class="py-3 px-4">Tanggal</th>
+                  <th class="py-3 px-4">Produk / Keterangan</th>
+                  <th class="py-3 px-4 text-right">Nominal</th>
+                  <th class="py-3 px-4">Pencatat (User)</th>
+                </tr>
+              </thead>
+              <tbody id="pemasukanTableBody" class="divide-y divide-slate-100 text-slate-700">
+                <!-- Baris Data di-generate via JavaScript -->
+                <tr>
+                  <td colspan="5" class="py-12 text-center text-slate-400">
+                    <i class="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-600 mb-2"></i>
+                    <p>Memuat data dari Google Spreadsheet...</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Table Footer -->
+          <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+            <span>Struktur kolom: <code class="font-mono text-slate-600">[id_pemASUKAN, tanggal_transaksi, produk, nominal, nama_user]</code></span>
+            <span id="lastUpdatedTime">Belum dimuat</span>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- MODAL PENGATURAN API URL                   -->
+  <!-- ========================================== -->
+  <div id="configModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="p-6 bg-gradient-to-r from-slate-900 to-emerald-950 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-sliders"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm">Konfigurasi Google Apps Script URL</h3>
+            <p class="text-xs text-slate-300">Tautan Web App Google Apps Script</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeConfigModal()" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5" for="modalGasUrl">
+            Google Apps Script Web App URL:
+          </label>
+          <input 
+            type="url" 
+            id="modalGasUrl" 
+            placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <p class="text-[11px] text-slate-500 mt-1">
+            Dapatkan URL ini setelah menerapkan (Deploy) <code class="font-bold text-slate-700">Code.gs</code> sebagai <strong>Web App</strong> dengan akses <em>"Siapa Saja (Anyone)"</em>.
+          </p>
+        </div>
+
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 space-y-1">
+          <p class="font-bold"><i class="fa-solid fa-circle-info"></i> Spreadsheet Target Terdaftar:</p>
+          <p class="font-mono break-all text-[11px] text-emerald-900 font-semibold">1ifDrOADQJjrqU3gnyhLkFN70Wo4KRLX7HUIwdTzJ7Q8</p>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <button 
+            type="button" 
+            onclick="testGasConnection()" 
+            id="btnTestGas"
+            class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-plug"></i>
+            <span>Test Koneksi</span>
+          </button>
+
+          <div class="flex gap-2">
+            <button 
+              type="button" 
+              onclick="closeConfigModal()" 
+              class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+              Tutup
+            </button>
+            <button 
+              type="button" 
+              onclick="saveGasUrlConfig()" 
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-md transition cursor-pointer">
+              Simpan URL
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- JAVASCRIPT LOGIC                           -->
+  <!-- ========================================== -->
+  <script>
+    /**
+     * ==============================================================
+     * KONFIGURASI UTAMA FRONTEND
+     * Masukkan URL Web App Google Apps Script Anda di sini.
+     * ==============================================================
+     */
+    let GAS_API_URL = "URL_WEB_APP_ANDA_DI_SINI";
+
+    // Cek apakah ada URL tersimpan di localStorage browser
+    const savedUrl = localStorage.getItem("bendahara_gas_url");
+    if (savedUrl && savedUrl.trim() !== "") {
+      GAS_API_URL = savedUrl.trim();
+    }
+
+    // State data aplikasi
+    let currentPemasukanList = [];
+    let currentUserSession = null;
+
+    // Inisialisasi saat halaman selesai dimuat
+    document.addEventListener("DOMContentLoaded", () => {
+      // Pasang tanggal hari ini pada form tanggal
+      setFormToday();
+      
+      // Sinkronkan input di modal setting
+      const modalInput = document.getElementById("modalGasUrl");
+      if (modalInput) modalInput.value = (GAS_API_URL !== "URL_WEB_APP_ANDA_DI_SINI") ? GAS_API_URL : "";
+
+      // Cek apakah URL masih default
+      checkGasUrlConfigured();
+
+      // Cek sesi login di localStorage
+      checkExistingSession();
+    });
+
+    /**
+     * Cek Konfigurasi GAS_API_URL
+     */
+    function checkGasUrlConfigured() {
+      const banner = document.getElementById("urlWarningBanner");
+      if (!GAS_API_URL || GAS_API_URL === "URL_WEB_APP_ANDA_DI_SINI" || !GAS_API_URL.startsWith("http")) {
+        if (banner) banner.classList.remove("hidden");
+        return false;
+      } else {
+        if (banner) banner.classList.add("hidden");
+        return true;
+      }
+    }
+
+    /**
+     * Cek Sesi Login di LocalStorage
+     */
+    function checkExistingSession() {
+      try {
+        const sessionStr = localStorage.getItem("bendahara_user_session");
+        if (sessionStr) {
+          const user = JSON.parse(sessionStr);
+          if (user && user.username) {
+            currentUserSession = user;
+            showDashboardView();
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Gagal membaca session:", e);
+      }
+      showLoginView();
+    }
+
+    /**
+     * Tampilkan Halaman Login
+     */
+    function showLoginView() {
+      document.getElementById("loginView").classList.remove("hidden");
+      document.getElementById("dashboardView").classList.add("hidden");
+    }
+
+    /**
+     * Tampilkan Halaman Dashboard
+     */
+    function showDashboardView() {
+      document.getElementById("loginView").classList.add("hidden");
+      document.getElementById("dashboardView").classList.remove("hidden");
+
+      if (currentUserSession) {
+        const username = currentUserSession.username || "User";
+        document.getElementById("navUserName").textContent = username;
+        document.getElementById("navUserInitial").textContent = username.charAt(0).toUpperCase();
+        document.getElementById("navUserRole").textContent = currentUserSession.role || "Bendahara";
+        document.getElementById("statCurrentUsername").textContent = username;
+        document.getElementById("inputNamaUser").value = username;
+      }
+
+      // Muat data pemasukan dari API
+      loadPemasukanData();
+    }
+
+    /**
+     * Handle Login Form Submit
+     */
+    async function handleLoginSubmit(event) {
+      event.preventDefault();
+
+      const usernameInput = document.getElementById("inputUsername");
+      const passwordInput = document.getElementById("inputPassword");
+      const btn = document.getElementById("btnLoginSubmit");
+      const btnText = document.getElementById("btnLoginText");
+      const btnSpinner = document.getElementById("btnLoginSpinner");
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      if (!username || !password) {
+        showToast("Username dan password tidak boleh kosong!", "error");
+        return;
+      }
+
+      if (!checkGasUrlConfigured()) {
+        showToast("Silakan atur URL Google Apps Script Anda terlebih dahulu!", "warning");
+        openConfigModal();
+        return;
+      }
+
+      // Animasi tombol loading
+      btn.disabled = true;
+      btnText.textContent = "Memverifikasi...";
+      btnSpinner.classList.remove("hidden");
+
+      try {
+        // Panggil endpoint doPost di Google Apps Script
+        // Menggunakan text/plain mencegah isu preflight CORS di Google Apps Script
+        const response = await fetch(GAS_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify({
+            action: "login",
+            username: username,
+            password: password
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.status === "success" && result.user) {
+          showToast("Login berhasil! Selamat datang, " + result.user.username, "success");
+          
+          // Simpan session di localStorage
+          currentUserSession = result.user;
+          localStorage.setItem("bendahara_user_session", JSON.stringify(result.user));
+          
+          // Reset form dan pindah ke dashboard
+          usernameInput.value = "";
+          passwordInput.value = "";
+          showDashboardView();
+        } else {
+          showToast(result.message || "Login gagal! Periksa username/password Anda.", "error");
+        }
+      } catch (error) {
+        console.error("Login error:", error);
+        showToast("Gagal terhubung ke Google Apps Script: " + error.message, "error");
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = "Masuk ke Sistem";
+        btnSpinner.classList.add("hidden");
+      }
+    }
+
+    /**
+     * Handle Logout
+     */
+    function handleLogout() {
+      if (confirm("Apakah Anda yakin ingin keluar dari aplikasi bendahara?")) {
+        localStorage.removeItem("bendahara_user_session");
+        currentUserSession = null;
+        showToast("Anda telah berhasil logout.", "info");
+        showLoginView();
+      }
+    }
+
+    /**
+     * Muat Data Pemasukan via doGet(e)
+     */
+    async function loadPemasukanData() {
+      const tableBody = document.getElementById("pemasukanTableBody");
+      const refreshIcon = document.getElementById("refreshIcon");
+
+      if (!checkGasUrlConfigured()) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-8 text-center text-amber-600 bg-amber-50">
+              <i class="fa-solid fa-triangle-exclamation text-2xl mb-2"></i>
+              <p class="font-bold">Google Apps Script URL belum dikonfigurasi.</p>
+              <button onclick="openConfigModal()" class="mt-2 text-xs font-semibold bg-emerald-600 text-white px-3 py-1.5 rounded-lg">Atur URL Sekarang</button>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      if (refreshIcon) refreshIcon.classList.add("fa-spin");
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="5" class="py-10 text-center text-slate-400">
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-600 mb-2"></i>
+            <p>Mengambil data dari Google Spreadsheet...</p>
+          </td>
+        </tr>
+      `;
+
+      try {
+        const fetchUrl = `${GAS_API_URL}?action=getPemasukan&_t=${Date.now()}`;
+        const response = await fetch(fetchUrl);
+        const result = await response.json();
+
+        if (result.status === "success" && Array.isArray(result.data)) {
+          currentPemasukanList = result.data;
+          renderTableData(currentPemasukanList);
+          updateSummaryCards(currentPemasukanList);
+          
+          const nowStr = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          document.getElementById("lastUpdatedTime").textContent = "Terakhir diperbarui: " + nowStr + " WIB";
+        } else {
+          tableBody.innerHTML = `
+            <tr>
+              <td colspan="5" class="py-8 text-center text-rose-500">
+                <i class="fa-solid fa-circle-exclamation text-xl mb-1"></i>
+                <p>${result.message || "Gagal memuat data."}</p>
+              </td>
+            </tr>
+          `;
+        }
+      } catch (err) {
+        console.error("Fetch data error:", err);
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-8 text-center text-rose-600 bg-rose-50">
+              <i class="fa-solid fa-triangle-exclamation text-xl mb-1"></i>
+              <p class="font-bold">Gagal mengambil data dari Google Apps Script.</p>
+              <p class="text-[11px] mt-1 text-rose-500">${err.message}</p>
+              <button onclick="loadPemasukanData()" class="mt-2 text-xs bg-rose-600 text-white px-3 py-1.5 rounded-lg">Coba Lagi</button>
+            </td>
+          </tr>
+        `;
+      } finally {
+        if (refreshIcon) refreshIcon.classList.remove("fa-spin");
+      }
+    }
+
+    /**
+     * Render Baris Tabel
+     */
+    function renderTableData(data) {
+      const tableBody = document.getElementById("pemasukanTableBody");
+      const countBadge = document.getElementById("filteredCountBadge");
+
+      if (countBadge) countBadge.textContent = `${data.length} baris`;
+
+      if (!data || data.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-inbox text-3xl mb-2 text-slate-300"></i>
+              <p class="font-medium text-slate-500">Belum ada transaksi pemasukan</p>
+              <p class="text-[11px] mt-0.5">Gunakan formulir di sebelah kiri untuk menambah data baru.</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      // Urutkan dari data terbaru (reverse)
+      const sorted = [...data].reverse();
+
+      tableBody.innerHTML = sorted.map((row) => {
+        const nominalFormatted = formatRupiah(row.nominal || 0);
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="py-3 px-4 font-mono font-medium text-slate-700">
+              <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px]">
+                ${escapeHtml(row.id_pemASUKAN || "-")}
+              </span>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap text-slate-600">
+              ${escapeHtml(row.tanggal_transaksi || "-")}
+            </td>
+            <td class="py-3 px-4 font-semibold text-slate-800">
+              ${escapeHtml(row.produk || "-")}
+            </td>
+            <td class="py-3 px-4 text-right font-extrabold text-emerald-700 whitespace-nowrap">
+              ${nominalFormatted}
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <i class="fa-solid fa-user text-[10px]"></i>
+                ${escapeHtml(row.nama_user || "-")}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    /**
+     * Hitung & Perbarui Ringkasan Statistik
+     */
+    function updateSummaryCards(data) {
+      let totalNominal = 0;
+      let todayNominal = 0;
+      const todayStr = getTodayDateString();
+
+      data.forEach(item => {
+        const nom = Number(item.nominal) || 0;
+        totalNominal += nom;
+
+        // Cek tanggal hari ini
+        const itemDate = String(item.tanggal_transaksi || "").slice(0, 10);
+        if (itemDate === todayStr) {
+          todayNominal += nom;
+        }
+      });
+
+      document.getElementById("statTotalNominal").textContent = formatRupiah(totalNominal);
+      document.getElementById("statTotalCount").textContent = `${data.length} Transaksi`;
+      document.getElementById("statTodayNominal").textContent = formatRupiah(todayNominal);
+      document.getElementById("statTodayDateLabel").textContent = "Tanggal: " + todayStr;
+    }
+
+    /**
+     * Handle Tambah Pemasukan Form Submit
+     */
+    async function handleAddPemasukanSubmit(event) {
+      event.preventDefault();
+
+      if (!currentUserSession || !currentUserSession.username) {
+        showToast("Sesi login berakhir. Silakan login kembali.", "error");
+        showLoginView();
+        return;
+      }
+
+      const tanggalInput = document.getElementById("inputTanggal");
+      const produkInput = document.getElementById("inputProduk");
+      const nominalInput = document.getElementById("inputNominal");
+      const btn = document.getElementById("btnAddSubmit");
+      const btnText = document.getElementById("btnAddText");
+      const btnIcon = document.getElementById("btnAddIcon");
+      const btnSpinner = document.getElementById("btnAddSpinner");
+
+      const tanggal = tanggalInput.value;
+      const produk = produkInput.value.trim();
+      const nominal = Number(nominalInput.value);
+      const namaUser = currentUserSession.username;
+
+      if (!tanggal || !produk || !nominal || nominal <= 0) {
+        showToast("Lengkapi semua kolom dengan benar!", "error");
+        return;
+      }
+
+      if (!checkGasUrlConfigured()) {
+        showToast("Silakan atur URL Google Apps Script Anda terlebih dahulu!", "warning");
+        openConfigModal();
+        return;
+      }
+
+      btn.disabled = true;
+      btnIcon.classList.add("hidden");
+      btnSpinner.classList.remove("hidden");
+      btnText.textContent = "Menyimpan...";
+
+      try {
+        const payload = {
+          action: "addPemasukan",
+          tanggal_transaksi: tanggal,
+          produk: produk,
+          nominal: nominal,
+          nama_user: namaUser
+        };
+
+        const response = await fetch(GAS_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          showToast("Pemasukan berhasil dicatat ke Google Sheets!", "success");
+          
+          // Reset form input
+          produkInput.value = "";
+          nominalInput.value = "";
+          document.getElementById("nominalPreview").textContent = "";
+          
+          // Muat ulang data terbaru
+          await loadPemasukanData();
+        } else {
+          showToast(result.message || "Gagal menyimpan data!", "error");
+        }
+      } catch (err) {
+        console.error("Gagal simpan pemasukan:", err);
+        showToast("Error saat menghubungi Google Apps Script: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btnIcon.classList.remove("hidden");
+        btnSpinner.classList.add("hidden");
+        btnText.textContent = "Simpan ke Spreadsheet";
+      }
+    }
+
+    /**
+     * Filter & Pencarian Tabel
+     */
+    function handleSearchTable() {
+      const q = document.getElementById("searchQuery").value.toLowerCase().trim();
+      if (!q) {
+        renderTableData(currentPemasukanList);
+        return;
+      }
+
+      const filtered = currentPemasukanList.filter(item => {
+        const idMatch = String(item.id_pemASUKAN || "").toLowerCase().includes(q);
+        const prodMatch = String(item.produk || "").toLowerCase().includes(q);
+        const userMatch = String(item.nama_user || "").toLowerCase().includes(q);
+        const dateMatch = String(item.tanggal_transaksi || "").toLowerCase().includes(q);
+        const nomMatch = String(item.nominal || "").includes(q);
+        return idMatch || prodMatch || userMatch || dateMatch || nomMatch;
+      });
+
+      renderTableData(filtered);
+    }
+
+    /**
+     * Export Tabel ke format CSV
+     */
+    function exportToCSV() {
+      if (!currentPemasukanList || currentPemasukanList.length === 0) {
+        showToast("Belum ada data untuk diekspor!", "warning");
+        return;
+      }
+
+      const headers = ["id_pemASUKAN", "tanggal_transaksi", "produk", "nominal", "nama_user"];
+      const rows = currentPemasukanList.map(item => [
+        `"${item.id_pemASUKAN || ""}"`,
+        `"${item.tanggal_transaksi || ""}"`,
+        `"${(item.produk || "").replace(/"/g, '""')}"`,
+        item.nominal || 0,
+        `"${item.nama_user || ""}"`
+      ]);
+
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `pemasukan_bendahara_${getTodayDateString()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("File CSV berhasil diunduh!", "success");
+    }
+
+    /**
+     * Pengaturan & Modal GAS URL
+     */
+    function openConfigModal() {
+      const modal = document.getElementById("configModal");
+      const input = document.getElementById("modalGasUrl");
+      input.value = (GAS_API_URL !== "URL_WEB_APP_ANDA_DI_SINI") ? GAS_API_URL : "";
+      modal.classList.remove("hidden");
+    }
+
+    function closeConfigModal() {
+      document.getElementById("configModal").classList.add("hidden");
+    }
+
+    function saveGasUrlConfig() {
+      const input = document.getElementById("modalGasUrl");
+      const val = input.value.trim();
+      if (!val) {
+        showToast("Harap masukkan URL yang valid!", "warning");
+        return;
+      }
+
+      GAS_API_URL = val;
+      localStorage.setItem("bendahara_gas_url", val);
+      checkGasUrlConfigured();
+      closeConfigModal();
+      showToast("URL Google Apps Script berhasil disimpan!", "success");
+
+      // Jika sedang di dashboard, muat ulang data
+      if (currentUserSession) {
+        loadPemasukanData();
+      }
+    }
+
+    async function testGasConnection() {
+      const input = document.getElementById("modalGasUrl");
+      const url = input.value.trim();
+      const btn = document.getElementById("btnTestGas");
+
+      if (!url || !url.startsWith("http")) {
+        showToast("Masukkan URL Google Apps Script yang valid terlebih dahulu!", "warning");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Testing...`;
+
+      try {
+        const res = await fetch(`${url}?action=ping&_t=${Date.now()}`);
+        const data = await res.json();
+        if (data.status === "success") {
+          showToast("Koneksi Berhasil! API aktif & Spreadsheet terhubung.", "success");
+        } else {
+          showToast("Respon diterima tetapi status: " + (data.message || "Gagal"), "warning");
+        }
+      } catch (err) {
+        showToast("Koneksi Gagal: " + err.message + ". Pastikan Deploy 'Anyone' sudah diaktifkan.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-plug"></i> Test Koneksi`;
+      }
+    }
+
+    /**
+     * Utilities & Helpers
+     */
+    function formatRupiah(num) {
+      return new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        minimumFractionDigits: 0
+      }).format(num);
+    }
+
+    function getTodayDateString() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function setFormToday() {
+      const t = document.getElementById("inputTanggal");
+      if (t) t.value = getTodayDateString();
+    }
+
+    function setProdukValue(text) {
+      const p = document.getElementById("inputProduk");
+      if (p) {
+        p.value = text;
+        p.focus();
+      }
+    }
+
+    function addNominal(amount) {
+      const n = document.getElementById("inputNominal");
+      if (n) {
+        const cur = Number(n.value) || 0;
+        n.value = cur + amount;
+        updateNominalPreview(n.value);
+      }
+    }
+
+    function updateNominalPreview(val) {
+      const num = Number(val);
+      const preview = document.getElementById("nominalPreview");
+      if (!isNaN(num) && num > 0) {
+        preview.textContent = "Terbilang: " + formatRupiah(num);
+      } else {
+        preview.textContent = "";
+      }
+    }
+
+    function togglePasswordVisibility() {
+      const p = document.getElementById("inputPassword");
+      const icon = document.getElementById("togglePassIcon");
+      if (p.type === "password") {
+        p.type = "text";
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+      } else {
+        p.type = "password";
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = "pointer-events-auto flex items-center gap-3 p-4 rounded-2xl shadow-xl text-xs font-semibold transform transition-all duration-300 translate-y-[-10px] opacity-0";
+
+      let icon = "fa-circle-info";
+      if (type === "success") {
+        toast.classList.add("bg-emerald-700", "text-white");
+        icon = "fa-circle-check";
+      } else if (type === "error") {
+        toast.classList.add("bg-rose-700", "text-white");
+        icon = "fa-circle-xmark";
+      } else if (type === "warning") {
+        toast.classList.add("bg-amber-600", "text-white");
+        icon = "fa-triangle-exclamation";
+      } else {
+        toast.classList.add("bg-slate-800", "text-white");
+      }
+
+      toast.innerHTML = `
+        <i class="fa-solid ${icon} text-base"></i>
+        <div class="flex-1">${message}</div>
+      `;
+
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove("translate-y-[-10px]", "opacity-0");
+      });
+
+      setTimeout(() => {
+        toast.classList.add("opacity-0", "translate-y-[-10px]");
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+  </script>
+</body>
+</html>
