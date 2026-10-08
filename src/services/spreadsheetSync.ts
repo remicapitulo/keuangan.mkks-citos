@@ -115,13 +115,27 @@ export function normalizeSekolahList(rawList: any[]): Sekolah[] {
     const kelurahan = getFlexibleValue(s, ['kelurahan', 'Kelurahan', 'KELURAHAN']);
     const kecamatan = getFlexibleValue(s, ['kecamatan', 'Kecamatan', 'KECAMATAN']) || 'Cimanggis Tapos';
 
+    let kontak = getFlexibleValue(s, [
+      'kontak', 'Kontak', 'KONTAK', 'No WA', 'no_wa', 'wa', 'WA', 'Nomor WA',
+      'No. HP', 'HP', 'Telepon', 'No Telepon', 'Kolom G', 'phone', 'telepon', 'kontak_wa', 'noWa'
+    ]);
+
+    if (!kontak) {
+      if (Array.isArray(s) && s[6] !== undefined && s[6] !== null) {
+        kontak = String(s[6]).trim();
+      } else if (s._rawRow && Array.isArray(s._rawRow) && s._rawRow[6] !== undefined && s._rawRow[6] !== null) {
+        kontak = String(s._rawRow[6]).trim();
+      }
+    }
+
     normalized.push({
       idSekolah,
       namaSekolah: namaSekolah.trim(),
       namaKepsek: namaKepsek ? namaKepsek.trim() : `Kepala Sekolah ${namaSekolah.trim()}`,
       alamat: alamat.trim(),
       kelurahan: kelurahan.trim(),
-      kecamatan: kecamatan.trim()
+      kecamatan: kecamatan.trim(),
+      kontak: kontak ? String(kontak).trim() : ''
     });
   });
 
@@ -604,6 +618,13 @@ export class StorageService {
   public static saveSekolah(sekolahList: Sekolah[]): void {
     const normalized = normalizeSekolahList(sekolahList);
     localStorage.setItem(STORAGE_KEYS.SEKOLAH, JSON.stringify(normalized));
+  }
+
+  public static updateSekolahKontak(idSekolah: string, newKontak: string): Sekolah[] {
+    const list = this.getSekolah();
+    const updated = list.map(s => s.idSekolah === idSekolah ? { ...s, kontak: newKontak.trim() } : s);
+    this.saveSekolah(updated);
+    return updated;
   }
 
   public static getUsers(): User[] {
@@ -1316,12 +1337,13 @@ function writeSheetData(ss, sheetName, rows) {
     'Rekonsiliasi_Kas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
     'RekonsiliasiKas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
     'Audit_Kas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
-    'Sekolah': ['ID Sekolah', 'Nama Sekolah', 'Nama Kepsek', 'Alamat', 'Kelurahan', 'Kecamatan'],
+    'Sekolah': ['ID Sekolah', 'Nama Sekolah', 'Nama Kepsek', 'Alamat', 'Kelurahan', 'Kecamatan', 'Kontak'],
     'User': ['Username', 'Password', 'Role', 'Sekolah', 'Aktif', 'Nama Kepsek']
   };
 
   // Pemetaan kata kunci alternatif
   var keyAlias = {
+    'Kontak': ['Kontak', 'kontak', 'KONTAK', 'No WA', 'noWa', 'No Telepon', 'telepon', 'HP', 'noHp', 'Telepon / WA', 'WA', 'phone'],
     'Tahun': ['Tahun', 'tahun'],
     'Bulan': ['Bulan', 'bulan'],
     'ID Sekolah': ['ID Sekolah', 'idSekolah', 'id_sekolah'],

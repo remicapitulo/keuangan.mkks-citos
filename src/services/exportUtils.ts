@@ -1147,3 +1147,227 @@ export function exportBeritaAcaraToPDF(params: ExportBeritaAcaraPDFParams) {
   doc.save(filename);
   return filename;
 }
+
+export interface ExportInvoicePDFParams {
+  sekolah: Sekolah;
+  tahun: number;
+  bulanTunggakan: string[];
+  totalTagihan: number;
+  bulanBatas: string;
+  namaBendahara: string;
+  nipBendahara?: string;
+  namaKetua?: string;
+  nipKetua?: string;
+  namaBank?: string;
+  nomorRekening?: string;
+  atasNamaRekening?: string;
+}
+
+export function exportInvoicePDF(params: ExportInvoicePDFParams) {
+  const {
+    sekolah,
+    tahun,
+    bulanTunggakan,
+    totalTagihan,
+    bulanBatas,
+    namaBendahara,
+    nipBendahara = '',
+    namaKetua = 'Ketua MKKS SMP Cimanggis & Tapos',
+    nipKetua = '',
+    namaBank = 'Bank DKI',
+    nomorRekening = '102.23.09876.1',
+    atasNamaRekening = 'MKKS SMP CITOS'
+  } = params;
+
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const tanggalCetak = formatDateIndonesian(new Date().toISOString().split('T')[0]);
+  const invoiceNo = `INV/MKKS-CITOS/${tahun}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${sekolah.idSekolah || '001'}`;
+
+  // 1. Kop Dokumen Resmi MKKS
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text('MUSYAWARAH KERJA KEPALA SEKOLAH (MKKS) SMP', 105, 16, { align: 'center' });
+
+  doc.setFontSize(14.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('KECAMATAN CIMANGGIS & TAPOS (CITOS)', 105, 22.5, { align: 'center' });
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('Sekretariat: Jl. Raya Bogor / Cimanggis & Tapos • Kota Depok', 105, 27, { align: 'center' });
+
+  // Double border line kop surat
+  doc.setDrawColor(15, 23, 42);
+  doc.setLineWidth(0.6);
+  doc.line(15, 30, 195, 30);
+  doc.setLineWidth(0.2);
+  doc.line(15, 31.2, 195, 31.2);
+
+  // 2. Judul Dokumen & Nomor Invoice
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(13, 148, 136); // teal-600
+  doc.text('SURAT TAGIHAN / INVOICE IURAN ANGGOTA', 105, 39, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Nomor: ${invoiceNo}`, 105, 44, { align: 'center' });
+
+  // 3. Info Tanggal & Kepada Yth
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text(`Tanggal Tagihan: ${tanggalCetak}`, 15, 52);
+  doc.text(`Batas Periode Penagihan: s.d. Bulan ${bulanBatas} ${tahun}`, 15, 57);
+
+  // Box Tujuan Sekolah
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(120, 48, 75, 24, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Ditujukan Kepada Yth:', 124, 53.5);
+  doc.setFontSize(9);
+  doc.text(sekolah.namaKepsek || 'Kepala Sekolah', 124, 58.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(13, 148, 136);
+  doc.text(sekolah.namaSekolah, 124, 63.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`${sekolah.alamat || '-'}, Kel. ${sekolah.kelurahan || '-'}`, 124, 68);
+
+  // 4. Pembuka
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
+  const intro = `Dengan hormat, bersama ini kami sampaikan rincian tagihan kewajiban iuran rutin organisasi Musyawarah Kerja Kepala Sekolah (MKKS) SMP Kecamatan Cimanggis dan Tapos untuk Tahun Buku ${tahun} yang belum tercatat lunas sampai dengan bulan ${bulanBatas} ${tahun}:`;
+  const splitIntro = doc.splitTextToSize(intro, 180);
+  doc.text(splitIntro, 15, 76);
+
+  let curY = 76 + (splitIntro.length * 4) + 2;
+
+  // 5. Tabel Rincian Tunggakan
+  const tableRows = bulanTunggakan.map((bulan, idx) => [
+    idx + 1,
+    `Iuran Anggota Bulan ${bulan} ${tahun}`,
+    `Tarif Resmi Rp 100.000 / Bulan`,
+    formatRupiah(IURAN_PER_BULAN)
+  ]);
+
+  tableRows.push([
+    '',
+    `TOTAL TAGIHAN TUNGGAKAN (${bulanTunggakan.length} Bulan)`,
+    '',
+    formatRupiah(totalTagihan)
+  ]);
+
+  autoTable(doc, {
+    startY: curY,
+    margin: { left: 15, right: 15 },
+    head: [['No', 'Uraian Komponen Iuran', 'Keterangan Tarif', 'Jumlah Nominal (Rp)']],
+    body: tableRows,
+    theme: 'grid',
+    headStyles: { fillColor: [13, 148, 136], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
+    styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 88, fontStyle: 'bold' },
+      2: { cellWidth: 45 },
+      3: { cellWidth: 35, halign: 'right', fontStyle: 'bold' }
+    },
+    didParseCell: (data) => {
+      if (data.row.index === tableRows.length - 1) {
+        data.cell.styles.fillColor = [254, 243, 199]; // amber-100
+        data.cell.styles.textColor = [180, 83, 9];   // amber-700
+        data.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  curY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 6. Box Informasi Pembayaran & Rekening
+  doc.setFillColor(240, 253, 250); // teal-50
+  doc.setDrawColor(153, 246, 228); // teal-200
+  doc.setLineWidth(0.35);
+  doc.roundedRect(15, curY, 180, 26, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(17, 94, 89);
+  doc.text('INFORMASI REKENING PEMBAYARAN RESMI MKKS CITOS:', 19, curY + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(`• Bank Tujuan: ${namaBank}`, 19, curY + 11.5);
+  doc.text(`• Nomor Rekening: ${nomorRekening}`, 19, curY + 16.5);
+  doc.text(`• Atas Nama Rekening: ${atasNamaRekening}`, 19, curY + 21.5);
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('* Pembayaran juga dapat diserahkan tunai kepada Bendahara saat rapat rutin MKKS.', 110, curY + 16.5);
+  doc.text('* Harap konfirmasi bukti transfer via WhatsApp ke Bendahara setelah melakukan pembayaran.', 110, curY + 21.5);
+
+  curY += 34;
+
+  // 7. Tanda Tangan
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Mengetahui,', 40, curY, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text('Ketua MKKS SMP Cimanggis & Tapos', 40, curY + 5, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Depok, ${tanggalCetak}`, 160, curY, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text('Bendahara MKKS SMP Citos', 160, curY + 5, { align: 'center' });
+
+  const sigY = curY + 25;
+
+  // Ketua
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(namaKetua || 'Dra. H. Nurbaiti', 40, sigY, { align: 'center' });
+  doc.setLineWidth(0.3);
+  const ketuaW = doc.getTextWidth(namaKetua || 'Dra. H. Nurbaiti');
+  doc.line(40 - (ketuaW / 2), sigY + 1, 40 + (ketuaW / 2), sigY + 1);
+  if (nipKetua && nipKetua !== '-') {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`NIP. ${nipKetua}`, 40, sigY + 5, { align: 'center' });
+  }
+
+  // Bendahara
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(namaBendahara || 'H. Nurhasan, M.Pd', 160, sigY, { align: 'center' });
+  const bendW = doc.getTextWidth(namaBendahara || 'H. Nurhasan, M.Pd');
+  doc.line(160 - (bendW / 2), sigY + 1, 160 + (bendW / 2), sigY + 1);
+  if (nipBendahara && nipBendahara !== '-') {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`NIP. ${nipBendahara}`, 160, sigY + 5, { align: 'center' });
+  }
+
+  const cleanSekolahName = sekolah.namaSekolah.replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `Invoice-Tagihan-MKKS-${cleanSekolahName}-${tahun}.pdf`;
+  doc.save(filename);
+  return filename;
+}
+

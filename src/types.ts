@@ -16,6 +16,7 @@ export interface Sekolah {
   alamat: string;
   kelurahan: string;
   kecamatan: string;
+  kontak?: string; // Kolom G: Nomor WhatsApp / Kontak Kepala Sekolah
 }
 
 export interface Iuran {

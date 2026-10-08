@@ -8,6 +8,7 @@ import { InputIuran } from './components/InputIuran';
 import { InputPemasukanLain } from './components/InputPemasukanLain';
 import { KelolaPengeluaran } from './components/KelolaPengeluaran';
 import { LaporanKeuangan } from './components/LaporanKeuangan';
+import { PenagihanIuran } from './components/PenagihanIuran';
 import { StrukModal } from './components/StrukModal';
 import { SpreadsheetModal } from './components/SpreadsheetModal';
 import { LoginModal } from './components/LoginModal';
@@ -303,9 +304,16 @@ export default function App() {
     showToast(`Login sebagai ${user.sekolah} (${user.role})`);
 
     // Reset tab if user is Sekolah role and on Bendahara-only tab
-    if (user.role === 'Sekolah' && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran')) {
+    if (user.role === 'Sekolah' && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan')) {
       setActiveTab('dashboard');
     }
+  };
+
+  // Update Kontak Sekolah
+  const handleUpdateSekolahKontak = (idSekolah: string, newKontak: string) => {
+    const updated = StorageService.updateSekolahKontak(idSekolah, newKontak);
+    setSekolahList(updated);
+    showToast('Nomor WhatsApp sekolah berhasil diperbarui.');
   };
 
   // Update Spreadsheet Config
@@ -364,7 +372,7 @@ export default function App() {
 
   // Auto redirect Ketua to dashboard if currently on closed tabs
   useEffect(() => {
-    if (isKetua && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran')) {
+    if (isKetua && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan')) {
       setActiveTab('dashboard');
     }
   }, [isKetua, activeTab]);
@@ -468,6 +476,21 @@ export default function App() {
                 />
               )}
 
+              {activeTab === 'penagihan' && canAccessBendaharaMenu && (
+                <PenagihanIuran
+                  sekolahList={sekolahList}
+                  iuranList={iuranList}
+                  currentUser={currentUser}
+                  usersList={usersList}
+                  rekonsiliasiKasList={rekonsiliasiKasList}
+                  onUpdateSekolahKontak={handleUpdateSekolahKontak}
+                  onNavigateToInputIuran={(namaSekolah) => {
+                    setSelectedSchoolForIuran(namaSekolah);
+                    setActiveTab('input-iuran');
+                  }}
+                />
+              )}
+
               {activeTab === 'laporan-keuangan' && (
                 <LaporanKeuangan
                   sekolahList={sekolahList}
@@ -489,12 +512,12 @@ export default function App() {
               )}
 
               {/* Access denied fallback if user attempts closed route */}
-              {!canAccessBendaharaMenu && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran') && (
+              {!canAccessBendaharaMenu && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan') && (
                 <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12 space-y-3">
                   <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto" />
-                  <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Bendahara)</h3>
+                  <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Admin & Bendahara)</h3>
                   <p className="text-xs text-slate-500">
-                    Menu Input Iuran, Pemasukan Lain, dan Kelola Pengeluaran ditutup untuk akun {isKetua ? 'Ketua' : 'Sekolah'}. Silakan gunakan menu Dashboard atau Laporan Keuangan.
+                    Menu Input Iuran, Pemasukan Lain, Kelola Pengeluaran, dan Penagihan ditutup untuk akun {isKetua ? 'Ketua' : 'Sekolah'}. Silakan gunakan menu Dashboard atau Laporan Keuangan.
                   </p>
                   <button
                     onClick={() => setActiveTab('dashboard')}

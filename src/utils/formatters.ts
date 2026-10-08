@@ -441,3 +441,35 @@ export function getSchoolSortKey(name: string): string {
 
   return cleaned || name.trim();
 }
+
+/**
+ * Normalizes phone numbers for WhatsApp link generation:
+ * e.g., '085778913450' -> '6285778913450'
+ * e.g., '6285778913450' -> '6285778913450'
+ * e.g., '+62 813-1025-1743' -> '6281310251743'
+ */
+export function cleanPhoneNumber(rawPhone?: string | number | null): string {
+  if (!rawPhone) return '';
+  let str = String(rawPhone).trim().replace(/[^0-9]/g, '');
+  if (!str) return '';
+  if (str.startsWith('0')) {
+    str = '62' + str.substring(1);
+  } else if (str.startsWith('8')) {
+    str = '62' + str;
+  }
+  return str;
+}
+
+export function formatWhatsAppDisplayNumber(rawPhone?: string | number | null): string {
+  const cleaned = cleanPhoneNumber(rawPhone);
+  if (!cleaned) return '-';
+  if (cleaned.startsWith('62')) {
+    const rest = cleaned.substring(2);
+    if (rest.length >= 9) {
+      return `+62 ${rest.substring(0, 3)}-${rest.substring(3, 7)}-${rest.substring(7)}`;
+    }
+    return `+62 ${rest}`;
+  }
+  return cleaned;
+}
+

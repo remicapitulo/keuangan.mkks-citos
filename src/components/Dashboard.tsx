@@ -17,7 +17,8 @@ import {
   UserCheck,
   Printer,
   FileCheck,
-  HandCoins
+  HandCoins,
+  Send
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -27,7 +28,7 @@ interface DashboardProps {
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
   pemasukanLainList?: PemasukanLain[];
-  onNavigateToTab: (tab: 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan') => void;
+  onNavigateToTab: (tab: 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan' | 'penagihan') => void;
   onSelectSchoolForIuran?: (namaSekolah: string) => void;
   onOpenStrukModal?: (kuitansiData: any) => void;
 }
@@ -410,6 +411,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
             )}
           </div>
+          {canInput && totalTunggakan > 0 && (
+            <div className="mt-3 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => onNavigateToTab('penagihan')}
+                className="w-full py-1.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5 text-amber-700" />
+                <span>Buka Penagihan WA ({sekolahList.length * 12 - iuranYear.length} Bulan) &rarr;</span>
+              </button>
+            </div>
+          )}
         </div>
 
       </div>
