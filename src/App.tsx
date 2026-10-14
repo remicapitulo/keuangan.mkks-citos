@@ -386,7 +386,7 @@ export default function App() {
   }, [isKetua, activeTab]);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col justify-between selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col justify-between selection:bg-teal-500 selection:text-white w-full max-w-full overflow-x-hidden">
       
       <div>
         {/* Top Header Navbar */}

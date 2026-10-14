@@ -23,44 +23,44 @@ export const Navigation: React.FC<NavigationProps> = ({
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: <LayoutDashboard className="w-5 h-5" />,
+      icon: <LayoutDashboard className="w-4.5 h-4.5" />,
       desc: 'Ringkasan Keuangan'
     },
     {
       id: 'input-iuran',
       label: 'Input Iuran',
-      icon: <Wallet className="w-5 h-5" />,
+      icon: <Wallet className="w-4.5 h-4.5" />,
       desc: 'Bayar Iuran Sekolah'
     },
     {
       id: 'penagihan',
       label: 'Penagihan',
-      icon: <Send className="w-5 h-5" />,
+      icon: <Send className="w-4.5 h-4.5" />,
       desc: 'Invoice WA Tunggakan'
     },
     {
       id: 'pemasukan-lain',
       label: 'Pemasukan Lain',
-      icon: <Coins className="w-5 h-5" />,
-      desc: 'Sponsor, Sisa Panitia, dll'
+      icon: <Coins className="w-4.5 h-4.5" />,
+      desc: 'Sponsor, Donatur, dll'
     },
     {
       id: 'kelola-pengeluaran',
-      label: 'Kelola Pengeluaran',
-      icon: <Receipt className="w-5 h-5" />,
+      label: 'Pengeluaran',
+      icon: <Receipt className="w-4.5 h-4.5" />,
       desc: 'Pencatatan Kas Keluar'
     },
     {
       id: 'laporan-keuangan',
       label: 'Laporan Keuangan',
-      icon: <FileText className="w-5 h-5" />,
+      icon: <FileText className="w-4.5 h-4.5" />,
       desc: 'Matriks & Rekap Kas'
     },
     {
       id: 'install-app',
-      label: 'Install Aplikasi APP',
-      icon: <Smartphone className="w-5 h-5 text-emerald-600" />,
-      desc: 'Pasang di Android Chrome'
+      label: 'Instal Aplikasi',
+      icon: <Smartphone className="w-4.5 h-4.5 text-emerald-600" />,
+      desc: 'Pasang di Layar Utama HP'
     }
   ];
 
@@ -68,20 +68,20 @@ export const Navigation: React.FC<NavigationProps> = ({
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: <LayoutDashboard className="w-5 h-5" />,
+      icon: <LayoutDashboard className="w-4.5 h-4.5" />,
       desc: 'Ringkasan Status Iuran'
     },
     {
       id: 'laporan-keuangan',
       label: 'Laporan Keuangan',
-      icon: <FileText className="w-5 h-5" />,
+      icon: <FileText className="w-4.5 h-4.5" />,
       desc: 'Matriks Iuran Sekolah'
     },
     {
       id: 'install-app',
-      label: 'Install Aplikasi APP',
-      icon: <Smartphone className="w-5 h-5 text-emerald-600" />,
-      desc: 'Pasang di Android Chrome'
+      label: 'Instal Aplikasi',
+      icon: <Smartphone className="w-4.5 h-4.5 text-emerald-600" />,
+      desc: 'Pasang di Layar Utama HP'
     }
   ];
 
@@ -89,20 +89,20 @@ export const Navigation: React.FC<NavigationProps> = ({
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: <LayoutDashboard className="w-5 h-5" />,
+      icon: <LayoutDashboard className="w-4.5 h-4.5" />,
       desc: 'Ringkasan Pengawasan'
     },
     {
       id: 'laporan-keuangan',
       label: 'Laporan Keuangan',
-      icon: <FileText className="w-5 h-5" />,
+      icon: <FileText className="w-4.5 h-4.5" />,
       desc: 'Matriks & Rekap Kas'
     },
     {
       id: 'install-app',
-      label: 'Install Aplikasi APP',
-      icon: <Smartphone className="w-5 h-5 text-emerald-600" />,
-      desc: 'Pasang di Android Chrome'
+      label: 'Instal Aplikasi',
+      icon: <Smartphone className="w-4.5 h-4.5 text-emerald-600" />,
+      desc: 'Pasang di Layar Utama HP'
     }
   ];
 
@@ -210,18 +210,19 @@ export const Navigation: React.FC<NavigationProps> = ({
         )}
 
         {/* DESKTOP NAVIGATION TABS (Visible on >= md) */}
-        <div className="hidden md:flex items-center justify-between py-2">
-          <div className="flex items-center space-x-2">
-            {currentMenu.map((item) => {
+        <div className="hidden md:flex items-center justify-between py-2 gap-2">
+          {/* Main Operational Tabs (Always clearly visible starting from Dashboard) */}
+          <div className="flex items-center space-x-1 lg:space-x-1.5 overflow-x-auto no-scrollbar py-0.5 min-w-0">
+            {currentMenu.filter(m => m.id !== 'install-app').map((item) => {
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
                   id={`nav-tab-${item.id}`}
                   onClick={() => onChangeTab(item.id)}
-                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-sm lg:text-base transition-all shrink-0 cursor-pointer ${
+                  className={`flex items-center space-x-1.5 lg:space-x-2 px-3 py-2 lg:px-3.5 lg:py-2 rounded-xl font-bold text-xs lg:text-sm transition-all shrink-0 cursor-pointer ${
                     isActive
-                      ? 'bg-teal-600 text-white shadow-md shadow-teal-600/25 ring-2 ring-teal-600/30'
+                      ? 'bg-teal-600 text-white shadow-sm ring-1 ring-teal-600'
                       : 'text-slate-600 hover:text-teal-700 hover:bg-teal-50/80'
                   }`}
                 >
@@ -232,20 +233,37 @@ export const Navigation: React.FC<NavigationProps> = ({
             })}
           </div>
 
-          {/* Database Google Sheets Button (Admin Only) */}
-          {isAdmin && (
-            <div className="flex items-center space-x-2 border-l border-slate-200 pl-4 ml-4 shrink-0">
+          {/* Quick Utility Actions on Right (Instal Aplikasi & Database) */}
+          <div className="flex items-center space-x-1.5 shrink-0 border-l border-slate-200 pl-3">
+            {/* Install App Quick Button */}
+            <button
+              onClick={() => onChangeTab('install-app')}
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'install-app'
+                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-600'
+                  : 'bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200/80'
+              }`}
+              title="Panduan Instal Aplikasi ke HP Android"
+            >
+              <Smartphone className={`w-4 h-4 ${activeTab === 'install-app' ? 'text-white' : 'text-emerald-600'}`} />
+              <span className="hidden xl:inline">Instal Aplikasi</span>
+              <span className="xl:hidden">Instal</span>
+            </button>
+
+            {/* Database Google Sheets Button (Admin Only) */}
+            {isAdmin && (
               <button
                 id="btn-sheet-sync-nav"
                 onClick={() => onOpenSpreadsheetModal('database')}
-                className="flex items-center space-x-2 text-xs sm:text-sm font-semibold text-slate-700 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 px-3.5 py-2 rounded-xl border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+                className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 px-3 py-2 rounded-xl border border-slate-200 transition-colors cursor-pointer shadow-2xs"
                 title="Buka Pengaturan Database Spreadsheet (Khusus Admin)"
               >
                 <Database className="w-4 h-4 text-teal-600" />
-                <span>Database Google Sheets</span>
+                <span className="hidden xl:inline">Database Sheets</span>
+                <span className="xl:hidden">Database</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
       </div>
