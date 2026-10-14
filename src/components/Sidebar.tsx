@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { UserRole } from '../types';
-import { LayoutDashboard, Wallet, Receipt, FileText, Database, Menu, X, ChevronDown, Coins, Send } from 'lucide-react';
+import { LayoutDashboard, Wallet, Receipt, FileText, Database, Menu, X, ChevronDown, Coins, Send, Smartphone } from 'lucide-react';
 
-export type ActiveTab = 'dashboard' | 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan' | 'penagihan';
+export type ActiveTab = 'dashboard' | 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan' | 'penagihan' | 'install-app';
 
 interface NavigationProps {
   role: UserRole;
   activeTab: ActiveTab;
   onChangeTab: (tab: ActiveTab) => void;
-  onOpenSpreadsheetModal: () => void;
+  onOpenSpreadsheetModal: (initialTab?: 'database' | 'install') => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -55,6 +55,12 @@ export const Navigation: React.FC<NavigationProps> = ({
       label: 'Laporan Keuangan',
       icon: <FileText className="w-5 h-5" />,
       desc: 'Matriks & Rekap Kas'
+    },
+    {
+      id: 'install-app',
+      label: 'Install Aplikasi APP',
+      icon: <Smartphone className="w-5 h-5 text-emerald-600" />,
+      desc: 'Pasang di Android Chrome'
     }
   ];
 
@@ -70,6 +76,12 @@ export const Navigation: React.FC<NavigationProps> = ({
       label: 'Laporan Keuangan',
       icon: <FileText className="w-5 h-5" />,
       desc: 'Matriks Iuran Sekolah'
+    },
+    {
+      id: 'install-app',
+      label: 'Install Aplikasi APP',
+      icon: <Smartphone className="w-5 h-5 text-emerald-600" />,
+      desc: 'Pasang di Android Chrome'
     }
   ];
 
@@ -85,6 +97,12 @@ export const Navigation: React.FC<NavigationProps> = ({
       label: 'Laporan Keuangan',
       icon: <FileText className="w-5 h-5" />,
       desc: 'Matriks & Rekap Kas'
+    },
+    {
+      id: 'install-app',
+      label: 'Install Aplikasi APP',
+      icon: <Smartphone className="w-5 h-5 text-emerald-600" />,
+      desc: 'Pasang di Android Chrome'
     }
   ];
 
@@ -171,18 +189,19 @@ export const Navigation: React.FC<NavigationProps> = ({
                 );
               })}
 
+              {/* Database Google Sheet Connection (Admin Only) */}
               {isAdmin && (
-                <div className="pt-2">
+                <div className="pt-2 border-t border-slate-200">
                   <button
                     id="mobile-btn-sheet-sync"
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      onOpenSpreadsheetModal();
+                      onOpenSpreadsheetModal('database');
                     }}
-                    className="w-full flex items-center justify-center space-x-2 text-xs font-bold text-teal-800 bg-teal-100/80 hover:bg-teal-200/80 px-4 py-2.5 rounded-xl border border-teal-300/60 transition-colors"
+                    className="w-full flex items-center justify-center space-x-2 text-xs font-bold text-teal-800 bg-teal-100/80 hover:bg-teal-200/80 px-4 py-2.5 rounded-xl border border-teal-300/60 transition-colors cursor-pointer"
                   >
                     <Database className="w-4 h-4 text-teal-700" />
-                    <span>Koneksi Google Sheets</span>
+                    <span>Database Google Sheets</span>
                   </button>
                 </div>
               )}
@@ -213,12 +232,13 @@ export const Navigation: React.FC<NavigationProps> = ({
             })}
           </div>
 
+          {/* Database Google Sheets Button (Admin Only) */}
           {isAdmin && (
             <div className="flex items-center space-x-2 border-l border-slate-200 pl-4 ml-4 shrink-0">
               <button
                 id="btn-sheet-sync-nav"
-                onClick={onOpenSpreadsheetModal}
-                className="flex items-center space-x-2 text-xs sm:text-sm font-semibold text-slate-700 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 px-3.5 py-2 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+                onClick={() => onOpenSpreadsheetModal('database')}
+                className="flex items-center space-x-2 text-xs sm:text-sm font-semibold text-slate-700 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 px-3.5 py-2 rounded-xl border border-slate-200 transition-colors cursor-pointer shadow-2xs"
                 title="Buka Pengaturan Database Spreadsheet (Khusus Admin)"
               >
                 <Database className="w-4 h-4 text-teal-600" />

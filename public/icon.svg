@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f766e" />
+      <stop offset="50%" stop-color="#115e59" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#facc15" />
+      <stop offset="100%" stop-color="#eab308" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="108" fill="url(#bgGrad)" />
+
+  <!-- Outer Ring Accent -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4" stroke-dasharray="8 8" />
+  <circle cx="256" cy="256" r="195" fill="none" stroke="url(#goldGrad)" stroke-width="3" opacity="0.6" />
+
+  <!-- Center Card Badge with shadow -->
+  <g filter="url(#shadow)">
+    <!-- Shield / Badge Backing -->
+    <path d="M 256 95 L 375 145 C 375 260 256 345 256 345 C 256 345 137 260 137 145 Z" fill="#0d9488" stroke="#ffffff" stroke-width="6" stroke-linejoin="round" />
+    
+    <!-- Inner Shield Accent -->
+    <path d="M 256 112 L 358 155 C 358 250 256 325 256 325 C 256 325 154 250 154 155 Z" fill="#042f2e" opacity="0.4" />
+
+    <!-- School / Education Building Icon -->
+    <!-- Pediment / Roof Triangle -->
+    <polygon points="256,135 185,175 327,175" fill="url(#goldGrad)" />
+    <!-- Architrave -->
+    <rect x="190" y="177" width="132" height="10" rx="3" fill="#ffffff" />
+    <!-- Pillars -->
+    <rect x="202" y="190" width="14" height="48" rx="2" fill="#ffffff" />
+    <rect x="232" y="190" width="14" height="48" rx="2" fill="#ffffff" />
+    <rect x="266" y="190" width="14" height="48" rx="2" fill="#ffffff" />
+    <rect x="296" y="190" width="14" height="48" rx="2" fill="#ffffff" />
+    <!-- Base -->
+    <rect x="185" y="240" width="142" height="12" rx="3" fill="#ffffff" />
+
+    <!-- Financial Coin / Badge Overlap -->
+    <circle cx="256" cy="285" r="26" fill="url(#goldGrad)" stroke="#ffffff" stroke-width="3" />
+    <!-- Rupiah / Money Symbol -->
+    <text x="256" y="294" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900" fill="#042f2e" text-anchor="middle">Rp</text>
+  </g>
+
+  <!-- Typography -->
+  <!-- Brand Title -->
+  <text x="256" y="398" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="34" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="3">MKKS CITOS</text>
+  <text x="256" y="428" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#5eead4" text-anchor="middle" letter-spacing="1.5">CIMANGGIS &amp; TAPOS</text>
+</svg>

@@ -118,20 +118,31 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const totalKasKeluar = pengeluaranYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const saldoBersih = totalKasMasuk - totalKasKeluar;
 
-  // Active year audit record (Real vs Data)
+  // Active year audit records (Real vs Data) - Menjaga histori audit lengkap tanpa menimpa data tanggal sebelumnya
   const effectiveAuditList = rekonsiliasiKasList && rekonsiliasiKasList.length > 0 ? rekonsiliasiKasList : localRekonsiliasiList;
-  const auditTahunThis: RekonsiliasiKas = effectiveAuditList.find(r => r.tahun === selectedYear) || {
-    id: `AUDIT-${selectedYear}-1`,
-    tahun: selectedYear,
-    tanggalAudit: getCurrentWIBDateTimeString(),
-    saldoCash: saldoBersih > 0 ? Math.round((saldoBersih * 0.25) / 50000) * 50000 : 0,
-    saldoBank: saldoBersih > 0 ? Math.max(0, saldoBersih - Math.round((saldoBersih * 0.25) / 50000) * 50000) : 0,
-    namaBank: 'Bank DKI',
-    nomorRekening: '102.23.09876.1',
-    atasNamaRekening: 'MKKS SMP CITOS',
-    catatanAudit: 'Pencocokan fisik kas dan rekening bank per saldo buku pembukuan sistem.',
-    diauditOleh: currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS Citos'
-  };
+  const auditsYear = effectiveAuditList.filter(r => r.tahun === selectedYear);
+
+  const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
+  const [activeBeritaAcaraAudit, setActiveBeritaAcaraAudit] = useState<RekonsiliasiKas | null>(null);
+
+  React.useEffect(() => {
+    setSelectedAuditId(null);
+  }, [selectedYear]);
+
+  const auditTahunThis: RekonsiliasiKas = 
+    (selectedAuditId ? auditsYear.find(r => r.id === selectedAuditId) : null) || 
+    auditsYear[0] || {
+      id: `AUDIT-${selectedYear}-01`,
+      tahun: selectedYear,
+      tanggalAudit: getCurrentWIBDateTimeString(),
+      saldoCash: saldoBersih > 0 ? Math.round((saldoBersih * 0.25) / 50000) * 50000 : 0,
+      saldoBank: saldoBersih > 0 ? Math.max(0, saldoBersih - Math.round((saldoBersih * 0.25) / 50000) * 50000) : 0,
+      namaBank: 'Bank BJB',
+      nomorRekening: '102.23.09876.1',
+      atasNamaRekening: 'MKKS SMP CITOS',
+      catatanAudit: 'Pencocokan fisik kas dan rekening bank per saldo buku pembukuan sistem.',
+      diauditOleh: currentUser?.namaKepsek || currentUser?.username || 'Bendahara MKKS Citos'
+    };
 
   const totalSaldoReal = (auditTahunThis.saldoCash || 0) + (auditTahunThis.saldoBank || 0);
   const selisihAudit = totalSaldoReal - saldoBersih;
@@ -144,6 +155,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
     }
     const updated = StorageService.saveSingleRekonsiliasi(record);
     setLocalRekonsiliasiList(updated);
+    setSelectedAuditId(record.id);
   };
 
   // Export handlers
@@ -1713,12 +1725,24 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           totalIuranMasuk={totalIuranMasuk}
           totalPemasukanLain={totalPemasukanLain}
           currentAudit={auditTahunThis}
+          allAudits={auditsYear}
+          onSelectAudit={(audit) => setSelectedAuditId(audit.id)}
+          onDeleteAudit={(id) => {
+            const updated = StorageService.deleteSingleRekonsiliasi(id);
+            setLocalRekonsiliasiList(updated);
+            if (selectedAuditId === id) {
+              setSelectedAuditId(null);
+            }
+          }}
           isBendahara={isBendahara}
           currentUser={currentUser}
           usersList={usersList}
           sekolahList={sekolahList}
           onSaveAudit={handleSaveAudit}
-          onOpenBeritaAcara={() => setIsBeritaAcaraOpen(true)}
+          onOpenBeritaAcara={(auditToOpen) => {
+            setActiveBeritaAcaraAudit(auditToOpen || auditTahunThis);
+            setIsBeritaAcaraOpen(true);
+          }}
           onOpenSpreadsheetModal={onOpenSpreadsheetModal}
           readOnly={isKetua}
         />
@@ -2401,7 +2425,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
       <BeritaAcaraAuditModal
         isOpen={isBeritaAcaraOpen && !isRoleSekolah}
         onClose={() => setIsBeritaAcaraOpen(false)}
-        auditData={auditTahunThis}
+        auditData={activeBeritaAcaraAudit || auditTahunThis}
         totalKasMasuk={totalKasMasuk}
         totalKasKeluar={totalKasKeluar}
         saldoData={saldoBersih}

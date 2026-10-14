@@ -92,12 +92,22 @@ export const PenagihanIuran: React.FC<PenagihanIuranProps> = ({
     }
   });
 
+  // Settings (Nomor Rekening, Nama Bank, Atas Nama, Catatan di Sheet Setting)
+  const [settings, setSettings] = useState(() => StorageService.getSettings());
+  const [isSettingModalOpen, setIsSettingModalOpen] = useState<boolean>(false);
+  const [inputNamaBank, setInputNamaBank] = useState<string>(settings.namaBank);
+  const [inputNomorRekening, setInputNomorRekening] = useState<string>(settings.nomorRekening);
+  const [inputAtasNamaRekening, setInputAtasNamaRekening] = useState<string>(settings.atasNamaRekening);
+  const [inputCatatanTagihan, setInputCatatanTagihan] = useState<string>(settings.catatanTagihan || '');
+  const [isSavingSetting, setIsSavingSetting] = useState<boolean>(false);
+  const [settingToast, setSettingToast] = useState<string | null>(null);
+
   // Pejabat and bank account data
   const pejabat = StorageService.getPejabat(usersList);
-  const activeAudit = rekonsiliasiKasList.find(r => r.tahun === selectedYear) || StorageService.getRekonsiliasiKas().find(r => r.tahun === selectedYear);
-  const namaBank = activeAudit?.namaBank || 'Bank DKI';
-  const nomorRekening = activeAudit?.nomorRekening || '102.23.09876.1';
-  const atasNamaRekening = activeAudit?.atasNamaRekening || 'MKKS SMP CITOS';
+  const namaBank = settings.namaBank || 'Bank BJB';
+  const nomorRekening = settings.nomorRekening || '102.23.09876.1';
+  const atasNamaRekening = settings.atasNamaRekening || 'MKKS SMP CITOS';
+  const catatanTagihan = settings.catatanTagihan || '';
   const currentBendahara = resolveNamaBendahara(
     currentUser?.namaKepsek || currentUser?.username,
     undefined,
@@ -274,7 +284,12 @@ Transfer ke Rekening Resmi MKKS CITOS:
 • *Bank:* ${namaBank}
 • *Nomor Rekening:* ${nomorRekening}
 • *Atas Nama:* ${atasNamaRekening}
-_(Atau dapat diserahkan tunai kepada Bendahara saat rapat rutin MKKS)_
+${catatanTagihan ? `• *Catatan:* ${catatanTagihan}\n` : ''}_(Atau dapat diserahkan tunai kepada Bendahara saat rapat rutin MKKS)_
+
+🌐 *PENGECEKAN IURAN ONLINE:*
+Pengecekan riwayat & status iuran dapat diakses melalui website resmi:
+• Website: http://mkks-citos.or.id/
+• Login dengan User dan Password: Nomor NPSN sekolah masing-masing${sekolah.idSekolah ? ` (*${sekolah.idSekolah}*)` : ''}
 
 Mohon konfirmasi bukti transfer atau pembayaran dengan membalas pesan WhatsApp ini.
 
@@ -459,6 +474,48 @@ ${pejabat.namaKetuaMkks || 'Ketua MKKS'}`;
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Pengisian Nomor Rekening Pembayaran Tagihan (Database: Sheet "Setting") */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center space-x-3.5">
+          <div className="p-3 bg-indigo-50 text-indigo-700 rounded-2xl border border-indigo-100 shadow-xs shrink-0">
+            <Landmark className="w-6 h-6 text-indigo-600" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2 flex-wrap gap-1">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
+                Rekening Pembayaran Tagihan
+              </span>
+              <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                Database: Sheet "Setting"
+              </span>
+            </div>
+            <div className="text-base sm:text-lg font-black text-slate-800 mt-1">
+              {namaBank} : <span className="font-mono text-indigo-700 font-black">{nomorRekening}</span>
+            </div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Atas Nama: <strong className="text-slate-800">{atasNamaRekening}</strong>
+              {catatanTagihan && <span className="ml-2 italic text-slate-600">• "{catatanTagihan}"</span>}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setInputNamaBank(settings.namaBank);
+            setInputNomorRekening(settings.nomorRekening);
+            setInputAtasNamaRekening(settings.atasNamaRekening);
+            setInputCatatanTagihan(settings.catatanTagihan || '');
+            setIsSettingModalOpen(true);
+          }}
+          className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100/90 text-indigo-800 border border-indigo-200/90 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-xs shrink-0"
+          title="Atur nomor rekening tujuan transfer untuk pesan WhatsApp tagihan dan invoice"
+        >
+          <Edit3 className="w-4 h-4 text-indigo-600" />
+          <span>Atur Nomor Rekening Tagihan</span>
+        </button>
       </div>
 
       {/* KPI Cards Grid */}
@@ -1203,6 +1260,165 @@ ${pejabat.namaKetuaMkks || 'Ketua MKKS'}`;
                 >
                   <ShieldCheck className="w-4 h-4" />
                   <span>Simpan Nomor</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENGATURAN REKENING PEMBAYARAN TAGIHAN (DATABASE SHEET SETTING) */}
+      {isSettingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-200">
+                  <Landmark className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-base">
+                    Pengaturan Rekening Tagihan
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Tersimpan pada Database di sheet "Setting"
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSettingModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setIsSavingSetting(true);
+              const { settings: updated, syncStatus } = await StorageService.saveSettingsAndSync({
+                namaBank: inputNamaBank,
+                nomorRekening: inputNomorRekening,
+                atasNamaRekening: inputAtasNamaRekening,
+                catatanTagihan: inputCatatanTagihan
+              });
+              setSettings(updated);
+              setIsSavingSetting(false);
+              setIsSettingModalOpen(false);
+              if (syncStatus.status === 'connected') {
+                setSavePhoneToast('Nomor rekening berhasil disimpan & disinkronkan ke sheet "Setting" di Google Spreadsheet!');
+              } else {
+                setSavePhoneToast(`Tersimpan lokal di browser. ${syncStatus.message}`);
+              }
+              setTimeout(() => setSavePhoneToast(null), 5000);
+            }} className="space-y-3.5 text-xs">
+              
+              {/* Quick Select Bank Chips */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Pilihan Bank Cepat:
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Bank BJB', 'Bank DKI', 'Bank Mandiri', 'BCA', 'BRI', 'BNI', 'BSI'].map(b => (
+                    <button
+                      key={b}
+                      type="button"
+                      onClick={() => setInputNamaBank(b)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                        inputNamaBank === b
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nama Bank */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Nama Bank <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={inputNamaBank}
+                  onChange={(e) => setInputNamaBank(e.target.value)}
+                  placeholder="Contoh: Bank BJB, Bank DKI, Bank Mandiri"
+                  required
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Nomor Rekening */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Nomor Rekening <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={inputNomorRekening}
+                  onChange={(e) => setInputNomorRekening(e.target.value)}
+                  placeholder="Contoh: 102.23.09876.1"
+                  required
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-indigo-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Atas Nama Rekening */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Atas Nama Rekening <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={inputAtasNamaRekening}
+                  onChange={(e) => setInputAtasNamaRekening(e.target.value)}
+                  placeholder="Contoh: MKKS SMP CITOS"
+                  required
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Catatan Instruksi Pembayaran */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Catatan / Instruksi Tambahan (Muncul di WA Tagihan)
+                </label>
+                <textarea
+                  value={inputCatatanTagihan}
+                  onChange={(e) => setInputCatatanTagihan(e.target.value)}
+                  rows={2}
+                  placeholder="Contoh: Mohon konfirmasi bukti transfer via WhatsApp ke Bendahara MKKS."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-200/60 text-[11px] text-indigo-900 leading-relaxed">
+                <p>
+                  <strong>Sinkronisasi Otomatis:</strong> Nomor rekening ini akan langsung tersimpan ke sheet <strong>"Setting"</strong> pada Google Spreadsheet dan otomatis tercantum pada draft invoice WhatsApp serta unduhan PDF resmi.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end space-x-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSetting}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-75"
+                >
+                  {isSavingSetting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  <span>Simpan ke Sheet "Setting"</span>
                 </button>
               </div>
             </form>

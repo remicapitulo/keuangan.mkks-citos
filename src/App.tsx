@@ -14,6 +14,8 @@ import { SpreadsheetModal } from './components/SpreadsheetModal';
 import { LoginModal } from './components/LoginModal';
 import { ModalHapusData, DataHapusTarget } from './components/ModalHapusData';
 import { ValidasiKuitansiModal, ValidasiData } from './components/ValidasiKuitansiModal';
+import { InstallAppTab } from './components/InstallAppTab';
+import { PWAInstallFloatingBanner } from './components/PWAInstallButton';
 import { CheckCircle2, ShieldAlert, Lock, UserCheck } from 'lucide-react';
 
 export default function App() {
@@ -32,9 +34,15 @@ export default function App() {
 
   // Modals state
   const [isSpreadsheetModalOpen, setIsSpreadsheetModalOpen] = useState<boolean>(false);
+  const [spreadsheetModalTab, setSpreadsheetModalTab] = useState<'database' | 'install'>('database');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(() => StorageService.getCurrentUser() === null);
   const [isStrukModalOpen, setIsStrukModalOpen] = useState<boolean>(false);
   const [strukData, setStrukData] = useState<any>(null);
+
+  const handleOpenSpreadsheetModal = (initialTab: 'database' | 'install' = 'database') => {
+    setSpreadsheetModalTab(initialTab);
+    setIsSpreadsheetModalOpen(true);
+  };
 
   // Modal Hapus Data State
   const [isHapusModalOpen, setIsHapusModalOpen] = useState<boolean>(false);
@@ -384,14 +392,12 @@ export default function App() {
         {/* Top Header Navbar */}
         <Navbar
           currentUser={currentUser}
-          onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
           onOpenLoginModal={() => setIsLoginModalOpen(true)}
           onLogout={() => {
             setCurrentUser(null);
             StorageService.setCurrentUser(null);
             setIsLoginModalOpen(true);
           }}
-          spreadsheetId={spreadsheetId}
         />
 
         {/* Navigation Bar */}
@@ -399,7 +405,7 @@ export default function App() {
           role={currentUser?.role || 'Bendahara'}
           activeTab={activeTab}
           onChangeTab={(tab) => setActiveTab(tab)}
-          onOpenSpreadsheetModal={() => setIsSpreadsheetModalOpen(true)}
+          onOpenSpreadsheetModal={handleOpenSpreadsheetModal}
         />
 
         {/* Notification Toast */}
@@ -511,6 +517,11 @@ export default function App() {
                 />
               )}
 
+              {/* Install Aplikasi PWA Tab (Accessible for all users: Admin, Bendahara, Sekolah, Ketua) */}
+              {activeTab === 'install-app' && (
+                <InstallAppTab />
+              )}
+
               {/* Access denied fallback if user attempts closed route */}
               {!canAccessBendaharaMenu && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan') && (
                 <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12 space-y-3">
@@ -567,6 +578,8 @@ export default function App() {
         spreadsheetId={spreadsheetId}
         onUpdateSpreadsheetConfig={handleUpdateSpreadsheetConfig}
         onResetToDefaultData={handleResetToDefaultData}
+        initialTab={spreadsheetModalTab}
+        isAdmin={isAdmin}
       />
 
       <LoginModal
@@ -595,6 +608,9 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Floating PWA Install Banner (Android Chrome / Mobile) */}
+      <PWAInstallFloatingBanner onOpenInstallModal={() => setActiveTab('install-app')} />
 
     </div>
   );

@@ -21,7 +21,12 @@ import {
   Edit3,
   ShieldCheck,
   Clock,
-  Lock
+  Lock,
+  History,
+  PlusCircle,
+  Trash2,
+  Eye,
+  Layers
 } from 'lucide-react';
 import { RekonsiliasiKas, PecahanUangCash, User, Sekolah } from '../types';
 import { 
@@ -44,12 +49,15 @@ interface AuditRekonsiliasiTabProps {
   totalIuranMasuk: number;
   totalPemasukanLain: number;
   currentAudit: RekonsiliasiKas;
+  allAudits?: RekonsiliasiKas[];
+  onSelectAudit?: (audit: RekonsiliasiKas) => void;
+  onDeleteAudit?: (id: string) => void;
   isBendahara: boolean;
   currentUser: User | null;
   usersList?: User[];
   sekolahList: Sekolah[];
   onSaveAudit: (record: RekonsiliasiKas) => void;
-  onOpenBeritaAcara: () => void;
+  onOpenBeritaAcara: (audit?: RekonsiliasiKas) => void;
   onOpenSpreadsheetModal?: () => void;
   readOnly?: boolean;
 }
@@ -62,6 +70,9 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   totalIuranMasuk,
   totalPemasukanLain,
   currentAudit,
+  allAudits = [],
+  onSelectAudit,
+  onDeleteAudit,
   isBendahara,
   currentUser,
   usersList = [],
@@ -74,12 +85,19 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
   const isKetua = currentUser?.role === 'Ketua' || currentUser?.role?.toLowerCase() === 'ketua';
   const isReadOnly = Boolean(readOnly || isKetua || !isBendahara);
 
+  // App settings for bank account
+  const appSettings = StorageService.getSettings();
+
+  // Audit state - Support multiple audits on different dates without overwriting history
+  const [editingAuditId, setEditingAuditId] = useState<string>(currentAudit.id || `AUDIT-${selectedYear}-01`);
+  const [isNewAuditMode, setIsNewAuditMode] = useState<boolean>(false);
+
   // Form state
   const [saldoCash, setSaldoCash] = useState<number>(currentAudit.saldoCash || 0);
   const [saldoBank, setSaldoBank] = useState<number>(currentAudit.saldoBank || 0);
-  const [namaBank, setNamaBank] = useState<string>(currentAudit.namaBank || 'Bank DKI');
-  const [nomorRekening, setNomorRekening] = useState<string>(currentAudit.nomorRekening || '102.23.09876.1');
-  const [atasNamaRekening, setAtasNamaRekening] = useState<string>(currentAudit.atasNamaRekening || 'MKKS SMP CITOS');
+  const [namaBank, setNamaBank] = useState<string>(currentAudit.namaBank || appSettings.namaBank || 'Bank BJB');
+  const [nomorRekening, setNomorRekening] = useState<string>(currentAudit.nomorRekening || appSettings.nomorRekening || '102.23.09876.1');
+  const [atasNamaRekening, setAtasNamaRekening] = useState<string>(currentAudit.atasNamaRekening || appSettings.atasNamaRekening || 'MKKS SMP CITOS');
   const [catatanAudit, setCatatanAudit] = useState<string>(currentAudit.catatanAudit || '');
   // Helper to detect placeholder/sample audit records or dummy/shifted dates
   const isPlaceholderAudit = (audit?: RekonsiliasiKas | null) => {
@@ -212,11 +230,13 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
 
   // Sync state when currentAudit prop changes (e.g. year changed) or usersList updates
   useEffect(() => {
+    setEditingAuditId(currentAudit.id || `AUDIT-${selectedYear}-01`);
+    setIsNewAuditMode(false);
     setSaldoCash(currentAudit.saldoCash || 0);
     setSaldoBank(currentAudit.saldoBank || 0);
-    setNamaBank(currentAudit.namaBank || 'Bank DKI');
-    setNomorRekening(currentAudit.nomorRekening || '102.23.09876.1');
-    setAtasNamaRekening(currentAudit.atasNamaRekening || 'MKKS SMP CITOS');
+    setNamaBank(currentAudit.namaBank || appSettings.namaBank || 'Bank BJB');
+    setNomorRekening(currentAudit.nomorRekening || appSettings.nomorRekening || '102.23.09876.1');
+    setAtasNamaRekening(currentAudit.atasNamaRekening || appSettings.atasNamaRekening || 'MKKS SMP CITOS');
     setCatatanAudit(currentAudit.catatanAudit || '');
     const isOldPlaceholderTime = isPlaceholderAudit(currentAudit);
     if (isOldPlaceholderTime || otomatisWaktuSekarang) {
@@ -244,7 +264,115 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     setNamaBendahara(resolvedBendahara);
     setNipBendahara(currentAudit.nipBendahara || pej.nipBendahara || '');
     setJabatanBendahara(currentAudit.jabatanBendahara || pej.jabatanBendahara || 'Bendahara MKKS SMP Citos');
-  }, [currentAudit, currentUser, usersList]);
+  }, [currentAudit, currentUser, usersList, selectedYear]);
+
+  const startNewAudit = () => {
+    const historyList = allAudits && allAudits.length > 0 ? allAudits : StorageService.getRekonsiliasiKas().filter(r => r.tahun === selectedYear);
+    const existingIds = new Set(historyList.map(h => h.id));
+    let nextNum = historyList.length + 1;
+    let newId = `AUDIT-${selectedYear}-${String(nextNum).padStart(2, '0')}`;
+    while (existingIds.has(newId)) {
+      nextNum++;
+      newId = `AUDIT-${selectedYear}-${String(nextNum).padStart(2, '0')}`;
+    }
+    setEditingAuditId(newId);
+    setIsNewAuditMode(true);
+    setSaldoCash(0);
+    setSaldoBank(0);
+    setNamaBank(appSettings.namaBank || 'Bank BJB');
+    setNomorRekening(appSettings.nomorRekening || '102.23.09876.1');
+    setAtasNamaRekening(appSettings.atasNamaRekening || 'MKKS SMP CITOS');
+    setCatatanAudit('');
+    setTanggalAudit(getCurrentWIBDateTimeString());
+    setOtomatisWaktuSekarang(true);
+    
+    // Smooth scroll to form
+    const formElem = document.getElementById('form-audit-rekonsiliasi');
+    if (formElem) {
+      formElem.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleSaveAsNew = () => {
+    const historyList = allAudits && allAudits.length > 0 ? allAudits : StorageService.getRekonsiliasiKas().filter(r => r.tahun === selectedYear);
+    const existingIds = new Set(historyList.map(h => h.id));
+    let nextNum = historyList.length + 1;
+    let newId = `AUDIT-${selectedYear}-${String(nextNum).padStart(2, '0')}`;
+    while (existingIds.has(newId)) {
+      nextNum++;
+      newId = `AUDIT-${selectedYear}-${String(nextNum).padStart(2, '0')}`;
+    }
+
+    const diauditOleh = namaPemeriksaLogin;
+    const penandatanganBendahara = namaBendahara.trim() || namaPemeriksaLogin;
+    
+    StorageService.savePejabat({
+      namaKetuaMkks,
+      nipKetuaMkks,
+      jabatanKetuaMkks,
+      namaBendahara: penandatanganBendahara,
+      nipBendahara,
+      jabatanBendahara
+    });
+
+    const finalTanggalAudit = otomatisWaktuSekarang 
+      ? getCurrentWIBDateTimeString() 
+      : (cleanDateInputString(tanggalAudit) || getCurrentWIBDateTimeString());
+
+    const recordToSave: RekonsiliasiKas = {
+      id: newId,
+      tahun: selectedYear,
+      tanggalAudit: finalTanggalAudit,
+      saldoCash: Number(saldoCash) || 0,
+      saldoBank: Number(saldoBank) || 0,
+      namaBank: namaBank || appSettings.namaBank || 'Bank BJB',
+      nomorRekening: nomorRekening || appSettings.nomorRekening || '-',
+      atasNamaRekening: atasNamaRekening || appSettings.atasNamaRekening || 'MKKS SMP CITOS',
+      catatanAudit: catatanAudit || '',
+      diauditOleh,
+      namaKetuaMkks,
+      nipKetuaMkks,
+      jabatanKetuaMkks,
+      namaBendahara: penandatanganBendahara,
+      nipBendahara,
+      jabatanBendahara,
+      pecahanCash: isCalculatorOpen || totalHitungFisikCash > 0 ? pecahan : currentAudit.pecahanCash
+    };
+
+    // Sinkronkan informasi bank ke AppSettings (Sheet Setting) jika diubah di form audit
+    if (namaBank || nomorRekening || atasNamaRekening) {
+      StorageService.saveSettings({
+        namaBank: (namaBank || appSettings.namaBank || 'Bank BJB').trim(),
+        nomorRekening: (nomorRekening || appSettings.nomorRekening || '').trim(),
+        atasNamaRekening: (atasNamaRekening || appSettings.atasNamaRekening || 'MKKS SMP CITOS').trim()
+      }, false);
+    }
+
+    onSaveAudit(recordToSave);
+    setEditingAuditId(newId);
+    setIsNewAuditMode(false);
+    setToastSave(true);
+    setTimeout(() => setToastSave(false), 3000);
+  };
+
+  const loadAuditForEditing = (audit: RekonsiliasiKas) => {
+    setEditingAuditId(audit.id);
+    setIsNewAuditMode(false);
+    setSaldoCash(audit.saldoCash || 0);
+    setSaldoBank(audit.saldoBank || 0);
+    setNamaBank(audit.namaBank || appSettings.namaBank || 'Bank BJB');
+    setNomorRekening(audit.nomorRekening || appSettings.nomorRekening || '102.23.09876.1');
+    setAtasNamaRekening(audit.atasNamaRekening || appSettings.atasNamaRekening || 'MKKS SMP CITOS');
+    setCatatanAudit(audit.catatanAudit || '');
+    setTanggalAudit(cleanDateInputString(audit.tanggalAudit) || getCurrentWIBDateTimeString());
+    setOtomatisWaktuSekarang(false);
+    if (audit.pecahanCash) {
+      setPecahan(audit.pecahanCash);
+    }
+    if (onSelectAudit) {
+      onSelectAudit(audit);
+    }
+  };
 
   // Total calculated from physical cash bills
   const totalHitungFisikCash = 
@@ -286,7 +414,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     setCatatanAudit(`Penyelarasan otomatis kas fisik dan rekening bank per saldo buku data ${selectedYear}.`);
   };
 
-  // Save audit data
+  // Save audit data - Never overwrites audits from other dates or other records!
   const handleSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const diauditOleh = namaPemeriksaLogin;
@@ -306,15 +434,17 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
       ? getCurrentWIBDateTimeString() 
       : (cleanDateInputString(tanggalAudit) || getCurrentWIBDateTimeString());
 
+    const finalId = editingAuditId || currentAudit.id || `AUDIT-${selectedYear}-01`;
+
     const recordToSave: RekonsiliasiKas = {
-      id: currentAudit.id || `AUDIT-${selectedYear}-${Date.now().toString().slice(-4)}`,
+      id: finalId,
       tahun: selectedYear,
       tanggalAudit: finalTanggalAudit,
       saldoCash: Number(saldoCash) || 0,
       saldoBank: Number(saldoBank) || 0,
-      namaBank: namaBank || 'Bank DKI',
-      nomorRekening: nomorRekening || '-',
-      atasNamaRekening: atasNamaRekening || 'MKKS SMP CITOS',
+      namaBank: namaBank || appSettings.namaBank || 'Bank BJB',
+      nomorRekening: nomorRekening || appSettings.nomorRekening || '-',
+      atasNamaRekening: atasNamaRekening || appSettings.atasNamaRekening || 'MKKS SMP CITOS',
       catatanAudit: catatanAudit || '',
       diauditOleh,
       namaKetuaMkks,
@@ -327,6 +457,7 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
     };
 
     onSaveAudit(recordToSave);
+    setIsNewAuditMode(false);
     setToastSave(true);
     setTimeout(() => setToastSave(false), 3000);
   };
@@ -337,28 +468,32 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
       ? namaBendahara
       : (namaPemeriksaLogin || StorageService.getPejabat(usersList).namaBendahara || DEFAULT_PEJABAT.namaBendahara);
 
+    const finalId = editingAuditId || currentAudit.id || `AUDIT-${selectedYear}-01`;
+
+    const record: RekonsiliasiKas = {
+      ...currentAudit,
+      id: finalId,
+      tahun: selectedYear,
+      saldoCash: Number(saldoCash) || 0,
+      saldoBank: Number(saldoBank) || 0,
+      namaBank: namaBank || appSettings.namaBank || 'Bank BJB',
+      nomorRekening: nomorRekening || appSettings.nomorRekening || '-',
+      atasNamaRekening: atasNamaRekening || appSettings.atasNamaRekening || 'MKKS SMP CITOS',
+      catatanAudit: catatanAudit || '',
+      tanggalAudit: effectiveTanggal,
+      namaKetuaMkks,
+      nipKetuaMkks,
+      jabatanKetuaMkks,
+      namaBendahara: penandatanganBendahara,
+      nipBendahara,
+      jabatanBendahara,
+      pecahanCash: isCalculatorOpen || totalHitungFisikCash > 0 ? pecahan : currentAudit.pecahanCash
+    };
+
     if (onSaveAudit) {
-      onSaveAudit({
-        ...currentAudit,
-        id: currentAudit.id || `AUDIT-${selectedYear}-${Date.now().toString().slice(-4)}`,
-        tahun: selectedYear,
-        saldoCash: Number(saldoCash) || 0,
-        saldoBank: Number(saldoBank) || 0,
-        namaBank: namaBank || 'Bank DKI',
-        nomorRekening: nomorRekening || '-',
-        atasNamaRekening: atasNamaRekening || 'MKKS SMP CITOS',
-        catatanAudit: catatanAudit || '',
-        tanggalAudit: effectiveTanggal,
-        namaKetuaMkks,
-        nipKetuaMkks,
-        jabatanKetuaMkks,
-        namaBendahara: penandatanganBendahara,
-        nipBendahara,
-        jabatanBendahara,
-        pecahanCash: isCalculatorOpen || totalHitungFisikCash > 0 ? pecahan : currentAudit.pecahanCash
-      });
+      onSaveAudit(record);
     }
-    onOpenBeritaAcara();
+    onOpenBeritaAcara(record);
   };
 
   return (
@@ -563,23 +698,309 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
 
       </div>
 
-      {/* Formulir Audit & Pemeriksaan Fisik (Bendahara & Admin) */}
+      {/* SECTION HISTORI CATATAN AUDIT KAS OPNAME (TIDAK MENIMPA DATA SEBELUMNYA) */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 px-5 sm:px-6 py-4 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              <History className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2 flex-wrap gap-1">
+                <h3 className="font-extrabold text-sm sm:text-base text-white">
+                  Histori Catatan Audit & Rekonsiliasi Kas (Tahun {selectedYear})
+                </h3>
+                <span className="bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                  {allAudits.length} Riwayat Tersimpan
+                </span>
+              </div>
+              <p className="text-xs text-teal-200/80 mt-0.5">
+                Setiap hasil audit kas opname pada tanggal tertentu tersimpan permanen dan tidak saling menimpa data sebelumnya.
+              </p>
+            </div>
+          </div>
+
+          {isBendahara && (
+            <button
+              type="button"
+              onClick={startNewAudit}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer active:scale-95 shrink-0"
+              title="Buat catatan audit baru untuk tanggal atau sesi kas opname lainnya"
+            >
+              <PlusCircle className="w-4 h-4 text-slate-950" />
+              <span>+ Catat Audit Baru (Tanggal Lain)</span>
+            </button>
+          )}
+        </div>
+
+        {/* Audit History List / Table */}
+        <div className="p-4 sm:p-5">
+          {allAudits.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs">
+              Belum ada riwayat audit untuk tahun {selectedYear}. Klik tombol di atas untuk mencatat audit kas opname baru.
+            </div>
+          ) : (
+            <>
+              {/* Mobile Card List */}
+              <div className="block lg:hidden space-y-3">
+                {allAudits.map((item, idx) => {
+                  const totalReal = (Number(item.saldoCash) || 0) + (Number(item.saldoBank) || 0);
+                  const sel = totalReal - saldoData;
+                  const isMatch = Math.abs(sel) === 0;
+                  const isActive = item.id === editingAuditId;
+
+                  return (
+                    <div
+                      key={`audit-mob-${item.id || idx}`}
+                      className={`p-4 rounded-xl border transition-all ${
+                        isActive 
+                          ? 'border-teal-500 bg-teal-50/50 shadow-sm ring-2 ring-teal-500/20' 
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono font-bold text-xs text-slate-800">{item.id}</span>
+                            {isActive && (
+                              <span className="bg-teal-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                                Sedang Dipilih
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs font-bold text-teal-800 mt-1 flex items-center space-x-1">
+                            <Calendar className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                            <span>{formatDateTimeIndonesian(item.tanggalAudit)}</span>
+                          </div>
+                        </div>
+
+                        <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                          isMatch 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : sel > 0 
+                            ? 'bg-amber-100 text-amber-800' 
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {isMatch ? 'BALANCE' : sel > 0 ? `+${formatRupiah(sel)}` : `-${formatRupiah(Math.abs(sel))}`}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Kas Tunai</span>
+                          <span className="font-mono font-bold text-slate-800">{formatRupiah(item.saldoCash)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Rekening Bank</span>
+                          <span className="font-mono font-bold text-slate-800">{formatRupiah(item.saldoBank)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Total Real</span>
+                          <span className="font-mono font-black text-teal-800">{formatRupiah(totalReal)}</span>
+                        </div>
+                      </div>
+
+                      {item.catatanAudit && (
+                        <p className="text-[11px] text-slate-500 italic mt-2 line-clamp-1 bg-slate-50 p-1.5 rounded">
+                          "{item.catatanAudit}"
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100">
+                        <span className="text-[10px] text-slate-400">
+                          Oleh: <strong className="text-slate-700">{item.diauditOleh || item.namaBendahara || 'Bendahara'}</strong>
+                        </span>
+
+                        <div className="flex items-center space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => loadAuditForEditing(item)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-lg border border-teal-200 cursor-pointer"
+                          >
+                            Muat Form
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenBeritaAcara(item)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer"
+                          >
+                            Berita Acara
+                          </button>
+                          {isBendahara && onDeleteAudit && allAudits.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Hapus catatan audit tanggal ${formatDateTimeIndonesian(item.tanggalAudit)} (${item.id})?`)) {
+                                  onDeleteAudit(item.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
+                              title="Hapus riwayat audit ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800 text-white font-bold text-[11px]">
+                      <th className="py-2.5 px-3 rounded-tl-xl w-12 text-center">No</th>
+                      <th className="py-2.5 px-3 w-44">Tanggal &amp; Waktu Audit</th>
+                      <th className="py-2.5 px-3 w-28">ID Audit</th>
+                      <th className="py-2.5 px-3 text-right">Kas Fisik (Tunai)</th>
+                      <th className="py-2.5 px-3 text-right">Rekening Bank</th>
+                      <th className="py-2.5 px-3 text-right">Total Uang Real</th>
+                      <th className="py-2.5 px-3 text-center">Status Audit</th>
+                      <th className="py-2.5 px-3">Pemeriksa / Bendahara</th>
+                      <th className="py-2.5 px-3 rounded-tr-xl text-center w-52">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {allAudits.map((item, idx) => {
+                      const totalReal = (Number(item.saldoCash) || 0) + (Number(item.saldoBank) || 0);
+                      const sel = totalReal - saldoData;
+                      const isMatch = Math.abs(sel) === 0;
+                      const isActive = item.id === editingAuditId;
+
+                      return (
+                        <tr 
+                          key={`audit-row-${item.id || idx}`}
+                          className={`transition-colors ${
+                            isActive 
+                              ? 'bg-teal-50/70 font-semibold text-slate-900' 
+                              : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <td className="py-2.5 px-3 text-center font-mono text-slate-400">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5 font-bold text-slate-800">
+                              <Clock className="w-3.5 h-3.5 text-teal-600" />
+                              <span>{formatDateTimeIndonesian(item.tanggalAudit)}</span>
+                            </div>
+                            {isActive && (
+                              <span className="text-[10px] text-teal-700 font-bold block mt-0.5">
+                                • Sedang Ditampilkan di Form
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-slate-600 text-xs">
+                            {item.id}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-slate-800">
+                            {formatRupiah(item.saldoCash)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-slate-800">
+                            {formatRupiah(item.saldoBank)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-black text-teal-800">
+                            {formatRupiah(totalReal)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] inline-flex items-center space-x-1 ${
+                              isMatch 
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                                : sel > 0 
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                                : 'bg-rose-100 text-rose-800 border border-rose-300'
+                            }`}>
+                              {isMatch ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <AlertTriangle className="w-3 h-3 text-amber-600" />}
+                              <span>{isMatch ? 'BALANCE' : sel > 0 ? `+${formatRupiah(sel)}` : `-${formatRupiah(Math.abs(sel))}`}</span>
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-slate-800 text-xs">{item.diauditOleh || item.namaBendahara || 'Bendahara'}</div>
+                            {item.catatanAudit && (
+                              <div className="text-[10px] text-slate-400 italic line-clamp-1 max-w-[200px]">
+                                "{item.catatanAudit}"
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => loadAuditForEditing(item)}
+                                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                                  isActive
+                                    ? 'bg-teal-700 text-white'
+                                    : 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200'
+                                }`}
+                                title="Pilih dan muat data audit ini ke formulir"
+                              >
+                                {isActive ? 'Dipilih' : 'Muat Form'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onOpenBeritaAcara(item)}
+                                className="px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-2xs transition-colors cursor-pointer flex items-center space-x-1"
+                                title="Cetak Berita Acara Audit tanggal ini"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Cetak</span>
+                              </button>
+                              {isBendahara && onDeleteAudit && allAudits.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`Hapus catatan audit tanggal ${formatDateTimeIndonesian(item.tanggalAudit)} (${item.id})?`)) {
+                                      onDeleteAudit(item.id);
+                                    }
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
+                                  title="Hapus riwayat audit ini"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Formulir Audit & Pemeriksaan Fisik (Bendahara & Admin) */}
+      <div id="form-audit-rekonsiliasi" className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="bg-slate-50 px-5 sm:px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="flex items-center space-x-2">
             <Scale className="w-5 h-5 text-teal-700" />
             <div>
-              <h3 className="font-black text-sm text-slate-800">
-                Formulir Hasil Cek Fisik Kas Tunai & Rekening Bank
-              </h3>
+              <div className="flex items-center space-x-2 flex-wrap">
+                <h3 className="font-black text-sm text-slate-800">
+                  Formulir Hasil Cek Fisik Kas Tunai &amp; Rekening Bank
+                </h3>
+                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                  isNewAuditMode 
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                    : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                }`}>
+                  {isNewAuditMode ? '➕ Mode: Catat Audit Baru' : `✏️ ID: ${editingAuditId}`}
+                </span>
+              </div>
               <p className="text-xs text-slate-500">
                 Input hasil penghitungan fisik uang cash di brankas dan saldo mutasi rekening bank
               </p>
             </div>
           </div>
 
-          {isBendahara && (
-            <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2">
+            {isBendahara && (
               <button
                 type="button"
                 onClick={handleAutoBalance}
@@ -589,8 +1010,20 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                 <span>Auto-Sesuaikan Saldo Data</span>
               </button>
-            </div>
-          )}
+            )}
+
+            {isBendahara && !isNewAuditMode && (
+              <button
+                type="button"
+                onClick={startNewAudit}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                title="Mulai input audit baru untuk tanggal lain"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
+                <span>+ Audit Baru</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <form onSubmit={handleSave} className="p-5 sm:p-7 space-y-6">
@@ -1111,24 +1544,38 @@ export const AuditRekonsiliasiTab: React.FC<AuditRekonsiliasiTabProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center space-x-2.5 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={handleOpenBeritaAcaraWithSync}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center space-x-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center space-x-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-colors cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
                 <span>Lihat Berita Acara</span>
               </button>
 
-              <button
-                type="submit"
-                className="flex-1 sm:flex-none inline-flex items-center justify-center space-x-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
-                title="Simpan data rekonsiliasi kas dan nama pejabat penandatangan"
-              >
-                <Save className="w-4 h-4" />
-                <span>Simpan Hasil Audit & Pejabat</span>
-              </button>
+              {isBendahara && !isNewAuditMode && (
+                <button
+                  type="button"
+                  onClick={handleSaveAsNew}
+                  className="inline-flex items-center justify-center space-x-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                  title="Simpan input ini sebagai catatan audit baru di riwayat histori tanpa menimpa data sebelumnya"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Simpan Sebagai Histori Baru</span>
+                </button>
+              )}
+
+              {isBendahara && (
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center space-x-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                  title={isNewAuditMode ? "Simpan hasil audit baru ke riwayat histori" : `Perbarui hasil audit untuk ${editingAuditId}`}
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isNewAuditMode ? 'Simpan Audit Baru' : `Perbarui Audit (${editingAuditId})`}</span>
+                </button>
+              )}
             </div>
           </div>
 

@@ -1313,8 +1313,9 @@ export function exportInvoicePDF(params: ExportInvoicePDFParams) {
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('* Pembayaran juga dapat diserahkan tunai kepada Bendahara saat rapat rutin MKKS.', 110, curY + 16.5);
-  doc.text('* Harap konfirmasi bukti transfer via WhatsApp ke Bendahara setelah melakukan pembayaran.', 110, curY + 21.5);
+  doc.text('* Pembayaran juga dapat diserahkan tunai kepada Bendahara saat rapat rutin MKKS.', 105, curY + 11.5);
+  doc.text('* Cek Iuran Online: http://mkks-citos.or.id/ (Login User & Pass: NPSN Sekolah)', 105, curY + 16.5);
+  doc.text('* Harap konfirmasi bukti transfer via WhatsApp ke Bendahara setelah melakukan pembayaran.', 105, curY + 21.5);
 
   curY += 34;
 

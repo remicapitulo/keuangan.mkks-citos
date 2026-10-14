@@ -1,4 +1,4 @@
-import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole, RiwayatHapus, RekonsiliasiKas, PejabatPenandatangan } from '../types';
+import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, UserRole, RiwayatHapus, RekonsiliasiKas, PejabatPenandatangan, AppSettings } from '../types';
 import { INITIAL_SEKOLAH, INITIAL_USER, INITIAL_IURAN, INITIAL_PENGELUARAN, INITIAL_PEMASUKAN_LAIN, INITIAL_RIWAYAT_HAPUS, INITIAL_REKONSILIASI_KAS, DEFAULT_SPREADSHEET_ID, DEFAULT_APPS_SCRIPT_URL } from '../data/initialData';
 import { cleanDateInputString, getCurrentWIBDateTimeString, getCurrentWIBDateString, isPlaceholderAuditTime } from '../utils/formatters';
 
@@ -11,6 +11,15 @@ export const DEFAULT_PEJABAT: PejabatPenandatangan = {
   jabatanBendahara: 'Bendahara MKKS SMP Citos'
 };
 
+export const DEFAULT_SETTINGS: AppSettings = {
+  namaBank: 'Bank BJB',
+  nomorRekening: '102.23.09876.1',
+  atasNamaRekening: 'MKKS SMP CITOS',
+  catatanTagihan: 'Mohon konfirmasi bukti transfer via WhatsApp ke Bendahara MKKS.',
+  kontakBendahara: '',
+  updatedAt: '2026-09-23 10:19'
+};
+
 const STORAGE_KEYS = {
   SEKOLAH: 'mkks_citos_sekolah',
   USER: 'mkks_citos_user',
@@ -20,6 +29,7 @@ const STORAGE_KEYS = {
   RIWAYAT_HAPUS: 'mkks_citos_riwayat_hapus',
   REKONSILIASI_KAS: 'mkks_citos_rekonsiliasi_kas',
   PEJABAT: 'mkks_citos_pejabat',
+  SETTINGS: 'mkks_citos_settings',
   SPREADSHEET_ID: 'mkks_citos_sheet_id',
   APPS_SCRIPT_URL: 'mkks_citos_apps_script_url',
   CURRENT_USER: 'mkks_citos_current_user'
@@ -561,6 +571,56 @@ export function normalizeRekonsiliasiKasList(rawList: any[]): RekonsiliasiKas[] 
   }).filter((item): item is RekonsiliasiKas => item !== null);
 }
 
+export function normalizeSettings(raw: any): AppSettings {
+  if (!raw) return DEFAULT_SETTINGS;
+  let obj = raw;
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return DEFAULT_SETTINGS;
+    // Check if sheet contains key-value rows
+    const isKeyValue = raw.some(r => {
+      const k = String(r?.Kunci || r?.Key || r?.kunci || (Array.isArray(r) ? r[0] : '') || '').toLowerCase();
+      return k.includes('bank') || k.includes('rekening') || k.includes('nama');
+    });
+
+    if (isKeyValue) {
+      const kvMap: Record<string, string> = {};
+      raw.forEach(r => {
+        if (!r) return;
+        const k = String(r.Kunci || r.Key || r.kunci || r['Nama Pengaturan'] || (Array.isArray(r) ? r[0] : '') || '').trim().toLowerCase();
+        const v = String(r.Nilai || r.Value || r.nilai || r.Isi || (Array.isArray(r) ? r[1] : '') || '').trim();
+        if (k) kvMap[k] = v;
+      });
+      return {
+        namaBank: kvMap['nama bank'] || kvMap['bank'] || DEFAULT_SETTINGS.namaBank,
+        nomorRekening: kvMap['nomor rekening'] || kvMap['no rekening'] || kvMap['rekening'] || DEFAULT_SETTINGS.nomorRekening,
+        atasNamaRekening: kvMap['atas nama rekening'] || kvMap['atas nama'] || kvMap['a.n'] || DEFAULT_SETTINGS.atasNamaRekening,
+        catatanTagihan: kvMap['catatan tagihan'] || kvMap['catatan'] || kvMap['instruksi pembayaran'] || DEFAULT_SETTINGS.catatanTagihan,
+        kontakBendahara: kvMap['kontak bendahara'] || kvMap['no wa bendahara'] || DEFAULT_SETTINGS.kontakBendahara,
+        updatedAt: kvMap['terakhir diperbarui'] || kvMap['updated'] || getCurrentWIBDateTimeString()
+      };
+    } else {
+      // Columnar format (first row of data)
+      obj = raw[0];
+    }
+  }
+
+  const namaBank = getFlexibleValue(obj, ['Nama Bank', 'namaBank', 'Bank', 'bank', 'NamaBank']) || DEFAULT_SETTINGS.namaBank;
+  const nomorRekening = getFlexibleValue(obj, ['Nomor Rekening', 'nomorRekening', 'No Rekening', 'noRekening', 'Rekening']) || DEFAULT_SETTINGS.nomorRekening;
+  const atasNamaRekening = getFlexibleValue(obj, ['Atas Nama Rekening', 'atasNamaRekening', 'Atas Nama', 'atasNama', 'an']) || DEFAULT_SETTINGS.atasNamaRekening;
+  const catatanTagihan = getFlexibleValue(obj, ['Catatan Tagihan', 'catatanTagihan', 'Catatan', 'Instruksi Pembayaran', 'Pesan']) || DEFAULT_SETTINGS.catatanTagihan;
+  const kontakBendahara = getFlexibleValue(obj, ['Kontak Bendahara', 'kontakBendahara', 'No WA Bendahara', 'WA Bendahara']) || '';
+  const updatedAt = getFlexibleValue(obj, ['Terakhir Diperbarui', 'updatedAt', 'Tanggal Update', 'Waktu']) || getCurrentWIBDateTimeString();
+
+  return {
+    namaBank: namaBank.trim(),
+    nomorRekening: nomorRekening.trim(),
+    atasNamaRekening: atasNamaRekening.trim(),
+    catatanTagihan: catatanTagihan.trim(),
+    kontakBendahara: kontakBendahara.trim(),
+    updatedAt: cleanDateInputString(updatedAt)
+  };
+}
+
 export class StorageService {
   public static getSpreadsheetId(): string {
     return localStorage.getItem(STORAGE_KEYS.SPREADSHEET_ID) || DEFAULT_SPREADSHEET_ID;
@@ -777,10 +837,63 @@ export class StorageService {
 
   public static saveSingleRekonsiliasi(record: RekonsiliasiKas): RekonsiliasiKas[] {
     const current = this.getRekonsiliasiKas();
-    const filtered = current.filter(r => r.tahun !== record.tahun);
-    const updated = [record, ...filtered];
+    // Cari apakah sudah ada data audit dengan ID yang sama
+    const existingIndex = current.findIndex(r => r.id === record.id);
+    let updated: RekonsiliasiKas[];
+    if (existingIndex !== -1) {
+      // Perbarui catatan audit spesifik tanpa menghapus riwayat lainnya
+      updated = [...current];
+      updated[existingIndex] = record;
+    } else {
+      // Tambahkan audit baru ke histori (data audit pada tanggal lain tetap tersimpan rapi)
+      updated = [record, ...current];
+    }
     this.saveRekonsiliasiKas(updated, true);
     return updated;
+  }
+
+  public static deleteSingleRekonsiliasi(id: string): RekonsiliasiKas[] {
+    const current = this.getRekonsiliasiKas();
+    const updated = current.filter(r => r.id !== id);
+    this.saveRekonsiliasiKas(updated, true);
+    return updated;
+  }
+
+  // App Settings (Nomor Rekening, Nama Bank, Catatan Tagihan, Sheet Setting)
+  public static getSettings(): AppSettings {
+    const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    if (!data) {
+      return DEFAULT_SETTINGS;
+    }
+    try {
+      const parsed = JSON.parse(data);
+      return normalizeSettings(parsed);
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  }
+
+  public static saveSettings(settings: Partial<AppSettings>, syncToRemote = true): AppSettings {
+    const current = this.getSettings();
+    const updated: AppSettings = {
+      namaBank: (settings.namaBank !== undefined ? settings.namaBank : current.namaBank).trim(),
+      nomorRekening: (settings.nomorRekening !== undefined ? settings.nomorRekening : current.nomorRekening).trim(),
+      atasNamaRekening: (settings.atasNamaRekening !== undefined ? settings.atasNamaRekening : current.atasNamaRekening).trim(),
+      catatanTagihan: (settings.catatanTagihan !== undefined ? settings.catatanTagihan : current.catatanTagihan).trim(),
+      kontakBendahara: (settings.kontakBendahara !== undefined ? settings.kontakBendahara : (current.kontakBendahara || '')).trim(),
+      updatedAt: getCurrentWIBDateTimeString()
+    };
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
+    if (syncToRemote) {
+      this.syncToAppsScript();
+    }
+    return updated;
+  }
+
+  public static async saveSettingsAndSync(settings: Partial<AppSettings>): Promise<{ settings: AppSettings; syncStatus: SyncStatus }> {
+    const updated = this.saveSettings(settings, false);
+    const syncStatus = await this.syncToAppsScript();
+    return { settings: updated, syncStatus };
   }
 
   // Get user with role Ketua from sheet User
@@ -885,6 +998,7 @@ export class StorageService {
     this.savePemasukanLain(INITIAL_PEMASUKAN_LAIN, false);
     this.saveRiwayatHapus(INITIAL_RIWAYAT_HAPUS, false);
     this.saveRekonsiliasiKas(INITIAL_REKONSILIASI_KAS, false);
+    this.saveSettings(DEFAULT_SETTINGS, false);
     this.setSpreadsheetId(DEFAULT_SPREADSHEET_ID);
     this.setAppsScriptUrl(DEFAULT_APPS_SCRIPT_URL);
     this.setCurrentUser(INITIAL_USER[0]);
@@ -1026,6 +1140,22 @@ export class StorageService {
       pecahanCash: item.pecahanCash
     }));
 
+    const currentSettings = this.getSettings();
+    const formattedSettings = [{
+      'Nama Bank': currentSettings.namaBank,
+      'Nomor Rekening': currentSettings.nomorRekening,
+      'Atas Nama Rekening': currentSettings.atasNamaRekening,
+      'Catatan Tagihan': currentSettings.catatanTagihan || '',
+      'Kontak Bendahara': currentSettings.kontakBendahara || '',
+      'Terakhir Diperbarui': currentSettings.updatedAt || getCurrentWIBDateTimeString(),
+      namaBank: currentSettings.namaBank,
+      nomorRekening: currentSettings.nomorRekening,
+      atasNamaRekening: currentSettings.atasNamaRekening,
+      catatanTagihan: currentSettings.catatanTagihan || '',
+      kontakBendahara: currentSettings.kontakBendahara || '',
+      updatedAt: currentSettings.updatedAt
+    }];
+
     const payload = {
       action: 'syncAll',
       spreadsheetId: this.getSpreadsheetId(),
@@ -1033,7 +1163,8 @@ export class StorageService {
       pengeluaran: formattedPengeluaran,
       pemasukanLain: formattedPemasukanLain,
       riwayatHapus: formattedRiwayatHapus,
-      rekonsiliasiKas: formattedRekonsiliasiKas
+      rekonsiliasiKas: formattedRekonsiliasiKas,
+      settings: formattedSettings
     };
 
     let data: any = null;
@@ -1176,6 +1307,22 @@ export class StorageService {
       if (Array.isArray(rekonsiliasiData) && rekonsiliasiData.length > 0) {
         this.saveRekonsiliasiKas(rekonsiliasiData, false);
       }
+
+      const settingData = data.settings || data.setting || data.Setting || data.Settings;
+      if (Array.isArray(settingData) && settingData.length > 0) {
+        // Hanya perbarui pengaturan jika data dari spreadsheet memiliki isi nyata (bukan array kosong)
+        const hasValidData = settingData.some(row => {
+          if (!row || typeof row !== 'object') return false;
+          return Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '');
+        });
+        if (hasValidData) {
+          const normalizedSet = normalizeSettings(settingData);
+          this.saveSettings(normalizedSet, false);
+        }
+      } else if (settingData && !Array.isArray(settingData) && typeof settingData === 'object') {
+        const normalizedSet = normalizeSettings(settingData);
+        this.saveSettings(normalizedSet, false);
+      }
       return true;
     }
 
@@ -1188,16 +1335,18 @@ export class StorageService {
  */
 export const GOOGLE_APPS_SCRIPT_CODE = `
 /**
- * Apps Script Web App backend untuk Aplikasi MKKS Citos (Versi 7 Sheet Lengkap)
- * Mendukung: Sekolah, User, Iuran, Pengeluaran, Pemasukan_Lain, Riwayat_Hapus, dan Rekonsiliasi_Kas
- * Urutan Kolom Iuran: Tahun -> Bulan -> ID Sekolah -> Nama Sekolah -> Nominal -> Keterangan / Tempat Terima -> Tanggal Input -> Diinput Oleh -> No Kuitansi
+ * Apps Script Web App backend untuk Aplikasi MKKS Citos (Versi 8 Sheet Lengkap + Format Nomor Rekening)
+ * Mendukung: Sekolah, User, Iuran, Pengeluaran, Pemasukan_Lain, Riwayat_Hapus, Rekonsiliasi_Kas, dan Setting
  * 
- * Cara Update di Google Sheets:
- * 1. Buka Google Spreadsheet -> Ekstensi -> Apps Script
- * 2. Hapus seluruh isi kode lama di Code.gs, lalu tempelkan (paste) seluruh kode di bawah ini
+ * PENTING - CARA UPDATE DEPLOYMENT DI GOOGLE APPS SCRIPT:
+ * 1. Buka Google Spreadsheet -> Klik menu "Ekstensi" -> "Apps Script"
+ * 2. Hapus seluruh isi kode lama di Code.gs, lalu paste seluruh kode ini
  * 3. Klik tombol "Simpan" (ikon disket / Ctrl + S)
- * 4. Klik menu "Deploy" (kanan atas) -> "Manage deployments" (Kelola deployment)
- * 5. Klik ikon Pensil (Edit) -> Pada pilihan Version, pilih "New version" (Versi baru) -> Klik "Deploy"
+ * 4. Klik tombol "Deploy" (kanan atas) -> Pilih "Manage deployments" (Kelola deployment)
+ * 5. Klik ikon Pensil (Edit) pada deployment yang aktif
+ * 6. Pada dropdown Version, pilih "New version" (Versi baru) -> WAJIB agar kode baru aktif!
+ * 7. Pastikan "Who has access" (Siapa yang memiliki akses) = "Anyone" (Siapa saja)
+ * 8. Klik tombol "Deploy"
  */
 
 function doGet(e) {
@@ -1207,7 +1356,7 @@ function doGet(e) {
     ss.setSpreadsheetTimeZone('Asia/Jakarta');
   } catch(tzErr) {}
   
-  // 1. Ambil Data dari Google Sheet (7 Sheet Lengkap)
+  // 1. Ambil Data dari Google Sheet (8 Sheet Lengkap termasuk Setting)
   if (action === 'getData') {
     var users = getSheetData(ss, 'User');
     if (!users || users.length === 0) users = getSheetData(ss, 'Users');
@@ -1225,7 +1374,8 @@ function doGet(e) {
       pengeluaran: getSheetData(ss, 'Pengeluaran'),
       pemasukanLain: getSheetData(ss, 'Pemasukan_Lain') || getSheetData(ss, 'PemasukanLain'),
       riwayatHapus: getSheetData(ss, 'Riwayat_Hapus') || getSheetData(ss, 'RiwayatHapus'),
-      rekonsiliasiKas: getSheetData(ss, 'Rekonsiliasi_Kas') || getSheetData(ss, 'RekonsiliasiKas') || getSheetData(ss, 'Audit_Kas')
+      rekonsiliasiKas: getSheetData(ss, 'Rekonsiliasi_Kas') || getSheetData(ss, 'RekonsiliasiKas') || getSheetData(ss, 'Audit_Kas'),
+      settings: getSheetData(ss, 'Setting') || getSheetData(ss, 'Settings')
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -1238,6 +1388,7 @@ function doGet(e) {
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
       if (data.riwayatHapus) writeSheetData(ss, 'Riwayat_Hapus', data.riwayatHapus);
       if (data.rekonsiliasiKas) writeSheetData(ss, 'Rekonsiliasi_Kas', data.rekonsiliasiKas);
+      if (data.settings) writeSheetData(ss, 'Setting', data.settings);
       
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed via GET' }))
         .setMimeType(ContentService.MimeType.JSON);
@@ -1246,8 +1397,21 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
   }
+
+  // 3. Sync khusus Setting via GET
+  if (action === 'syncSetting' && e && e.parameter && e.parameter.data) {
+    try {
+      var setRows = JSON.parse(e.parameter.data);
+      writeSheetData(ss, 'Setting', setRows);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Setting Synchronized via GET' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch(errSet) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: errSet.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
   
-  return ContentService.createTextOutput(JSON.stringify({ status: 'active', message: 'API MKKS Citos Ready (7 Sheets)' }))
+  return ContentService.createTextOutput(JSON.stringify({ status: 'active', message: 'API MKKS Citos Ready (8 Sheets)' }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -1271,8 +1435,15 @@ function doPost(e) {
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
       if (data.riwayatHapus) writeSheetData(ss, 'Riwayat_Hapus', data.riwayatHapus);
       if (data.rekonsiliasiKas) writeSheetData(ss, 'Rekonsiliasi_Kas', data.rekonsiliasiKas);
+      if (data.settings) writeSheetData(ss, 'Setting', data.settings);
       
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Sync Completed' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data && (data.action === 'syncSetting' || data.action === 'saveSetting')) {
+      if (data.settings) writeSheetData(ss, 'Setting', data.settings);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Setting Saved' }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -1300,7 +1471,6 @@ function getSheetData(ss, sheetName) {
       if (headerKey) {
         var val = data[i][j];
         if (val instanceof Date) {
-          // Format waktu sel ke zona waktu Asia/Jakarta (WIB) secara presisi
           try {
             var hours = val.getHours();
             var minutes = val.getMinutes();
@@ -1313,7 +1483,12 @@ function getSheetData(ss, sheetName) {
             row[headerKey] = displayValues[i][j] || String(val);
           }
         } else {
-          row[headerKey] = val;
+          // Khusus Nomor Rekening, Nomor Telepon/Kontak, ID, NIP, ambil display value agar angka nol di depan tidak terpotong
+          if (headerKey === 'Nomor Rekening' || headerKey === 'Kontak' || headerKey === 'Kontak Bendahara' || headerKey === 'No Kuitansi' || headerKey.indexOf('NIP') !== -1) {
+            row[headerKey] = (displayValues[i] && displayValues[i][j] !== undefined && displayValues[i][j] !== '') ? displayValues[i][j] : String(val !== undefined && val !== null ? val : '');
+          } else {
+            row[headerKey] = val;
+          }
         }
       }
     }
@@ -1326,7 +1501,7 @@ function writeSheetData(ss, sheetName, rows) {
   var sheet = findSheetByName(ss, sheetName) || ss.insertSheet(sheetName);
   if (!rows || rows.length === 0) return;
 
-  // Header Rapi Standar MKKS Citos (Nominal sebelum Keterangan / Tempat Terima)
+  // Header Standar MKKS Citos (Termasuk Setting dengan Nomor Rekening & Kontak Bendahara)
   var headerMap = {
     'Iuran': ['Tahun', 'Bulan', 'ID Sekolah', 'Nama Sekolah', 'Nominal', 'Keterangan / Tempat Terima', 'Tanggal Input', 'Diinput Oleh', 'No Kuitansi'],
     'Pengeluaran': ['No', 'Tanggal Transaksi', 'Alokasi Project / Kegiatan', 'Keterangan Tambahan', 'Jumlah Nominal (Rp)', 'Diinput Oleh'],
@@ -1338,11 +1513,16 @@ function writeSheetData(ss, sheetName, rows) {
     'RekonsiliasiKas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
     'Audit_Kas': ['ID Audit', 'Tahun', 'Tanggal Audit', 'Saldo Cash Fisik (Rp)', 'Saldo Rekening Bank (Rp)', 'Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Temuan Audit', 'Diaudit Oleh', 'Rincian Pecahan Cash (JSON)'],
     'Sekolah': ['ID Sekolah', 'Nama Sekolah', 'Nama Kepsek', 'Alamat', 'Kelurahan', 'Kecamatan', 'Kontak'],
-    'User': ['Username', 'Password', 'Role', 'Sekolah', 'Aktif', 'Nama Kepsek']
+    'User': ['Username', 'Password', 'Role', 'Sekolah', 'Aktif', 'Nama Kepsek'],
+    'Setting': ['Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Tagihan', 'Kontak Bendahara', 'Terakhir Diperbarui'],
+    'Settings': ['Nama Bank', 'Nomor Rekening', 'Atas Nama Rekening', 'Catatan Tagihan', 'Kontak Bendahara', 'Terakhir Diperbarui']
   };
 
   // Pemetaan kata kunci alternatif
   var keyAlias = {
+    'Catatan Tagihan': ['Catatan Tagihan', 'catatanTagihan', 'catatan', 'Catatan', 'Instruksi Pembayaran'],
+    'Kontak Bendahara': ['Kontak Bendahara', 'kontakBendahara', 'No WA Bendahara', 'waBendahara', 'kontak', 'Kontak'],
+    'Terakhir Diperbarui': ['Terakhir Diperbarui', 'updatedAt', 'Waktu', 'tanggal', 'Tanggal Update'],
     'Kontak': ['Kontak', 'kontak', 'KONTAK', 'No WA', 'noWa', 'No Telepon', 'telepon', 'HP', 'noHp', 'Telepon / WA', 'WA', 'phone'],
     'Tahun': ['Tahun', 'tahun'],
     'Bulan': ['Bulan', 'bulan'],
@@ -1375,7 +1555,7 @@ function writeSheetData(ss, sheetName, rows) {
     'Saldo Cash Fisik (Rp)': ['Saldo Cash Fisik (Rp)', 'saldoCash', 'Saldo Cash', 'Uang Cash', 'cash', 'Cash', 'saldo_cash'],
     'Saldo Rekening Bank (Rp)': ['Saldo Rekening Bank (Rp)', 'saldoBank', 'Saldo Bank', 'Uang di Rekening', 'bank', 'Bank', 'saldo_bank'],
     'Nama Bank': ['Nama Bank', 'namaBank', 'bankName', 'Bank'],
-    'Nomor Rekening': ['Nomor Rekening', 'nomorRekening', 'noRekening', 'No Rekening'],
+    'Nomor Rekening': ['Nomor Rekening', 'nomorRekening', 'noRekening', 'No Rekening', 'Rekening', 'rekening'],
     'Atas Nama Rekening': ['Atas Nama Rekening', 'atasNamaRekening', 'atasNama', 'Atas Nama'],
     'Catatan Temuan Audit': ['Catatan Temuan Audit', 'catatanAudit', 'catatan', 'Catatan', 'keterangan', 'Keterangan'],
     'Diaudit Oleh': ['Diaudit Oleh', 'diauditOleh', 'auditor', 'Auditor', 'petugas'],
@@ -1405,13 +1585,34 @@ function writeSheetData(ss, sheetName, rows) {
           break;
         }
       }
+      // Khusus Nomor Rekening dan Kontak WA pastikan format berupa String murni agar tidak terpotong nol awalnya
+      if (h === 'Nomor Rekening' || h === 'Kontak' || h === 'Kontak Bendahara' || h === 'No Kuitansi') {
+        val = String(val !== undefined && val !== null ? val : '').trim();
+      }
       row.push(val);
     });
     values.push(row);
   });
 
   sheet.clear();
-  sheet.getRange(1, 1, values.length, headers.length).setValues(values);
+  var range = sheet.getRange(1, 1, values.length, headers.length);
+  range.setValues(values);
+
+  // Percantik Header dan Format Kolom
+  try {
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#0f766e');
+    headerRange.setFontColor('#ffffff');
+
+    // Format kolom teks (Nomor Rekening, No WA, Kontak) sebagai Plain Text (@)
+    for (var col = 1; col <= headers.length; col++) {
+      var headerTitle = headers[col - 1];
+      if (headerTitle === 'Nomor Rekening' || headerTitle === 'Kontak' || headerTitle === 'Kontak Bendahara' || headerTitle === 'No Kuitansi') {
+        sheet.getRange(2, col, Math.max(1, values.length - 1), 1).setNumberFormat('@');
+      }
+    }
+  } catch(fmtErr) {}
 }
 
 function findSheetByName(ss, sheetName) {

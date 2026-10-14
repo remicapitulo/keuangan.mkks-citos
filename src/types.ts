@@ -146,3 +146,12 @@ export interface PejabatPenandatangan {
   nipBendahara: string;
   jabatanBendahara: string;
 }
+
+export interface AppSettings {
+  namaBank: string;
+  nomorRekening: string;
+  atasNamaRekening: string;
+  catatanTagihan?: string;
+  kontakBendahara?: string;
+  updatedAt?: string;
+}

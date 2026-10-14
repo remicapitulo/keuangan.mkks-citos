@@ -1,28 +1,18 @@
 import React from 'react';
 import { User } from '../types';
-import { Building2, Database, LogOut, UserCheck, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Building2, LogOut, UserCheck, RefreshCw } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: User | null;
-  onOpenSpreadsheetModal: () => void;
   onOpenLoginModal: () => void;
   onLogout: () => void;
-  spreadsheetId: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
-  onOpenSpreadsheetModal,
   onOpenLoginModal,
-  onLogout,
-  spreadsheetId
+  onLogout
 }) => {
-  const isAdmin = currentUser ? (
-    currentUser.role === 'Admin' ||
-    currentUser.role?.toLowerCase() === 'admin' ||
-    currentUser.username?.toLowerCase() === 'admin' ||
-    currentUser.username?.toLowerCase().includes('admin')
-  ) : false;
 
   return (
     <header id="app-header" className="bg-gradient-to-r from-teal-700 via-teal-800 to-indigo-900 text-white shadow-lg sticky top-0 z-40">
@@ -48,23 +38,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </p>
             </div>
           </div>
-
-          {/* Center / Spreadsheet Sync Badge (Visible ONLY to Admin / Super Admin) */}
-          {isAdmin && (
-            <div className="flex items-center space-x-2">
-              <button
-                id="btn-spreadsheet-config"
-                onClick={onOpenSpreadsheetModal}
-                className="flex items-center space-x-1.5 sm:space-x-2 bg-teal-900/60 hover:bg-teal-900/90 text-teal-100 text-xs sm:text-sm px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-teal-500/30 transition-all shadow-sm group cursor-pointer"
-                title="Kelola & Tes Koneksi Google Spreadsheet (Admin)"
-              >
-                <Database className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-300 group-hover:scale-110 transition-transform shrink-0" />
-                <span className="hidden sm:inline">Database Spreadsheet</span>
-                <span className="inline sm:hidden font-semibold">Sheet DB</span>
-                <span className="inline-block w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-              </button>
-            </div>
-          )}
 
           {/* Right / User Profile & Role */}
           <div className="flex items-center space-x-2 sm:space-x-3">
