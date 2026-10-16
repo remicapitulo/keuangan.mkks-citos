@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { formatRupiah, terbilang, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { formatRupiah, terbilang, formatDateIndonesian, resolveNamaBendahara, formatBulanRange } from '../utils/formatters';
 import { Printer, CheckCircle2, X, Download, ShieldCheck, Building2, QrCode, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
@@ -474,7 +474,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
 
       const pemText = isPemasukanLain
         ? (data.keterangan || `Penerimaan ${data.kategori || 'Dana'} dari ${data.sumberDana || data.namaSekolah}`)
-        : `Iuran Anggota MKKS Bulan ${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`;
+        : `Iuran Anggota MKKS ${formatBulanRange(data.bulanList)} - Tahun ${data.tahunBuku}`;
 
       ctx.fillStyle = '#1e293b';
       ctx.font = 'bold 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -749,7 +749,7 @@ export const StrukModal: React.FC<StrukModalProps> = ({
                 <span className="font-bold text-slate-800 text-right max-w-xs leading-snug">
                   {isPemasukanLain 
                     ? (data.keterangan || `Penerimaan ${data.kategori || 'Dana'} dari ${data.sumberDana || data.namaSekolah}`)
-                    : `Iuran Anggota MKKS Bulan ${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`
+                    : `Iuran Anggota MKKS ${formatBulanRange(data.bulanList)} - Tahun ${data.tahunBuku}`
                   }
                 </span>
               </div>

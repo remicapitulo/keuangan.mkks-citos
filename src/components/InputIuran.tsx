@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sekolah, Iuran, BULAN_LIST, IURAN_PER_BULAN, PaketDurasi, User } from '../types';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList, getSchoolSortKey } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, getTahunBukuList, getSchoolSortKey, getMergedIuranReceipt } from '../utils/formatters';
 import { Search, CheckCircle2, AlertCircle, Printer, History, PlusCircle, CheckSquare, Calendar, Building2, ListFilter, MapPin, FileText, Sparkles, Lock, ShieldAlert } from 'lucide-react';
 
 interface InputIuranProps {
@@ -722,18 +722,29 @@ export const InputIuran: React.FC<InputIuranProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                onOpenStrukModal({
-                                  noKuitansi: item.noKuitansi || 'KWT-RE-PRINT',
-                                  tanggal: item.tanggalInput,
-                                  namaSekolah: item.namaSekolah || schoolOfItem?.namaSekolah || 'Sekolah',
-                                  namaKepsek: schoolOfItem?.namaKepsek || '-',
-                                  alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
-                                  tahunBuku: item.tahun,
-                                  bulanList: [item.bulan],
-                                  totalNominal: item.nominal,
-                                  diinputOleh: resolveNamaBendahara(item.diinputOleh, undefined, sekolahList),
-                                  keterangan: item.keterangan
-                                });
+                                const receiptData = getMergedIuranReceipt(
+                                  {
+                                    jenis: 'iuran',
+                                    id: item.id,
+                                    noKuitansi: item.noKuitansi || 'KWT-RE-PRINT',
+                                    tanggalInput: item.tanggalInput,
+                                    idSekolah: item.idSekolah,
+                                    namaSekolah: item.namaSekolah || schoolOfItem?.namaSekolah || 'Sekolah',
+                                    namaKepsek: schoolOfItem?.namaKepsek || '-',
+                                    alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                                    tahun: item.tahun,
+                                    tahunBuku: item.tahun,
+                                    bulan: item.bulan,
+                                    bulanList: [item.bulan],
+                                    nominal: item.nominal,
+                                    totalNominal: item.nominal,
+                                    diinputOleh: item.diinputOleh,
+                                    keterangan: item.keterangan
+                                  },
+                                  iuranList,
+                                  sekolahList
+                                );
+                                onOpenStrukModal(receiptData);
                               }}
                               className="text-teal-600 hover:text-teal-800 font-bold text-[10px] flex items-center space-x-1 hover:underline cursor-pointer"
                             >

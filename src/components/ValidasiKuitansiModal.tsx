@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatRupiah, formatDateIndonesian, resolveNamaBendahara } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, resolveNamaBendahara, formatBulanRange } from '../utils/formatters';
 import { 
   ShieldCheck, 
   CheckCircle2, 
@@ -133,7 +133,7 @@ export const ValidasiKuitansiModal: React.FC<ValidasiKuitansiModalProps> = ({
               <span className="font-bold text-slate-800 text-right">
                 {isPemasukanLain 
                   ? (data.keterangan || `Penerimaan ${data.kategori || 'Kas Non-Iuran'}`)
-                  : `${data.bulanList.join(', ')} (Tahun ${data.tahunBuku})`
+                  : `${formatBulanRange(data.bulanList)} - Tahun ${data.tahunBuku}`
                 }
               </span>
             </div>

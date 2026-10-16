@@ -17,6 +17,7 @@ import { ValidasiKuitansiModal, ValidasiData } from './components/ValidasiKuitan
 import { InstallAppTab } from './components/InstallAppTab';
 import { PWAInstallFloatingBanner } from './components/PWAInstallButton';
 import { CheckCircle2, ShieldAlert, Lock, UserCheck } from 'lucide-react';
+import { getMergedIuranReceipt } from './utils/formatters';
 
 export default function App() {
   // Application state
@@ -292,9 +293,10 @@ export default function App() {
     showToast(`Data ${target.jenis} berhasil dihapus & dicatat di Riwayat Hapus.`);
   };
 
-  // Open Struk Modal
+  // Open Struk Modal (with automatic multi-month receipt bundling)
   const handleOpenStrukModal = (kuitansiData: any) => {
-    setStrukData(kuitansiData);
+    const mergedData = getMergedIuranReceipt(kuitansiData, iuranList, sekolahList);
+    setStrukData(mergedData);
     setIsStrukModalOpen(true);
   };
 
@@ -417,7 +419,7 @@ export default function App() {
         )}
 
         {/* Main Content Area */}
-        <main className="max-w-[1700px] mx-auto px-3 sm:px-6 lg:px-8 py-6">
+        <main className="max-w-[1700px] mx-auto px-3 sm:px-6 lg:px-8 py-6 pb-20 md:pb-6">
           {!currentUser ? (
             <div className="bg-white rounded-2xl p-10 sm:p-16 text-center border border-slate-200 shadow-sm max-w-xl mx-auto my-12 space-y-4">
               <div className="p-4 bg-teal-50 text-teal-700 rounded-2xl w-16 h-16 mx-auto flex items-center justify-center shadow-inner">

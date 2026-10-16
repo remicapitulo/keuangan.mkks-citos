@@ -287,9 +287,8 @@ Transfer ke Rekening Resmi MKKS CITOS:
 ${catatanTagihan ? `• *Catatan:* ${catatanTagihan}\n` : ''}_(Atau dapat diserahkan tunai kepada Bendahara saat rapat rutin MKKS)_
 
 🌐 *PENGECEKAN IURAN ONLINE:*
-Pengecekan riwayat & status iuran dapat diakses melalui website resmi:
-• Website: http://mkks-citos.or.id/
-• Login dengan User dan Password: Nomor NPSN sekolah masing-masing${sekolah.idSekolah ? ` (*${sekolah.idSekolah}*)` : ''}
+Pengecekan Iuran melalui website: http://mkks-citos.or.id/
+Login dengan User dan Password: Nomor NPSN sekolah masing-masing${sekolah.idSekolah ? ` (NPSN: *${sekolah.idSekolah}*)` : ''}
 
 Mohon konfirmasi bukti transfer atau pembayaran dengan membalas pesan WhatsApp ini.
 

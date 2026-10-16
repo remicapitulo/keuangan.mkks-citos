@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas, PejabatPenandatangan } from '../types';
-import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList, getCurrentWIBDateTimeString, getSchoolSortKey } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList, getCurrentWIBDateTimeString, getSchoolSortKey, getMergedIuranReceipt } from '../utils/formatters';
 import { exportToExcel, exportToPDF, exportRiwayatHapusToExcel, exportRiwayatHapusToPDF } from '../services/exportUtils';
 import { StorageService } from '../services/spreadsheetSync';
 import { AuditRekonsiliasiTab } from './AuditRekonsiliasiTab';
@@ -808,19 +808,29 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                             disabled={!m.isPaid}
                             onClick={() => {
                               if (m.isPaid && onOpenStrukModal && matchingIuran) {
-                                onOpenStrukModal({
-                                  jenis: 'iuran',
-                                  noKuitansi: matchingIuran.noKuitansi || `KWT-IURAN/${matchingIuran.tahun}/${matchingIuran.id}`,
-                                  tanggal: matchingIuran.tanggalInput,
-                                  namaSekolah: sek.namaSekolah,
-                                  namaKepsek: sek.namaKepsek || '-',
-                                  alamatSekolah: `${sek.alamat || ''}, ${sek.kelurahan || ''}`,
-                                  tahunBuku: matchingIuran.tahun,
-                                  bulanList: [m.bulan],
-                                  totalNominal: matchingIuran.nominal,
-                                  diinputOleh: resolveNamaBendahara(matchingIuran.diinputOleh, undefined, sekolahList),
-                                  keterangan: matchingIuran.keterangan || ''
-                                });
+                                const receiptData = getMergedIuranReceipt(
+                                  {
+                                    jenis: 'iuran',
+                                    id: matchingIuran.id,
+                                    noKuitansi: matchingIuran.noKuitansi || `KWT-IURAN/${matchingIuran.tahun}/${matchingIuran.id}`,
+                                    tanggalInput: matchingIuran.tanggalInput,
+                                    idSekolah: sek.idSekolah,
+                                    namaSekolah: sek.namaSekolah,
+                                    namaKepsek: sek.namaKepsek || '-',
+                                    alamatSekolah: `${sek.alamat || ''}, ${sek.kelurahan || ''}`,
+                                    tahun: matchingIuran.tahun,
+                                    tahunBuku: matchingIuran.tahun,
+                                    bulan: m.bulan,
+                                    bulanList: [m.bulan],
+                                    nominal: matchingIuran.nominal,
+                                    totalNominal: matchingIuran.nominal,
+                                    diinputOleh: matchingIuran.diinputOleh,
+                                    keterangan: matchingIuran.keterangan || ''
+                                  },
+                                  iuranList,
+                                  sekolahList
+                                );
+                                onOpenStrukModal(receiptData);
                               }
                             }}
                             title={m.isPaid ? `Klik untuk cetak kuitansi bulan ${m.bulan}` : `Bulan ${m.bulan} belum lunas`}
@@ -943,19 +953,29 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                                 type="button"
                                 onClick={() => {
                                   if (onOpenStrukModal && matchingIuran) {
-                                    onOpenStrukModal({
-                                      jenis: 'iuran',
-                                      noKuitansi: matchingIuran.noKuitansi || `KWT-IURAN/${matchingIuran.tahun}/${matchingIuran.id}`,
-                                      tanggal: matchingIuran.tanggalInput,
-                                      namaSekolah: sek.namaSekolah,
-                                      namaKepsek: sek.namaKepsek || '-',
-                                      alamatSekolah: `${sek.alamat || ''}, ${sek.kelurahan || ''}`,
-                                      tahunBuku: matchingIuran.tahun,
-                                      bulanList: [currentBulan],
-                                      totalNominal: matchingIuran.nominal,
-                                      diinputOleh: resolveNamaBendahara(matchingIuran.diinputOleh, undefined, sekolahList),
-                                      keterangan: matchingIuran.keterangan || ''
-                                    });
+                                    const receiptData = getMergedIuranReceipt(
+                                      {
+                                        jenis: 'iuran',
+                                        id: matchingIuran.id,
+                                        noKuitansi: matchingIuran.noKuitansi || `KWT-IURAN/${matchingIuran.tahun}/${matchingIuran.id}`,
+                                        tanggalInput: matchingIuran.tanggalInput,
+                                        idSekolah: sek.idSekolah,
+                                        namaSekolah: sek.namaSekolah,
+                                        namaKepsek: sek.namaKepsek || '-',
+                                        alamatSekolah: `${sek.alamat || ''}, ${sek.kelurahan || ''}`,
+                                        tahun: matchingIuran.tahun,
+                                        tahunBuku: matchingIuran.tahun,
+                                        bulan: currentBulan,
+                                        bulanList: [currentBulan],
+                                        nominal: matchingIuran.nominal,
+                                        totalNominal: matchingIuran.nominal,
+                                        diinputOleh: matchingIuran.diinputOleh,
+                                        keterangan: matchingIuran.keterangan || ''
+                                      },
+                                      iuranList,
+                                      sekolahList
+                                    );
+                                    onOpenStrukModal(receiptData);
                                   }
                                 }}
                                 title={`Lunas (Bulan ${currentBulan}) - Klik untuk cetak kuitansi`}
@@ -1083,19 +1103,29 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                             type="button"
                             onClick={() => {
                               const schoolOfItem = sekolahList.find(s => (i.idSekolah && s.idSekolah === i.idSekolah) || s.namaSekolah.toLowerCase().trim() === i.namaSekolah.toLowerCase().trim());
-                              onOpenStrukModal({
-                                jenis: 'iuran',
-                                noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
-                                tanggal: i.tanggalInput,
-                                namaSekolah: i.namaSekolah,
-                                namaKepsek: schoolOfItem?.namaKepsek || '-',
-                                alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
-                                tahunBuku: i.tahun,
-                                bulanList: [i.bulan],
-                                totalNominal: i.nominal,
-                                diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
-                                keterangan: i.keterangan || ''
-                              });
+                              const receiptData = getMergedIuranReceipt(
+                                {
+                                  jenis: 'iuran',
+                                  id: i.id,
+                                  noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
+                                  tanggalInput: i.tanggalInput,
+                                  idSekolah: i.idSekolah,
+                                  namaSekolah: i.namaSekolah,
+                                  namaKepsek: schoolOfItem?.namaKepsek || '-',
+                                  alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                                  tahun: i.tahun,
+                                  tahunBuku: i.tahun,
+                                  bulan: i.bulan,
+                                  bulanList: [i.bulan],
+                                  nominal: i.nominal,
+                                  totalNominal: i.nominal,
+                                  diinputOleh: i.diinputOleh,
+                                  keterangan: i.keterangan || ''
+                                },
+                                iuranList,
+                                sekolahList
+                              );
+                              onOpenStrukModal(receiptData);
                             }}
                             className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center space-x-1 cursor-pointer bg-white px-2 py-0.5 rounded border border-emerald-200"
                           >
@@ -1167,19 +1197,29 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                               type="button"
                               onClick={() => {
                                 const schoolOfItem = sekolahList.find(s => (i.idSekolah && s.idSekolah === i.idSekolah) || s.namaSekolah.toLowerCase().trim() === i.namaSekolah.toLowerCase().trim());
-                                onOpenStrukModal({
-                                  jenis: 'iuran',
-                                  noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
-                                  tanggal: i.tanggalInput,
-                                  namaSekolah: i.namaSekolah,
-                                  namaKepsek: schoolOfItem?.namaKepsek || '-',
-                                  alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
-                                  tahunBuku: i.tahun,
-                                  bulanList: [i.bulan],
-                                  totalNominal: i.nominal,
-                                  diinputOleh: resolveNamaBendahara(i.diinputOleh, undefined, sekolahList),
-                                  keterangan: i.keterangan || ''
-                                });
+                                const receiptData = getMergedIuranReceipt(
+                                  {
+                                    jenis: 'iuran',
+                                    id: i.id,
+                                    noKuitansi: i.noKuitansi || `KWT-IURAN/${i.tahun}/${i.id}`,
+                                    tanggalInput: i.tanggalInput,
+                                    idSekolah: i.idSekolah,
+                                    namaSekolah: i.namaSekolah,
+                                    namaKepsek: schoolOfItem?.namaKepsek || '-',
+                                    alamatSekolah: schoolOfItem ? `${schoolOfItem.alamat || ''}, ${schoolOfItem.kelurahan || ''}` : '-',
+                                    tahun: i.tahun,
+                                    tahunBuku: i.tahun,
+                                    bulan: i.bulan,
+                                    bulanList: [i.bulan],
+                                    nominal: i.nominal,
+                                    totalNominal: i.nominal,
+                                    diinputOleh: i.diinputOleh,
+                                    keterangan: i.keterangan || ''
+                                  },
+                                  iuranList,
+                                  sekolahList
+                                );
+                                onOpenStrukModal(receiptData);
                               }}
                               className="inline-flex items-center space-x-1 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold text-[11px] transition-colors cursor-pointer"
                               title="Cetak Kuitansi Iuran"

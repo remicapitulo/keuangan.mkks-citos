@@ -1159,6 +1159,8 @@ export class StorageService {
     const payload = {
       action: 'syncAll',
       spreadsheetId: this.getSpreadsheetId(),
+      sekolah: this.getSekolah(),
+      users: this.getUsers(),
       iuran: formattedIuran,
       pengeluaran: formattedPengeluaran,
       pemasukanLain: formattedPemasukanLain,
@@ -1383,6 +1385,8 @@ function doGet(e) {
   if (action === 'syncAll' && e && e.parameter && e.parameter.data) {
     try {
       var data = JSON.parse(e.parameter.data);
+      if (data.sekolah) writeSheetData(ss, 'Sekolah', data.sekolah);
+      if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);
@@ -1430,6 +1434,8 @@ function doPost(e) {
     } catch(tzErr) {}
     
     if (data && data.action === 'syncAll') {
+      if (data.sekolah) writeSheetData(ss, 'Sekolah', data.sekolah);
+      if (data.users) writeSheetData(ss, 'User', data.users);
       if (data.iuran) writeSheetData(ss, 'Iuran', data.iuran);
       if (data.pengeluaran) writeSheetData(ss, 'Pengeluaran', data.pengeluaran);
       if (data.pemasukanLain) writeSheetData(ss, 'Pemasukan_Lain', data.pemasukanLain);

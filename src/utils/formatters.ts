@@ -473,3 +473,200 @@ export function formatWhatsAppDisplayNumber(rawPhone?: string | number | null): 
   return cleaned;
 }
 
+/**
+ * Format a list of month names into a natural Indonesian range string.
+ * Examples:
+ * - ['Januari'] -> 'Bulan Januari'
+ * - ['Januari', 'Februari', 'Maret'] -> 'Bulan Januari s.d. Maret (3 Bulan)'
+ * - ['Januari', 'Februari'] -> 'Bulan Januari s.d. Februari (2 Bulan)'
+ * - ['Maret', 'Januari', 'Februari'] -> 'Bulan Januari s.d. Maret (3 Bulan)' (auto sorted)
+ * - ['Januari', 'Maret'] -> 'Bulan Januari & Maret (2 Bulan)'
+ */
+export function formatBulanRange(bulanList?: string[] | null): string {
+  if (!bulanList || bulanList.length === 0) return '';
+  if (bulanList.length === 1) return `Bulan ${bulanList[0]}`;
+
+  // Sort according to calendar INDO_MONTHS
+  const sorted = [...bulanList].sort((a, b) => {
+    const idxA = INDO_MONTHS.indexOf(a);
+    const idxB = INDO_MONTHS.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    return a.localeCompare(b);
+  });
+
+  const firstMonth = sorted[0];
+  const lastMonth = sorted[sorted.length - 1];
+  const firstIdx = INDO_MONTHS.indexOf(firstMonth);
+  const lastIdx = INDO_MONTHS.indexOf(lastMonth);
+
+  // Check if consecutive
+  const isConsecutive = firstIdx !== -1 && lastIdx !== -1 && (lastIdx - firstIdx + 1 === sorted.length);
+
+  if (isConsecutive) {
+    return `Bulan ${firstMonth} s.d. ${lastMonth} (${sorted.length} Bulan)`;
+  }
+
+  if (sorted.length === 2) {
+    return `Bulan ${sorted[0]} & ${sorted[1]} (2 Bulan)`;
+  }
+
+  return `Bulan ${sorted.join(', ')} (${sorted.length} Bulan)`;
+}
+
+/**
+ * Given an iuran item (or clicked month data) and the full iuran list,
+ * finds all companion months that were inputted together with the same date & kuitansi number.
+ * Returns the unified kuitansi data so whether any of the months is clicked,
+ * the exact same 1 unified receipt is presented.
+ */
+export function getMergedIuranReceipt(
+  target: {
+    id?: string;
+    noKuitansi?: string;
+    tanggalInput?: string;
+    tanggal?: string;
+    idSekolah?: string;
+    namaSekolah?: string;
+    tahun?: number;
+    tahunBuku?: number;
+    bulan?: string;
+    bulanList?: string[];
+    nominal?: number;
+    totalNominal?: number;
+    diinputOleh?: string;
+    keterangan?: string;
+    namaKepsek?: string;
+    alamatSekolah?: string;
+    jenis?: string;
+    sumberDana?: string;
+    kategori?: string;
+  },
+  allIuranList: any[] = [],
+  sekolahList: any[] = []
+) {
+  if (!target) return target;
+
+  // If this is not an iuran (e.g. pemasukan-lain), return as-is
+  if (target.jenis === 'pemasukan-lain' || target.noKuitansi?.startsWith('KWT-IN')) {
+    return target;
+  }
+
+  const effectiveTahun = Number(target.tahun || target.tahunBuku || 2026);
+  const effectiveTanggal = String(target.tanggalInput || target.tanggal || '').trim();
+  const effectiveNoKuitansi = String(target.noKuitansi || '').trim();
+  const targetSchoolName = (target.namaSekolah || '').toLowerCase().trim();
+  const targetIdSekolah = target.idSekolah;
+
+  // Find school metadata
+  const schoolObj = sekolahList.find(s => 
+    (targetIdSekolah && s.idSekolah === targetIdSekolah) ||
+    (targetSchoolName && s.namaSekolah && s.namaSekolah.toLowerCase().trim() === targetSchoolName)
+  );
+
+  const finalSchoolName = target.namaSekolah || schoolObj?.namaSekolah || 'Sekolah Anggota MKKS';
+  const finalKepsek = target.namaKepsek || schoolObj?.namaKepsek || '-';
+  const finalAlamat = target.alamatSekolah || (schoolObj ? `${schoolObj.alamat || ''}, Kel. ${schoolObj.kelurahan || ''}, Kec. ${schoolObj.kecamatan || ''}` : undefined);
+
+  // If we have an allIuranList to search for companions
+  let companionRecords: any[] = [];
+
+  if (Array.isArray(allIuranList) && allIuranList.length > 0) {
+    companionRecords = allIuranList.filter(i => {
+      // Must match school
+      const sameSchool = (targetIdSekolah && i.idSekolah === targetIdSekolah) ||
+        (i.namaSekolah && targetSchoolName && i.namaSekolah.toLowerCase().trim() === targetSchoolName);
+      if (!sameSchool) return false;
+
+      // Must match year
+      if (Number(i.tahun) !== effectiveTahun) return false;
+
+      const itemNoKwt = String(i.noKuitansi || '').trim();
+      const itemTgl = String(i.tanggalInput || i.tanggal || '').trim();
+
+      const hasValidKwt = effectiveNoKuitansi && 
+        !effectiveNoKuitansi.startsWith('KWT-IURAN/') && 
+        !effectiveNoKuitansi.startsWith('KWT-RE-PRINT');
+
+      // 1. Same valid noKuitansi AND same date
+      if (hasValidKwt && itemNoKwt === effectiveNoKuitansi) {
+        if (!effectiveTanggal || !itemTgl || effectiveTanggal === itemTgl) {
+          return true;
+        }
+      }
+
+      // 2. Or same date + same noKuitansi even if generated
+      if (effectiveNoKuitansi && itemNoKwt === effectiveNoKuitansi && effectiveTanggal && itemTgl === effectiveTanggal) {
+        return true;
+      }
+
+      return false;
+    });
+  }
+
+  // If no companions found, fallback to target's provided bulanList or single bulan
+  if (companionRecords.length === 0) {
+    const rawMonths = target.bulanList && target.bulanList.length > 0 
+      ? target.bulanList 
+      : target.bulan ? [target.bulan] : ['Januari'];
+
+    const sortedMonths = [...rawMonths].sort((a, b) => {
+      const idxA = INDO_MONTHS.indexOf(a);
+      const idxB = INDO_MONTHS.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      return a.localeCompare(b);
+    });
+
+    const nominal = target.totalNominal || target.nominal || (sortedMonths.length * 100000);
+
+    return {
+      ...target,
+      jenis: 'iuran',
+      noKuitansi: effectiveNoKuitansi || `KWT/MKKS-CITOS/${effectiveTahun}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(Date.now()).slice(-4)}`,
+      tanggal: effectiveTanggal || new Date().toISOString().split('T')[0],
+      namaSekolah: finalSchoolName,
+      namaKepsek: finalKepsek,
+      alamatSekolah: finalAlamat,
+      tahunBuku: effectiveTahun,
+      bulanList: sortedMonths,
+      totalNominal: nominal,
+      diinputOleh: resolveNamaBendahara(target.diinputOleh, undefined, sekolahList),
+      keterangan: target.keterangan || ''
+    };
+  }
+
+  // Companions found: merge all months into single unified receipt
+  const allMonthsSet = new Set<string>();
+  let totalSum = 0;
+  companionRecords.forEach(c => {
+    if (c.bulan) allMonthsSet.add(c.bulan);
+    totalSum += (Number(c.nominal) || 100000);
+  });
+
+  const sortedMonths = Array.from(allMonthsSet).sort((a, b) => {
+    const idxA = INDO_MONTHS.indexOf(a);
+    const idxB = INDO_MONTHS.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    return a.localeCompare(b);
+  });
+
+  const primaryNoKuitansi = companionRecords.find(c => c.noKuitansi)?.noKuitansi || effectiveNoKuitansi || `KWT/MKKS-CITOS/${effectiveTahun}/01`;
+  const primaryTanggal = companionRecords.find(c => c.tanggalInput)?.tanggalInput || effectiveTanggal || new Date().toISOString().split('T')[0];
+  const primaryDiinput = resolveNamaBendahara(companionRecords.find(c => c.diinputOleh)?.diinputOleh || target.diinputOleh, undefined, sekolahList);
+  const primaryKeterangan = companionRecords.find(c => c.keterangan)?.keterangan || target.keterangan || '';
+
+  return {
+    ...target,
+    jenis: 'iuran',
+    noKuitansi: primaryNoKuitansi,
+    tanggal: primaryTanggal,
+    namaSekolah: finalSchoolName,
+    namaKepsek: finalKepsek,
+    alamatSekolah: finalAlamat,
+    tahunBuku: effectiveTahun,
+    bulanList: sortedMonths,
+    totalNominal: totalSum,
+    diinputOleh: primaryDiinput,
+    keterangan: primaryKeterangan
+  };
+}
+

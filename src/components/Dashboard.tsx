@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN } from '../types';
-import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara, getTahunBukuList, getSchoolSortKey } from '../utils/formatters';
+import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara, getTahunBukuList, getSchoolSortKey, getMergedIuranReceipt } from '../utils/formatters';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -204,7 +204,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const myTotalPaidNominal = myIuran.reduce((a, b) => a + b.nominal, 0);
   const myTunggakan = Math.max(0, (12 - myTotalPaidMonths) * IURAN_PER_BULAN);
 
-  // Handler when a paid month is clicked in Info Sekolah
+  // Handler when a paid month is clicked in Info Sekolah (Single unified receipt for multi-month payment)
   const handlePaidMonthClick = (bulan: string, index: number) => {
     if (!onOpenStrukModal) return;
 
@@ -213,21 +213,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const receiptNo = paidRecord?.noKuitansi || `KWT/${selectedYear}/${monthNum}/${mySekolahObj?.idSekolah || 'CITOS'}`;
     const tanggalBayar = paidRecord?.tanggalInput || `${selectedYear}-${monthNum}-10`;
 
-    const inputterFullName = resolveNamaBendahara(paidRecord?.diinputOleh, undefined, sekolahList);
+    const merged = getMergedIuranReceipt(
+      {
+        jenis: 'iuran',
+        id: paidRecord?.id,
+        noKuitansi: receiptNo,
+        tanggalInput: tanggalBayar,
+        tanggal: tanggalBayar,
+        idSekolah: mySekolahObj?.idSekolah,
+        namaSekolah: mySekolahObj?.namaSekolah || currentUser?.sekolah || 'Sekolah Anggota MKKS',
+        namaKepsek: mySekolahObj?.namaKepsek || currentUser?.namaKepsek,
+        alamatSekolah: mySekolahObj ? `${mySekolahObj.alamat}, Kel. ${mySekolahObj.kelurahan}` : undefined,
+        tahun: selectedYear,
+        tahunBuku: selectedYear,
+        bulan,
+        bulanList: [bulan],
+        nominal: paidRecord?.nominal || IURAN_PER_BULAN,
+        totalNominal: paidRecord?.nominal || IURAN_PER_BULAN,
+        diinputOleh: paidRecord?.diinputOleh,
+        keterangan: paidRecord?.keterangan || ''
+      },
+      iuranList,
+      sekolahList
+    );
 
-    onOpenStrukModal({
-      jenis: 'iuran',
-      noKuitansi: receiptNo,
-      tanggal: tanggalBayar,
-      namaSekolah: mySekolahObj?.namaSekolah || currentUser?.sekolah || 'Sekolah Anggota MKKS',
-      namaKepsek: mySekolahObj?.namaKepsek || currentUser?.namaKepsek,
-      alamatSekolah: mySekolahObj ? `${mySekolahObj.alamat}, Kel. ${mySekolahObj.kelurahan}` : undefined,
-      tahunBuku: selectedYear,
-      bulanList: [bulan],
-      totalNominal: paidRecord?.nominal || IURAN_PER_BULAN,
-      diinputOleh: inputterFullName,
-      keterangan: paidRecord?.keterangan || ''
-    });
+    onOpenStrukModal(merged);
   };
 
   return (
