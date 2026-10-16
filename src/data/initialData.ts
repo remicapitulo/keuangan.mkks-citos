@@ -1,4 +1,4 @@
-import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, RekonsiliasiKas } from '../types';
+import { Sekolah, User, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, RekonsiliasiKas, Pengecualian } from '../types';
 import { getCurrentWIBDateTimeString } from '../utils/formatters';
 
 // Default initial schools fallback (empty - loaded dynamically from Google Spreadsheet)
@@ -86,6 +86,8 @@ export const INITIAL_PENGELUARAN: Pengeluaran[] = [];
 export const INITIAL_PEMASUKAN_LAIN: PemasukanLain[] = [];
 
 export const INITIAL_RIWAYAT_HAPUS: RiwayatHapus[] = [];
+
+export const INITIAL_PENGECUALIAN: Pengecualian[] = [];
 
 export const INITIAL_REKONSILIASI_KAS: RekonsiliasiKas[] = [
   {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas, PejabatPenandatangan } from '../types';
+import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, Pengecualian, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas, PejabatPenandatangan } from '../types';
 import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getTahunBukuList, getCurrentWIBDateTimeString, getSchoolSortKey, getMergedIuranReceipt } from '../utils/formatters';
 import { exportToExcel, exportToPDF, exportRiwayatHapusToExcel, exportRiwayatHapusToPDF } from '../services/exportUtils';
 import { StorageService } from '../services/spreadsheetSync';
@@ -37,7 +37,8 @@ import {
   Landmark,
   ArrowRight,
   ShieldAlert,
-  ArrowUpDown
+  ArrowUpDown,
+  Percent
 } from 'lucide-react';
 
 interface LaporanKeuanganProps {
@@ -46,6 +47,7 @@ interface LaporanKeuanganProps {
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
   pemasukanLainList?: PemasukanLain[];
+  pengecualianList?: Pengecualian[];
   riwayatHapusList?: RiwayatHapus[];
   rekonsiliasiKasList?: RekonsiliasiKas[];
   userSchoolName?: string;
@@ -64,6 +66,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   iuranList,
   pengeluaranList,
   pemasukanLainList = [],
+  pengecualianList = [],
   riwayatHapusList = [],
   rekonsiliasiKasList,
   userSchoolName,
@@ -78,7 +81,7 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const currentYear = new Date().getFullYear();
   const availableYears = getTahunBukuList(iuranList.map((i) => i.tahun));
   const [selectedYear, setSelectedYear] = useState<number>(() => Math.max(2026, currentYear));
-  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'rekap' | 'audit' | 'riwayat-hapus'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'kas-masuk' | 'pemasukan-lain' | 'kas-keluar' | 'pengecualian' | 'rekap' | 'audit' | 'riwayat-hapus'>('matrix');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [matrixViewMode, setMatrixViewMode] = useState<'cards' | 'table'>('cards');
   const [matrixSortOrder, setMatrixSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -110,13 +113,15 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   const iuranYear = iuranList.filter(i => i.tahun === selectedYear);
   const pengeluaranYear = pengeluaranList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
   const pemasukanLainYear = pemasukanLainList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
+  const pengecualianYear = (pengecualianList || []).filter(p => p.tahun === selectedYear);
 
   // Total Kas
   const totalIuranMasuk = iuranYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const totalPemasukanLain = pemasukanLainYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const totalKasMasuk = totalIuranMasuk + totalPemasukanLain;
   const totalKasKeluar = pengeluaranYear.reduce((acc, curr) => acc + curr.nominal, 0);
-  const saldoBersih = totalKasMasuk - totalKasKeluar;
+  const totalPengecualian = pengecualianYear.reduce((acc, curr) => acc + curr.nominalPotongan, 0);
+  const saldoBersih = totalKasMasuk - totalKasKeluar - totalPengecualian;
 
   // Active year audit records (Real vs Data) - Menjaga histori audit lengkap tanpa menimpa data tanggal sebelumnya
   const effectiveAuditList = rekonsiliasiKasList && rekonsiliasiKasList.length > 0 ? rekonsiliasiKasList : localRekonsiliasiList;
@@ -161,12 +166,12 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
   // Export handlers
   const handleExportExcel = () => {
     if (isRoleSekolah) return;
-    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList, riwayatHapusList, auditTahunThis);
+    exportToExcel(selectedYear, sekolahList, iuranList, pengeluaranList, pemasukanLainList, riwayatHapusList, auditTahunThis, pengecualianList);
   };
 
   const handleExportPDF = () => {
     if (isRoleSekolah) return;
-    exportToPDF(selectedYear, sekolahList, iuranList, pengeluaranList, currentUser, pemasukanLainList, auditTahunThis);
+    exportToPDF(selectedYear, sekolahList, iuranList, pengeluaranList, currentUser, pemasukanLainList, auditTahunThis, pengecualianList);
   };
 
   const handlePrintReport = () => {
@@ -564,6 +569,24 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
           >
             <TrendingDown className="w-3.5 h-3.5" />
             <span>Kas Keluar</span>
+          </button>
+
+          <button
+            id="tab-laporan-pengecualian"
+            onClick={() => setActiveTab('pengecualian')}
+            className={`px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 shrink-0 ${
+              activeTab === 'pengecualian'
+                ? 'bg-teal-800 text-white shadow-md'
+                : 'text-slate-600 bg-slate-50 hover:bg-slate-100'
+            }`}
+          >
+            <Percent className="w-3.5 h-3.5" />
+            <span>Pengecualian</span>
+            {pengecualianYear.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeTab === 'pengecualian' ? 'bg-teal-950 text-teal-100' : 'bg-teal-100 text-teal-800'}`}>
+                {pengecualianYear.length}
+              </span>
+            )}
           </button>
 
           {!isRoleSekolah && (
@@ -1535,6 +1558,103 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
         </div>
       )}
 
+      {/* TAB: PENGECUALIAN / DISKON KEBIJAKAN MANAJEMEN */}
+      {activeTab === 'pengecualian' && (
+        <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-teal-100 text-teal-800 rounded-lg">
+                  <Percent className="w-4 h-4" />
+                </div>
+                <h3 className="font-extrabold text-slate-800 text-sm sm:text-base">
+                  Daftar Pengecualian & Potongan Kebijakan Manajemen ({selectedYear})
+                </h3>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                Pemotongan resmi untuk Panitia Kegiatan MKKS, Pengurus, dan sekolah berkendala yang menjadi pengurang saldo akhir buku kas.
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[11px] text-slate-400 font-semibold block">Total Potongan Tahun {selectedYear}:</span>
+              <span className="text-base sm:text-lg font-black text-teal-800">{formatRupiah(totalPengecualian)}</span>
+            </div>
+          </div>
+
+          {pengecualianYear.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs">
+              <Percent className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              Tidak ada catatan pengecualian kebijakan manajemen untuk tahun buku {selectedYear}.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-teal-900 text-white font-bold text-[11px]">
+                    <th className="py-2.5 px-3 rounded-tl-xl w-12 text-center">No</th>
+                    <th className="py-2.5 px-3">Nama Sekolah</th>
+                    <th className="py-2.5 px-3 text-center">Diskon</th>
+                    <th className="py-2.5 px-3">Durasi & Bulan Tercover</th>
+                    <th className="py-2.5 px-3">Alasan Kebijakan & SK</th>
+                    <th className="py-2.5 px-3 text-right">Potongan (Rp)</th>
+                    <th className="py-2.5 px-3 rounded-tr-xl">Petugas & Tgl</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pengecualianYear.map((item, idx) => (
+                    <tr key={item.id} className="hover:bg-teal-50/50 transition-colors">
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-extrabold text-slate-900">{item.namaSekolah}</div>
+                        <div className="text-[10px] text-slate-500">
+                          {sekolahList.find(s => s.idSekolah === item.idSekolah)?.namaKepsek || ''}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] ${
+                          item.diskonPersen === 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-teal-100 text-teal-800'
+                        }`}>
+                          {item.diskonPersen}%
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-bold text-slate-800">{item.jumlahBulan} Bulan</div>
+                        <div className="text-[10px] text-slate-500 line-clamp-1">
+                          {Array.isArray(item.bulanList) ? item.bulanList.map(b => b.substring(0, 3)).join(', ') : '-'}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-bold text-slate-800">{item.alasan}</div>
+                        {item.noReferensi && (
+                          <div className="text-[10px] text-teal-700 font-semibold">{item.noReferensi}</div>
+                        )}
+                        {item.keterangan && (
+                          <div className="text-[10px] text-slate-500 italic truncate max-w-xs">{item.keterangan}</div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="font-extrabold text-emerald-700">{formatRupiah(item.nominalPotongan)}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-[10px] text-slate-500">
+                        <div>{item.diinputOleh}</div>
+                        <div className="text-slate-400">{formatDateIndonesian(item.tanggalInput)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-slate-900 text-white font-bold text-xs">
+                    <td colSpan={5} className="py-3 px-4 text-right rounded-bl-xl">TOTAL POTONGAN PENGECUALIAN ({selectedYear}):</td>
+                    <td className="py-3 px-3 text-right text-emerald-400 font-black text-sm">{formatRupiah(totalPengecualian)}</td>
+                    <td className="rounded-br-xl"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* TAB 5: REKAP BULANAN & SALDO BERSIH (DITUTUP UNTUK ROLE SEKOLAH) */}
       {activeTab === 'rekap' && !isRoleSekolah && (
         <div className="bg-white rounded-2xl p-3.5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
@@ -1666,16 +1786,43 @@ export const LaporanKeuangan: React.FC<LaporanKeuanganProps> = ({
                 })}
               </tbody>
               <tfoot>
-                <tr className="bg-slate-900 text-white font-bold text-xs">
-                  <td className="py-3 px-3 rounded-bl-xl">TOTAL AKUMULASI:</td>
-                  <td className="py-3 px-3 text-right text-slate-300 font-bold">{formatRupiah(totalIuranMasuk)}</td>
-                  <td className="py-3 px-3 text-right text-teal-300 font-bold">{formatRupiah(totalPemasukanLain)}</td>
-                  <td className="py-3 px-3 text-right text-emerald-400 font-black">{formatRupiah(totalKasMasuk)}</td>
-                  <td className="py-3 px-3 text-right text-rose-400 font-black">{formatRupiah(totalKasKeluar)}</td>
-                  <td className={`py-3 px-3 text-right text-sm font-black ${saldoBersih >= 0 ? 'text-teal-300' : 'text-rose-300'}`}>
+                <tr className="bg-slate-900 text-white font-bold text-xs border-b border-slate-800">
+                  <td className="py-2.5 px-3">TOTAL MASUK & KELUAR:</td>
+                  <td className="py-2.5 px-3 text-right text-slate-300 font-bold">{formatRupiah(totalIuranMasuk)}</td>
+                  <td className="py-2.5 px-3 text-right text-teal-300 font-bold">{formatRupiah(totalPemasukanLain)}</td>
+                  <td className="py-2.5 px-3 text-right text-emerald-400 font-black">{formatRupiah(totalKasMasuk)}</td>
+                  <td className="py-2.5 px-3 text-right text-rose-400 font-black">{formatRupiah(totalKasKeluar)}</td>
+                  <td className="py-2.5 px-3 text-right text-xs font-black text-slate-300">
+                    {formatRupiah(totalKasMasuk - totalKasKeluar)}
+                  </td>
+                  <td className="rounded-tr-xl"></td>
+                </tr>
+                {totalPengecualian > 0 && (
+                  <tr className="bg-teal-950 text-teal-200 font-bold text-xs border-b border-teal-900/60">
+                    <td colSpan={4} className="py-2.5 px-3">
+                      <span className="flex items-center space-x-1.5">
+                        <Percent className="w-3.5 h-3.5 text-teal-400" />
+                        <span>PENGECUALIAN / POTONGAN KEBIJAKAN MANAJEMEN ({pengecualianYear.length} SK):</span>
+                      </span>
+                    </td>
+                    <td colSpan={2} className="py-2.5 px-3 text-right text-emerald-300 font-black">
+                      -{formatRupiah(totalPengecualian)}
+                    </td>
+                    <td></td>
+                  </tr>
+                )}
+                <tr className="bg-slate-950 text-white font-extrabold text-xs">
+                  <td colSpan={4} className="py-3 px-3 rounded-bl-xl text-teal-300">
+                    SALDO AKHIR BERSIH BUKU KAS (SETELAH PENGECUALIAN):
+                  </td>
+                  <td colSpan={2} className={`py-3 px-3 text-right text-sm font-black ${saldoBersih >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {formatRupiah(saldoBersih)}
                   </td>
-                  <td className="rounded-br-xl"></td>
+                  <td className="rounded-br-xl text-center">
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-black ${saldoBersih >= 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400'}`}>
+                      {saldoBersih >= 0 ? 'SURPLUS' : 'DEFISIT'}
+                    </span>
+                  </td>
                 </tr>
               </tfoot>
             </table>

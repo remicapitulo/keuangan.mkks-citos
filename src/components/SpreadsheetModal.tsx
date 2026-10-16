@@ -101,7 +101,7 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
               <div className="font-bold text-slate-800 flex items-center justify-between">
                 <span>Database Terhubung: Google Spreadsheet</span>
                 <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                  Multi-Sheet Aktif (8 Sheet)
+                  Multi-Sheet Aktif (9 Sheet Termasuk Pengecualian)
                 </span>
               </div>
               <p className="text-slate-500 leading-relaxed text-[11px]">
@@ -190,11 +190,14 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
             <div className="border border-slate-200 rounded-xl p-3.5 space-y-3 bg-slate-50/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-slate-800 text-xs">
-                    Kode Google Apps Script (Versi 8 Sheet Termasuk Setting)
+                  <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <span>Kode Google Apps Script (Versi 9 Sheet Lengkap)</span>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      Termasuk Pengecualian
+                    </span>
                   </h4>
                   <p className="text-[11px] text-slate-500">
-                    Mendukung sheet: Sekolah, User, Iuran, Pengeluaran, Pemasukan_Lain, Riwayat_Hapus, Rekonsiliasi_Kas, Setting.
+                    Mendukung 9 Sheet: Sekolah, User, Iuran, Pengeluaran, Pemasukan_Lain, Pengecualian, Riwayat_Hapus, Rekonsiliasi_Kas, Setting.
                   </p>
                 </div>
                 <button
@@ -207,7 +210,7 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
                   }`}
                 >
                   {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedCode ? 'Tersalin!' : 'Salin Kode'}</span>
+                  <span>{copiedCode ? 'Tersalin!' : 'Salin Kode Apps Script'}</span>
                 </button>
               </div>
 
@@ -218,18 +221,30 @@ export const SpreadsheetModal: React.FC<SpreadsheetModalProps> = ({
                 </pre>
               </div>
 
-              {/* 4 Step Instructions */}
-              <div className="text-[11px] text-slate-600 space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
+              {/* FAQ & Steps */}
+              <div className="text-[11px] text-slate-600 space-y-2 bg-white p-3 rounded-lg border border-slate-200">
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-[11px] space-y-1">
+                  <div className="font-bold flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Mengapa inputan Anda belum langsung terlihat di Google Sheets?</span>
+                  </div>
+                  <p className="text-blue-800 leading-relaxed">
+                    1. Data Anda <strong>aman tersimpan</strong> di penyimpanan lokal browser.
+                    <br />
+                    2. Untuk sheet baru <strong>"Pengecualian"</strong>, Apps Script lama di Google Sheet belum memiliki fungsi penerima data pengecualian.
+                    <br />
+                    3. <strong>Solusi:</strong> Salin kode versi 9 sheet di atas, paste ke <code>Code.gs</code> di Apps Script, lalu lakukan <strong>Deploy Ulang (New version)</strong> dengan panduan di bawah.
+                  </p>
+                </div>
+
                 <p className="font-bold text-slate-800">Langkah Memasang / Update di Google Sheets:</p>
                 <ol className="list-decimal pl-4 space-y-1 text-slate-600">
-                  <li>Buka spreadsheet Anda di browser, klik menu <strong>Ekstensi</strong> &gt; <strong>Apps Script</strong>.</li>
-                  <li>Hapus semua kode lama di <code>Code.gs</code>, lalu paste kode yang telah Anda salin di atas.</li>
+                  <li>Buka Google Spreadsheet Anda, klik menu <strong>Ekstensi</strong> &gt; <strong>Apps Script</strong>.</li>
+                  <li>Hapus seluruh isi kode lama di <code>Code.gs</code>, lalu paste seluruh kode yang disalin di atas.</li>
                   <li>Klik tombol <strong>Simpan (Ctrl+S)</strong>.</li>
                   <li>Klik tombol biru <strong>Deploy</strong> (kanan atas) &gt; <strong>Manage deployments</strong> &gt; Edit (ikon pensil) &gt; Pada Version pilih <strong>New version</strong> &gt; Pastikan <em>Who has access</em> = <strong>Anyone</strong> &gt; Klik <strong>Deploy</strong>.</li>
+                  <li>Salin URL Web App yang baru (atau gunakan yang sudah ada jika ID deployment sama) dan simpan di form atas.</li>
                 </ol>
-                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[10px] leading-relaxed">
-                  <strong>Penting untuk Sheet "Setting" &amp; Nomor Rekening:</strong> Jika sheet <em>Setting</em> masih kosong di Google Spreadsheet, hal itu karena Apps Script Anda masih menjalankan versi lama. Setelah deploy <strong>New version</strong>, klik tombol hijau <strong>"Simpan &amp; Tes Koneksi"</strong> di bawah, maka sheet Setting dan nomor rekening akan otomatis terisi dan diformat rapi!
-                </div>
               </div>
             </div>
 

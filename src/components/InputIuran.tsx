@@ -17,8 +17,15 @@ const PAKET_LIST: PaketDurasi[] = [
   { label: '1 Bulan (Rp 100.000)', bulanCount: 1, nominal: 100000 },
   { label: '2 Bulan (Rp 200.000)', bulanCount: 2, nominal: 200000 },
   { label: '3 Bulan (Rp 300.000)', bulanCount: 3, nominal: 300000 },
+  { label: '4 Bulan (Rp 400.000)', bulanCount: 4, nominal: 400000 },
+  { label: '5 Bulan (Rp 500.000)', bulanCount: 5, nominal: 500000 },
   { label: '6 Bulan / 1 Semester (Rp 600.000)', bulanCount: 6, nominal: 600000 },
-  { label: '1 Tahun / 12 Bulan (Rp 1.200.000)', bulanCount: 12, nominal: 1200000 },
+  { label: '7 Bulan (Rp 700.000)', bulanCount: 7, nominal: 700000 },
+  { label: '8 Bulan (Rp 800.000)', bulanCount: 8, nominal: 800000 },
+  { label: '9 Bulan (Rp 900.000)', bulanCount: 9, nominal: 900000 },
+  { label: '10 Bulan (Rp 1.000.000)', bulanCount: 10, nominal: 1000000 },
+  { label: '11 Bulan (Rp 1.100.000)', bulanCount: 11, nominal: 1100000 },
+  { label: '12 Bulan / 1 Tahun (Rp 1.200.000)', bulanCount: 12, nominal: 1200000 },
 ];
 
 export const InputIuran: React.FC<InputIuranProps> = ({
@@ -111,6 +118,16 @@ export const InputIuran: React.FC<InputIuranProps> = ({
       setSelectedMonths(prev => [...prev, bulan]);
     }
   };
+
+  // Keep selectedPaketIndex in sync when manual months are toggled
+  useEffect(() => {
+    if (selectedMonths.length > 0) {
+      const matchIdx = PAKET_LIST.findIndex(p => p.bulanCount === selectedMonths.length);
+      if (matchIdx !== -1) {
+        setSelectedPaketIndex(matchIdx);
+      }
+    }
+  }, [selectedMonths.length]);
 
   // Submit Handler
   const handleSubmitPembukuan = (e: React.FormEvent) => {

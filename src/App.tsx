@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, RekonsiliasiKas } from './types';
+import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, RekonsiliasiKas, Pengecualian } from './types';
 import { StorageService } from './services/spreadsheetSync';
 import { Navbar } from './components/Navbar';
 import { Navigation, ActiveTab } from './components/Sidebar';
@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { InputIuran } from './components/InputIuran';
 import { InputPemasukanLain } from './components/InputPemasukanLain';
 import { KelolaPengeluaran } from './components/KelolaPengeluaran';
+import { MenuPengecualian } from './components/Pengecualian';
 import { LaporanKeuangan } from './components/LaporanKeuangan';
 import { PenagihanIuran } from './components/PenagihanIuran';
 import { StrukModal } from './components/StrukModal';
@@ -29,6 +30,7 @@ export default function App() {
   const [iuranList, setIuranList] = useState<Iuran[]>(() => StorageService.getIuran());
   const [pengeluaranList, setPengeluaranList] = useState<Pengeluaran[]>(() => StorageService.getPengeluaran());
   const [pemasukanLainList, setPemasukanLainList] = useState<PemasukanLain[]>(() => StorageService.getPemasukanLain());
+  const [pengecualianList, setPengecualianList] = useState<Pengecualian[]>(() => StorageService.getPengecualian());
   const [riwayatHapusList, setRiwayatHapusList] = useState<RiwayatHapus[]>(() => StorageService.getRiwayatHapus());
   const [rekonsiliasiKasList, setRekonsiliasiKasList] = useState<RekonsiliasiKas[]>(() => StorageService.getRekonsiliasiKas());
   const [spreadsheetId, setSpreadsheetId] = useState<string>(() => StorageService.getSpreadsheetId());
@@ -64,6 +66,7 @@ export default function App() {
     setIuranList(StorageService.getIuran());
     setPengeluaranList(StorageService.getPengeluaran());
     setPemasukanLainList(StorageService.getPemasukanLain());
+    setPengecualianList(StorageService.getPengecualian());
     setRiwayatHapusList(StorageService.getRiwayatHapus());
     setRekonsiliasiKasList(StorageService.getRekonsiliasiKas());
 
@@ -74,6 +77,7 @@ export default function App() {
         setIuranList(StorageService.getIuran());
         setPengeluaranList(StorageService.getPengeluaran());
         setPemasukanLainList(StorageService.getPemasukanLain());
+        setPengecualianList(StorageService.getPengecualian());
         setRiwayatHapusList(StorageService.getRiwayatHapus());
         setRekonsiliasiKasList(StorageService.getRekonsiliasiKas());
       }
@@ -314,7 +318,7 @@ export default function App() {
     showToast(`Login sebagai ${user.sekolah} (${user.role})`);
 
     // Reset tab if user is Sekolah role and on Bendahara-only tab
-    if (user.role === 'Sekolah' && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan')) {
+    if (user.role === 'Sekolah' && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan' || activeTab === 'pengecualian')) {
       setActiveTab('dashboard');
     }
   };
@@ -342,10 +346,64 @@ export default function App() {
     setIuranList(StorageService.getIuran());
     setPengeluaranList(StorageService.getPengeluaran());
     setPemasukanLainList(StorageService.getPemasukanLain());
+    setPengecualianList(StorageService.getPengecualian());
     setRiwayatHapusList(StorageService.getRiwayatHapus());
     setRekonsiliasiKasList(StorageService.getRekonsiliasiKas());
     setCurrentUser(StorageService.getCurrentUser());
     showToast('Data aplikasi di-reset ke data default awal.');
+  };
+
+  // Pengecualian & Potongan Kebijakan Manajemen Handlers
+  const handleSavePengecualian = async (newItem: Omit<Pengecualian, 'id'>) => {
+    if (isKetua) {
+      showToast('Aksi Input ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
+    const newRecord: Pengecualian = {
+      ...newItem,
+      id: `PENG-${newItem.tahun}-${Date.now().toString(36).toUpperCase()}`
+    };
+    const updated = StorageService.addPengecualian(newRecord);
+    setPengecualianList(updated);
+    
+    const syncRes = await StorageService.syncToAppsScript();
+    if (syncRes.status === 'connected') {
+      showToast(`Pengecualian ${newItem.diskonPersen}% untuk ${newItem.namaSekolah} berhasil disimpan & disinkronkan ke Google Sheets!`);
+    } else {
+      showToast(`Pengecualian ${newItem.diskonPersen}% tersimpan lokal di browser. Hubungkan Google Apps Script untuk sinkronisasi otomatis.`);
+    }
+  };
+
+  const handleUpdatePengecualian = async (updatedItem: Pengecualian) => {
+    if (isKetua) {
+      showToast('Aksi Edit ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
+    const updated = StorageService.addPengecualian(updatedItem);
+    setPengecualianList(updated);
+    
+    const syncRes = await StorageService.syncToAppsScript();
+    if (syncRes.status === 'connected') {
+      showToast(`Data pengecualian ${updatedItem.namaSekolah} diperbarui & disinkronkan ke Google Sheets!`);
+    } else {
+      showToast(`Data pengecualian diperbarui di lokal browser.`);
+    }
+  };
+
+  const handleDeletePengecualian = async (id: string) => {
+    if (isKetua) {
+      showToast('Aksi Hapus ditutup: Role Ketua hanya memiliki hak akses Lihat (View Only).');
+      return;
+    }
+    const updated = StorageService.deletePengecualian(id);
+    setPengecualianList(updated);
+    
+    const syncRes = await StorageService.syncToAppsScript();
+    if (syncRes.status === 'connected') {
+      showToast('Data pengecualian berhasil dihapus & disinkronkan ke Google Sheets.');
+    } else {
+      showToast('Data pengecualian berhasil dihapus dari browser lokal.');
+    }
   };
 
   // Save Audit Rekonsiliasi Kas
@@ -447,6 +505,7 @@ export default function App() {
                   iuranList={iuranList}
                   pengeluaranList={pengeluaranList}
                   pemasukanLainList={pemasukanLainList}
+                  pengecualianList={pengecualianList}
                   onNavigateToTab={(tab) => setActiveTab(tab)}
                   onSelectSchoolForIuran={(namaSekolah) => setSelectedSchoolForIuran(namaSekolah)}
                   onOpenStrukModal={handleOpenStrukModal}
@@ -484,6 +543,18 @@ export default function App() {
                 />
               )}
 
+              {activeTab === 'pengecualian' && (canAccessBendaharaMenu || isKetua) && (
+                <MenuPengecualian
+                  sekolahList={sekolahList}
+                  pengecualianList={pengecualianList}
+                  onSavePengecualian={handleSavePengecualian}
+                  onUpdatePengecualian={handleUpdatePengecualian}
+                  onDeletePengecualian={handleDeletePengecualian}
+                  currentUser={currentUser}
+                  readOnly={isKetua}
+                />
+              )}
+
               {activeTab === 'penagihan' && canAccessBendaharaMenu && (
                 <PenagihanIuran
                   sekolahList={sekolahList}
@@ -506,6 +577,7 @@ export default function App() {
                   iuranList={iuranList}
                   pengeluaranList={pengeluaranList}
                   pemasukanLainList={pemasukanLainList}
+                  pengecualianList={pengecualianList}
                   riwayatHapusList={riwayatHapusList}
                   rekonsiliasiKasList={rekonsiliasiKasList}
                   onSaveRekonsiliasiKas={handleSaveRekonsiliasiKas}
@@ -525,12 +597,12 @@ export default function App() {
               )}
 
               {/* Access denied fallback if user attempts closed route */}
-              {!canAccessBendaharaMenu && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan') && (
+              {!canAccessBendaharaMenu && !isKetua && (activeTab === 'input-iuran' || activeTab === 'pemasukan-lain' || activeTab === 'kelola-pengeluaran' || activeTab === 'penagihan' || activeTab === 'pengecualian') && (
                 <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto my-12 space-y-3">
                   <ShieldAlert className="w-12 h-12 text-amber-500 mx-auto" />
-                  <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Admin & Bendahara)</h3>
+                  <h3 className="text-lg font-bold text-slate-800">Akses Terbatas (Khusus Pengurus & Bendahara)</h3>
                   <p className="text-xs text-slate-500">
-                    Menu Input Iuran, Pemasukan Lain, Kelola Pengeluaran, dan Penagihan ditutup untuk akun {isKetua ? 'Ketua' : 'Sekolah'}. Silakan gunakan menu Dashboard atau Laporan Keuangan.
+                    Menu ini ditutup untuk akun Sekolah. Silakan gunakan menu Dashboard atau Laporan Keuangan.
                   </p>
                   <button
                     onClick={() => setActiveTab('dashboard')}

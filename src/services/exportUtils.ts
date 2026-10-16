@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas } from '../types';
+import { Sekolah, Iuran, Pengeluaran, PemasukanLain, RiwayatHapus, Pengecualian, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN, User, RekonsiliasiKas } from '../types';
 import { formatRupiah, formatDateIndonesian, formatDateTimeIndonesian, resolveNamaBendahara, getSchoolSortKey } from '../utils/formatters';
 import { StorageService } from './spreadsheetSync';
 
@@ -12,7 +12,8 @@ export function exportToExcel(
   pengeluaranList: Pengeluaran[],
   pemasukanLainList: PemasukanLain[] = [],
   riwayatHapusList: RiwayatHapus[] = [],
-  rekonsiliasiKas?: RekonsiliasiKas
+  rekonsiliasiKas?: RekonsiliasiKas,
+  pengecualianList: Pengecualian[] = []
 ) {
   const wb = XLSX.utils.book_new();
 
@@ -180,11 +181,25 @@ export function exportToExcel(
     };
   });
 
+  const pengecualianTahunThis = (pengecualianList || []).filter(p => p.tahun === tahun);
+  const totalPengecualian = pengecualianTahunThis.reduce((acc, curr) => acc + curr.nominalPotongan, 0);
   const totalMasukSemua = totalIuranMasuk + totalPemasukanLain;
-  const saldoAkhir = totalMasukSemua - totalKasKeluar;
+  const saldoAkhir = totalMasukSemua - totalKasKeluar - totalPengecualian;
+
+  if (totalPengecualian > 0) {
+    rekapData.push({
+      'Bulan': 'POTONGAN KEBIJAKAN MANAJEMEN (PENGECUALIAN)',
+      'Iuran (Rp)': '',
+      'Pemasukan Lain (Rp)': '',
+      'Total Masuk (Rp)': '',
+      'Pengeluaran (Rp)': totalPengecualian,
+      'Saldo Bersih (Rp)': -totalPengecualian,
+      'Status': 'PENGURANGAN'
+    } as any);
+  }
 
   rekapData.push({
-    'Bulan': 'TOTAL TAHUNAN',
+    'Bulan': 'TOTAL SALDO BERSIH AKHIR',
     'Iuran (Rp)': totalIuranMasuk,
     'Pemasukan Lain (Rp)': totalPemasukanLain,
     'Total Masuk (Rp)': totalMasukSemua,
@@ -195,6 +210,40 @@ export function exportToExcel(
 
   const wsRekap = XLSX.utils.json_to_sheet(rekapData);
   XLSX.utils.book_append_sheet(wb, wsRekap, `Rekap Arus Kas ${tahun}`);
+
+  // Sheet Pengecualian & Potongan Kebijakan
+  if (pengecualianTahunThis.length > 0) {
+    const pengecualianData = pengecualianTahunThis.map((p, idx) => ({
+      'No': idx + 1,
+      'Nama Sekolah': p.namaSekolah,
+      'Diskon (%)': `${p.diskonPersen}%`,
+      'Pilihan Bulan': Array.isArray(p.bulanList) ? p.bulanList.join(', ') : '-',
+      'Jumlah Bulan': p.jumlahBulan,
+      'Tarif Per Bulan (Rp)': p.nominalTarifPerBulan,
+      'Potongan Kebijakan (Rp)': p.nominalPotongan,
+      'Alasan Kebijakan': p.alasan,
+      'Keterangan Tambahan': p.keterangan || '-',
+      'No. Referensi / SK': p.noReferensi || '-',
+      'Tanggal Input': formatDateIndonesian(p.tanggalInput),
+      'Diinput Oleh': p.diinputOleh
+    }));
+    pengecualianData.push({
+      'No': '',
+      'Nama Sekolah': 'TOTAL POTONGAN KEBIJAKAN',
+      'Diskon (%)': '',
+      'Pilihan Bulan': '',
+      'Jumlah Bulan': '',
+      'Tarif Per Bulan (Rp)': '',
+      'Potongan Kebijakan (Rp)': totalPengecualian,
+      'Alasan Kebijakan': '',
+      'Keterangan Tambahan': '',
+      'No. Referensi / SK': '',
+      'Tanggal Input': '',
+      'Diinput Oleh': ''
+    } as any);
+    const wsPengecualian = XLSX.utils.json_to_sheet(pengecualianData);
+    XLSX.utils.book_append_sheet(wb, wsPengecualian, `Pengecualian ${tahun}`);
+  }
 
   // 6. Sheet Riwayat Penghapusan Data (Audit Log)
   if (riwayatHapusList && riwayatHapusList.length > 0) {
@@ -246,7 +295,8 @@ export function exportToPDF(
   pengeluaranList: Pengeluaran[],
   currentUser?: User | null,
   pemasukanLainList: PemasukanLain[] = [],
-  rekonsiliasiKas?: RekonsiliasiKas
+  rekonsiliasiKas?: RekonsiliasiKas,
+  pengecualianList: Pengecualian[] = []
 ) {
   const doc = new jsPDF('landscape', 'mm', 'a4');
 
@@ -280,7 +330,8 @@ export function exportToPDF(
   const totalPemasukanLain = pemasukanLainTahunThis.reduce((acc, curr) => acc + curr.nominal, 0);
   const totalKasMasuk = totalIuranMasuk + totalPemasukanLain;
   const totalKasKeluar = pengeluaranTahunThis.reduce((acc, curr) => acc + curr.nominal, 0);
-  const saldoBersih = totalKasMasuk - totalKasKeluar;
+  const totalPengecualian = (pengecualianList || []).filter(p => p.tahun === tahun).reduce((acc, curr) => acc + curr.nominalPotongan, 0);
+  const saldoBersih = totalKasMasuk - totalKasKeluar - totalPengecualian;
 
   // Header Laporan
   doc.setFont('helvetica', 'bold');

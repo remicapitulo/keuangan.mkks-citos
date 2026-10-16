@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN } from '../types';
+import { User, Sekolah, Iuran, Pengeluaran, PemasukanLain, Pengecualian, BULAN_LIST, BULAN_SINGKAT, IURAN_PER_BULAN } from '../types';
 import { formatRupiah, formatDateIndonesian, formatNumber, resolveNamaBendahara, getTahunBukuList, getSchoolSortKey, getMergedIuranReceipt } from '../utils/formatters';
 import { 
   TrendingUp, 
@@ -18,7 +18,8 @@ import {
   Printer,
   FileCheck,
   HandCoins,
-  Send
+  Send,
+  Percent
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -28,7 +29,8 @@ interface DashboardProps {
   iuranList: Iuran[];
   pengeluaranList: Pengeluaran[];
   pemasukanLainList?: PemasukanLain[];
-  onNavigateToTab: (tab: 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan' | 'penagihan') => void;
+  pengecualianList?: Pengecualian[];
+  onNavigateToTab: (tab: 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'pengecualian' | 'laporan-keuangan' | 'penagihan') => void;
   onSelectSchoolForIuran?: (namaSekolah: string) => void;
   onOpenStrukModal?: (kuitansiData: any) => void;
 }
@@ -40,6 +42,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   iuranList,
   pengeluaranList,
   pemasukanLainList = [],
+  pengecualianList = [],
   onNavigateToTab,
   onSelectSchoolForIuran,
   onOpenStrukModal
@@ -52,13 +55,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const iuranYear = iuranList.filter(i => i.tahun === selectedYear);
   const pengeluaranYear = pengeluaranList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
   const pemasukanLainYear = pemasukanLainList.filter(p => p.tanggal.startsWith(`${selectedYear}`));
+  const pengecualianYear = pengecualianList.filter(p => p.tahun === selectedYear);
 
   // Calculations
   const totalIuranMasuk = iuranYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const totalPemasukanLain = pemasukanLainYear.reduce((acc, curr) => acc + curr.nominal, 0);
   const totalKasMasuk = totalIuranMasuk + totalPemasukanLain;
   const totalKasKeluar = pengeluaranYear.reduce((acc, curr) => acc + curr.nominal, 0);
-  const totalKasBersih = totalKasMasuk - totalKasKeluar;
+  const totalPengecualian = pengecualianYear.reduce((acc, curr) => acc + curr.nominalPotongan, 0);
+  const totalKasBersih = totalKasMasuk - totalKasKeluar - totalPengecualian;
 
   // Target total expected iuran per year = 10 Sekolah * 12 Bulan * Rp 100.000 = Rp 12.000.000
   const totalExpectedIuran = sekolahList.length * 12 * IURAN_PER_BULAN; // Rp 12,000,000
@@ -328,12 +333,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="text-2xl sm:text-3xl lg:text-3xl font-black text-slate-900 tracking-tight">
               {formatRupiah(totalKasBersih)}
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 flex items-center font-medium">
-              <span>Akumulasi saldo hingga {selectedYear}</span>
+            <p className="text-xs text-slate-500 mt-1 flex items-center font-medium">
+              <span>Saldo akhir pembukuan tahun {selectedYear}</span>
             </p>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm text-slate-600 font-semibold">
-            <span>Total Masuk: {formatRupiah(totalKasMasuk)}</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600 font-semibold">
+            <div className="flex items-center justify-between">
+              <span>Total Masuk:</span>
+              <span className="text-emerald-700 font-bold">{formatRupiah(totalKasMasuk)}</span>
+            </div>
+            {totalPengecualian > 0 && (
+              <div 
+                onClick={() => onNavigateToTab('pengecualian')}
+                className="flex items-center justify-between text-teal-800 bg-teal-50 px-2 py-0.5 rounded-lg text-[11px] font-bold cursor-pointer hover:bg-teal-100 transition-colors"
+                title="Buka Menu Pengecualian"
+              >
+                <span className="flex items-center space-x-1">
+                  <Percent className="w-3 h-3 text-teal-600" />
+                  <span>Potongan Kebijakan:</span>
+                </span>
+                <span className="text-teal-900 font-extrabold">-{formatRupiah(totalPengecualian)}</span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -155,3 +155,32 @@ export interface AppSettings {
   kontakBendahara?: string;
   updatedAt?: string;
 }
+
+export interface Pengecualian {
+  id: string;
+  tahun: number;
+  idSekolah: string;
+  namaSekolah: string;
+  diskonPersen: number; // 0, 5, 10, ..., 100 (kelipatan 5)
+  bulanList: string[];  // e.g. ["Januari", "Februari"]
+  jumlahBulan: number;  // bulanList.length
+  nominalTarifPerBulan: number; // default IURAN_PER_BULAN (Rp 100.000)
+  nominalPotongan: number; // jumlahBulan * nominalTarifPerBulan * (diskonPersen / 100)
+  alasan: string; // e.g. "Panitia Kegiatan", "Pengurus MKKS", "Kendala Keuangan", dll.
+  keterangan?: string;
+  tanggalInput: string; // YYYY-MM-DD
+  diinputOleh: string;
+  noReferensi?: string;
+}
+
+export const DISKON_OPTIONS = [
+  0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
+  55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+] as const;
+
+export const KATEGORI_ALASAN_PENGECUALIAN = [
+  'Panitia Kegiatan MKKS',
+  'Pengurus MKKS',
+  'Kendala Keuangan Sekolah',
+  'Kebijakan Khusus Manajemen'
+] as const;

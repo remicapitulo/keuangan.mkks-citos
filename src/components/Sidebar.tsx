@@ -13,10 +13,11 @@ import {
   Smartphone,
   Check,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Percent
 } from 'lucide-react';
 
-export type ActiveTab = 'dashboard' | 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'laporan-keuangan' | 'penagihan' | 'install-app';
+export type ActiveTab = 'dashboard' | 'input-iuran' | 'pemasukan-lain' | 'kelola-pengeluaran' | 'pengecualian' | 'laporan-keuangan' | 'penagihan' | 'install-app';
 
 interface NavigationProps {
   role: UserRole;
@@ -93,6 +94,13 @@ export const Navigation: React.FC<NavigationProps> = ({
       desc: 'Pencatatan kas operasional'
     },
     {
+      id: 'pengecualian',
+      label: 'Pengecualian',
+      shortLabel: 'Pengecualian',
+      icon: <Percent className="w-4 h-4" />,
+      desc: 'Diskon kebijakan panitia & kendala'
+    },
+    {
       id: 'laporan-keuangan',
       label: 'Laporan Keuangan',
       shortLabel: 'Laporan',
@@ -125,6 +133,13 @@ export const Navigation: React.FC<NavigationProps> = ({
       shortLabel: 'Dashboard',
       icon: <LayoutDashboard className="w-4 h-4" />,
       desc: 'Ringkasan pengawasan umum'
+    },
+    {
+      id: 'pengecualian',
+      label: 'Pengecualian',
+      shortLabel: 'Pengecualian',
+      icon: <Percent className="w-4 h-4" />,
+      desc: 'Daftar kebijakan diskon panitia'
     },
     {
       id: 'laporan-keuangan',
@@ -254,7 +269,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 <span className="xl:hidden">App HP</span>
               </button>
 
-              {/* Database Google Sheets Button (Admin Only) */}
+              {/* Database Google Sheets Button (Khusus Role Admin) */}
               {isAdmin && (
                 <button
                   id="btn-sheet-sync-nav"
@@ -393,7 +408,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                     )}
                   </button>
 
-                  {/* Database Sheets (Admin only) */}
+                  {/* Database Sheets (Khusus Admin) */}
                   {isAdmin && (
                     <button
                       type="button"
