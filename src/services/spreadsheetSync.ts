@@ -578,23 +578,26 @@ export function normalizePengecualianList(rawList: any[], sekolahList: Sekolah[]
   return rawList.map((p, idx) => {
     if (!p || typeof p !== 'object') return null;
 
-    const id = String(p.id || p.ID || `PENG-${p.tahun || p.Tahun || 2026}-${idx + 1}`).trim();
-    const tahun = Number(p.tahun || p.Tahun || 2026);
+    const rawTahun = getFlexibleValue(p, ['tahun', 'Tahun', 'Tahun Buku', 'tahunBuku', 'tahun_buku']);
+    const tahun = Number(rawTahun) || 2026;
+    const rawId = getFlexibleValue(p, ['id', 'ID', 'ID Pengecualian', 'idPengecualian', 'id_pengecualian']);
+    const id = String(rawId || `PENG-${tahun}-${idx + 1}`).trim();
     const namaSekolah = getFlexibleValue(p, ['namaSekolah', 'Nama Sekolah', 'nama_sekolah', 'sekolah', 'Sekolah']) || '';
-    if (!namaSekolah) return null;
+    if (!namaSekolah || !namaSekolah.trim()) return null;
 
-    let idSekolah = getFlexibleValue(p, ['idSekolah', 'ID Sekolah', 'id_sekolah', 'id']);
+    let idSekolah = getFlexibleValue(p, ['idSekolah', 'ID Sekolah', 'id_sekolah']);
     if (!idSekolah) {
-      const matched = sekolahList.find(s => s.namaSekolah.toLowerCase() === namaSekolah.toLowerCase());
+      const matched = sekolahList.find(s => s.namaSekolah.toLowerCase() === namaSekolah.trim().toLowerCase());
       idSekolah = matched?.idSekolah || `SKL-${idx + 1}`;
     }
 
-    let diskonPersen = Number(p.diskonPersen ?? p['Diskon (%)'] ?? p.diskon ?? p['Diskon'] ?? 0);
+    const rawDiskon = p.diskonPersen ?? p['Diskon (%)'] ?? p.diskon ?? p['Diskon'] ?? 0;
+    let diskonPersen = Number(String(rawDiskon).replace(/[^0-9.]/g, '')) || 0;
     if (isNaN(diskonPersen) || diskonPersen < 0) diskonPersen = 0;
     if (diskonPersen > 100) diskonPersen = 100;
 
     let bulanList: string[] = [];
-    const rawBulanList = p.bulanList || p['Pilihan Bulan'] || p.bulan;
+    const rawBulanList = p.bulanList || p['Pilihan Bulan'] || p.pilihanBulan || p.bulan || p.Bulan;
     if (Array.isArray(rawBulanList)) {
       bulanList = rawBulanList.map(b => String(b).trim()).filter(Boolean);
     } else if (typeof rawBulanList === 'string' && rawBulanList.trim()) {
@@ -613,9 +616,11 @@ export function normalizePengecualianList(rawList: any[], sekolahList: Sekolah[]
       ? bulanList.length 
       : Math.max(1, Number(p.jumlahBulan ?? p['Jumlah Bulan'] ?? 1));
 
-    const nominalTarifPerBulan = Number(p.nominalTarifPerBulan ?? p['Tarif Per Bulan (Rp)'] ?? 100000) || 100000;
+    const rawTarif = p.nominalTarifPerBulan ?? p['Tarif Per Bulan (Rp)'] ?? 100000;
+    const nominalTarifPerBulan = Number(String(rawTarif).replace(/[^0-9]/g, '')) || 100000;
     
-    let nominalPotongan = Number(p.nominalPotongan ?? p['Nominal Potongan (Rp)'] ?? p.potongan ?? 0);
+    const rawPotongan = p.nominalPotongan ?? p['Nominal Potongan (Rp)'] ?? p.potongan ?? 0;
+    let nominalPotongan = Number(String(rawPotongan).replace(/[^0-9]/g, '')) || 0;
     if (!nominalPotongan || nominalPotongan === 0) {
       nominalPotongan = Math.round(jumlahBulan * nominalTarifPerBulan * (diskonPersen / 100));
     }
@@ -625,7 +630,7 @@ export function normalizePengecualianList(rawList: any[], sekolahList: Sekolah[]
     const rawTgl = p.tanggalInput || p['Tanggal Input'] || p.tanggal || '';
     const tanggalInput = rawTgl ? cleanDateInputString(String(rawTgl)).split(' ')[0] : cleanDateInputString(getCurrentWIBDateString());
     const diinputOleh = String(p.diinputOleh || p['Diinput Oleh'] || p.petugas || 'Bendahara MKKS').trim();
-    const noReferensi = String(p.noReferensi || p['No. Referensi'] || p.noSK || '').trim() || undefined;
+    const noReferensi = String(p.noReferensi || p['No. Referensi'] || p['No Referensi'] || p.noSK || '').trim() || undefined;
 
     return {
       id,
@@ -912,7 +917,7 @@ export class StorageService {
     }
   }
 
-  public static addPengecualian(item: Pengecualian): Pengecualian[] {
+  public static addPengecualian(item: Pengecualian, syncToRemote = false): Pengecualian[] {
     const current = this.getPengecualian();
     const existingIndex = current.findIndex(p => p.id === item.id);
     let updated: Pengecualian[];
@@ -922,14 +927,15 @@ export class StorageService {
     } else {
       updated = [item, ...current];
     }
-    this.savePengecualian(updated, true);
+    this.savePengecualian(updated, syncToRemote);
     return updated;
   }
 
-  public static deletePengecualian(id: string): Pengecualian[] {
+  public static deletePengecualian(id: string, syncToRemote = false): Pengecualian[] {
     const current = this.getPengecualian();
-    const updated = current.filter(p => p.id !== id);
-    this.savePengecualian(updated, true);
+    const targetId = String(id).trim();
+    const updated = current.filter(p => String(p.id).trim() !== targetId);
+    this.savePengecualian(updated, syncToRemote);
     return updated;
   }
 
@@ -1309,6 +1315,28 @@ export class StorageService {
       noReferensi: item.noReferensi
     }));
 
+    // Jika daftar pengecualian kosong (setelah dihapus semua), kirim 1 baris placeholder kosong
+    // agar script Google Apps Script versi lama (yang memiliki pengecekan rows.length === 0)
+    // tetap menjalankan sheet.clear() dan menghapus baris terakhir di Google Sheet.
+    const syncPengecualian = formattedPengecualian.length > 0
+      ? formattedPengecualian
+      : [{
+          _emptyPlaceholder: true,
+          'ID Pengecualian': '',
+          'Tahun Buku': '',
+          'Nama Sekolah': '',
+          'Diskon (%)': '',
+          'Pilihan Bulan': '',
+          'Jumlah Bulan': '',
+          'Tarif Per Bulan (Rp)': '',
+          'Nominal Potongan (Rp)': '',
+          'Alasan Kebijakan': '',
+          'Keterangan': '',
+          'Tanggal Input': '',
+          'Diinput Oleh': '',
+          'No. Referensi': ''
+        }];
+
     const payload = {
       action: 'syncAll',
       spreadsheetId: this.getSpreadsheetId(),
@@ -1317,7 +1345,7 @@ export class StorageService {
       iuran: formattedIuran,
       pengeluaran: formattedPengeluaran,
       pemasukanLain: formattedPemasukanLain,
-      pengecualian: formattedPengecualian,
+      pengecualian: syncPengecualian,
       riwayatHapus: formattedRiwayatHapus,
       rekonsiliasiKas: formattedRekonsiliasiKas,
       settings: formattedSettings
@@ -1790,8 +1818,19 @@ function writeSheetData(ss, sheetName, rows) {
 
   sheet.clear();
 
+  // Saring baris placeholder kosong jika ada
+  var validRows = rows.filter(function(r) {
+    if (!r || r._emptyPlaceholder) return false;
+    var keys = Object.keys(r);
+    for (var i = 0; i < keys.length; i++) {
+      var val = r[keys[i]];
+      if (val !== '' && val !== null && val !== undefined) return true;
+    }
+    return false;
+  });
+
   // Jika data rows kosong (misal setelah dihapus seluruhnya), tulis baris header saja agar rapi
-  if (rows.length === 0) {
+  if (validRows.length === 0) {
     var hRange = sheet.getRange(1, 1, 1, headers.length);
     hRange.setValues([headers]);
     try {
@@ -1803,7 +1842,7 @@ function writeSheetData(ss, sheetName, rows) {
   }
 
   var values = [headers];
-  rows.forEach(function(r) {
+  validRows.forEach(function(r) {
     var row = [];
     headers.forEach(function(h) {
       var val = '';

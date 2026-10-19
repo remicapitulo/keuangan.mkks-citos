@@ -17,7 +17,7 @@ import { ModalHapusData, DataHapusTarget } from './components/ModalHapusData';
 import { ValidasiKuitansiModal, ValidasiData } from './components/ValidasiKuitansiModal';
 import { InstallAppTab } from './components/InstallAppTab';
 import { PWAInstallFloatingBanner } from './components/PWAInstallButton';
-import { CheckCircle2, ShieldAlert, Lock, UserCheck } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, Lock, UserCheck, MessageCircle, Mail, ExternalLink, X } from 'lucide-react';
 import { getMergedIuranReceipt } from './utils/formatters';
 
 export default function App() {
@@ -57,6 +57,7 @@ export default function App() {
 
   const [selectedSchoolForIuran, setSelectedSchoolForIuran] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isDevContactOpen, setIsDevContactOpen] = useState<boolean>(false);
 
   // Sync background fetch on load & check URL for scanned QR code verification
   useEffect(() => {
@@ -477,7 +478,7 @@ export default function App() {
         )}
 
         {/* Main Content Area */}
-        <main className="max-w-[1700px] mx-auto px-3 sm:px-6 lg:px-8 py-6 pb-20 md:pb-6">
+        <main className="max-w-[1700px] mx-auto px-3 sm:px-6 lg:px-8 pt-6 pb-4">
           {!currentUser ? (
             <div className="bg-white rounded-2xl p-10 sm:p-16 text-center border border-slate-200 shadow-sm max-w-xl mx-auto my-12 space-y-4">
               <div className="p-4 bg-teal-50 text-teal-700 rounded-2xl w-16 h-16 mx-auto flex items-center justify-center shadow-inner">
@@ -665,13 +666,13 @@ export default function App() {
         isForceLogin={!currentUser}
       />
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs sm:text-sm text-slate-500 mt-12">
-        <div className="max-w-[1700px] mx-auto px-4 space-y-2">
+      {/* Footer - Raised on mobile (pb-28) so it is never covered by the bottom navigation bar */}
+      <footer className="bg-white border-t border-slate-200 pt-5 pb-28 lg:pb-8 text-center text-xs sm:text-sm text-slate-500 mt-4 sm:mt-8">
+        <div className="max-w-[1700px] mx-auto px-4 space-y-2.5">
           <p className="font-extrabold text-slate-800 text-sm sm:text-base tracking-tight">
             Sistem Keuangan MKKS Citos
           </p>
-          <div className="flex items-center justify-center space-x-3 text-xs text-slate-500 flex-wrap gap-y-1">
+          <div className="flex items-center justify-center space-x-2.5 text-xs text-slate-500 flex-wrap gap-y-1.5">
             <span className="font-semibold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
               Versi 2.2.0
             </span>
@@ -680,8 +681,112 @@ export default function App() {
             <span>•</span>
             <span>© 2026 MKKS Citos. Hak Cipta Dilindungi Undang-Undang.</span>
           </div>
+          <div className="pt-1 text-xs text-slate-600 flex items-center justify-center gap-1">
+            <span>Dibuat oleh:</span>
+            <button
+              type="button"
+              onClick={() => setIsDevContactOpen(true)}
+              className="font-extrabold text-teal-700 hover:text-teal-800 underline decoration-teal-500/60 hover:decoration-teal-700 underline-offset-4 transition-colors cursor-pointer"
+            >
+              Abu Haripin
+            </button>
+          </div>
         </div>
       </footer>
+
+      {/* Modal Hubungi Pengembang (Abu Haripin) */}
+      {isDevContactOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setIsDevContactOpen(false)}
+        >
+          <div
+            className="bg-[#0f172a] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl text-slate-100 relative animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-extrabold text-white leading-snug">
+                  Hubungi Pengembang
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Abu Haripin · Jasa Pembuatan Aplikasi Web &amp; PWA
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDevContactOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Description */}
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-4 mb-5">
+              Tertarik memesan aplikasi web, sistem SPMB sekolah, atau sistem manajemen lainnya? Silakan pilih saluran komunikasi berikut:
+            </p>
+
+            {/* Contact Options */}
+            <div className="space-y-3">
+              {/* Option 1: WhatsApp */}
+              <a
+                href="https://wa.me/6285310999527"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/30 hover:border-emerald-400/50 transition-all group"
+              >
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0 shadow-md shadow-emerald-500/20">
+                    <MessageCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-emerald-400 group-hover:text-emerald-300">
+                      Chat via WhatsApp
+                    </div>
+                    <div className="text-xs text-slate-300 mt-0.5">
+                      0853-1099-9527
+                    </div>
+                  </div>
+                </div>
+                <ExternalLink className="w-4 h-4 text-emerald-400/80 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+              </a>
+
+              {/* Option 2: Email */}
+              <a
+                href="mailto:abuharipin@gmail.com"
+                className="flex items-center justify-between p-3.5 rounded-xl bg-sky-950/50 hover:bg-sky-900/60 border border-sky-500/30 hover:border-sky-400/50 transition-all group"
+              >
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-10 h-10 rounded-full bg-sky-500 flex items-center justify-center text-white shrink-0 shadow-md shadow-sky-500/20">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-sky-400 group-hover:text-sky-300">
+                      Kirim Email
+                    </div>
+                    <div className="text-xs text-slate-300 mt-0.5">
+                      abuharipin@gmail.com
+                    </div>
+                  </div>
+                </div>
+                <ExternalLink className="w-4 h-4 text-sky-400/80 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+              </a>
+            </div>
+
+            {/* Close Action */}
+            <button
+              type="button"
+              onClick={() => setIsDevContactOpen(false)}
+              className="mt-5 w-full py-1.5 text-xs sm:text-sm font-semibold text-slate-400 hover:text-white transition-colors text-center cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating PWA Install Banner (Android Chrome / Mobile) */}
       <PWAInstallFloatingBanner onOpenInstallModal={() => setActiveTab('install-app')} />

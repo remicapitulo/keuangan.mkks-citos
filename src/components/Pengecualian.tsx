@@ -321,7 +321,7 @@ export const MenuPengecualian: React.FC<PengecualianProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-4">
       {/* Toast Notification */}
       {successToast && (
         <div className="fixed top-20 right-6 z-50 bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center space-x-2 text-sm font-semibold animate-in slide-in-from-top duration-300">
